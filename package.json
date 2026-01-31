@@ -1,0 +1,43 @@
+{
+  "name": "begin-cli",
+  "version": "0.1.0",
+  "description": "A CLI tool for interacting with Cardano blockchain",
+  "type": "module",
+  "bin": {
+    "begin": "./dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "start": "node dist/cli.js",
+    "lint": "eslint src --ext .ts,.tsx",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "cardano",
+    "blockchain",
+    "cli",
+    "ink",
+    "wallet"
+  ],
+  "author": "ArloByte",
+  "license": "MIT",
+  "dependencies": {
+    "ink": "^5.0.1",
+    "meow": "^13.2.0",
+    "react": "^18.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "@types/react": "^18.3.12",
+    "typescript": "^5.6.3"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "files": [
+    "dist"
+  ]
+}
