@@ -2,6 +2,8 @@ import React from 'react';
 import { Box, Text } from 'ink';
 import { CardanoBalance } from './commands/cardano/balance.js';
 import { CardanoSend } from './commands/cardano/send.js';
+import { WalletAddress } from './commands/wallet/address.js';
+import type { NetworkType } from './lib/address.js';
 
 interface AppProps {
   command?: string;
@@ -9,6 +11,10 @@ interface AppProps {
   args: string[];
   flags: {
     network: string;
+    password?: string;
+    wallet?: string;
+    full?: boolean;
+    json?: boolean;
   };
   showHelp: () => void;
 }
@@ -61,6 +67,28 @@ export function App({ command, subcommand, args, flags, showHelp }: AppProps) {
       <Box flexDirection="column">
         <Text color="red">Unknown cardano command: {subcommand || '(none)'}</Text>
         <Text color="gray">Available commands: balance, send</Text>
+      </Box>
+    );
+  }
+
+  // Route to wallet commands
+  if (command === 'wallet') {
+    if (subcommand === 'address') {
+      return (
+        <WalletAddress
+          network={flags.network as NetworkType}
+          walletName={flags.wallet}
+          password={flags.password}
+          full={flags.full}
+          json={flags.json}
+        />
+      );
+    }
+
+    return (
+      <Box flexDirection="column">
+        <Text color="red">Unknown wallet command: {subcommand || '(none)'}</Text>
+        <Text color="gray">Available commands: address</Text>
       </Box>
     );
   }
