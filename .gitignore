@@ -2,6 +2,10 @@
 /target/
 Cargo.lock
 
+# Node/TypeScript
+node_modules/
+dist/
+
 # IDE
 .idea/
 .vscode/
@@ -12,7 +16,19 @@ Cargo.lock
 .DS_Store
 Thumbs.db
 
-# Secrets
+# Environment/Secrets
 .env
+.env.local
+.env.*.local
 *.key
 *.pem
+
+# Logs
+*.log
+npm-debug.log*
+
+# Coverage
+coverage/
+
+# Misc
+*.tgz
