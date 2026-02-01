@@ -2,6 +2,8 @@ import React from 'react';
 import { Box, Text } from 'ink';
 import { CardanoBalance } from './commands/cardano/balance.js';
 import { CardanoSend } from './commands/cardano/send.js';
+import { Receive } from './commands/receive.js';
+import { WalletAddress } from './commands/wallet/address.js';
 
 interface AppProps {
   command?: string;
@@ -9,6 +11,9 @@ interface AppProps {
   args: string[];
   flags: {
     network: string;
+    wallet?: string;
+    qr?: boolean;
+    json?: boolean;
   };
   showHelp: () => void;
 }
@@ -18,6 +23,59 @@ export function App({ command, subcommand, args, flags, showHelp }: AppProps) {
   if (!command) {
     showHelp();
     return null;
+  }
+
+  // Route to receive command
+  if (command === 'receive') {
+    // For receive, the address can be passed as positional arg (subcommand position) or via --wallet flag
+    const target = flags.wallet || subcommand;
+    if (!target) {
+      return (
+        <Box flexDirection="column">
+          <Text color="red">Error: Wallet name or address is required</Text>
+          <Text color="gray">Usage: begin receive {'<address>'} [--qr]</Text>
+          <Text color="gray">       begin receive --wallet {'<name>'} [--qr]</Text>
+        </Box>
+      );
+    }
+    return (
+      <Receive
+        target={target}
+        showQR={flags.qr ?? false}
+        json={flags.json ?? false}
+        network={flags.network}
+      />
+    );
+  }
+
+  // Route to wallet commands
+  if (command === 'wallet') {
+    if (subcommand === 'address') {
+      const walletName = flags.wallet || args[0];
+      if (!walletName) {
+        return (
+          <Box flexDirection="column">
+            <Text color="red">Error: Wallet name is required</Text>
+            <Text color="gray">Usage: begin wallet address --wallet {'<name>'} [--qr]</Text>
+          </Box>
+        );
+      }
+      return (
+        <WalletAddress
+          wallet={walletName}
+          showQR={flags.qr ?? false}
+          json={flags.json ?? false}
+          network={flags.network}
+        />
+      );
+    }
+
+    return (
+      <Box flexDirection="column">
+        <Text color="red">Unknown wallet command: {subcommand || '(none)'}</Text>
+        <Text color="gray">Available commands: address</Text>
+      </Box>
+    );
   }
 
   // Route to cardano commands
