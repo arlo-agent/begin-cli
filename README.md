@@ -17,7 +17,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/npm/v/begin-cli?color=blue" alt="npm version">
+  <img src="https://img.shields.io/npm/v/@beginwallet/cli?color=blue" alt="npm version">
   <img src="https://img.shields.io/badge/cardano-mainnet%20%7C%20preprod%20%7C%20preview-green" alt="networks">
   <img src="https://img.shields.io/badge/license-MIT-blue" alt="license">
 </p>
@@ -44,10 +44,10 @@ Get a working wallet in under 5 minutes:
 
 ```bash
 # Option 1: Run directly with npx (no install)
-npx @aspect58/begin-cli balance addr1qy...
+npx @beginwallet/cli balance addr1qy...
 
 # Option 2: Install globally
-npm install -g @aspect58/begin-cli
+npm install -g @beginwallet/cli
 begin balance addr1qy...
 ```
 
@@ -119,7 +119,7 @@ echo "Sent! TX: $TX_HASH"
 ### Step 1: Install
 
 ```bash
-npm install -g @aspect58/begin-cli
+npm install -g @beginwallet/cli
 ```
 
 ### Step 2: Configure

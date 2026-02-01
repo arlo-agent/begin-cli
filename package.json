@@ -1,7 +1,7 @@
 {
-  "name": "begin-cli",
+  "name": "@beginwallet/cli",
   "version": "0.1.0",
-  "description": "A CLI tool for interacting with Cardano blockchain",
+  "description": "The first Cardano CLI wallet designed for AI agents",
   "type": "module",
   "bin": {
     "begin": "./dist/cli.js"
