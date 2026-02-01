@@ -80,25 +80,16 @@ export BEGIN_CLI_MNEMONIC="word1 word2 word3 ... word24"
 export BEGIN_CLI_NETWORK=mainnet
 ```
 
-### 2. Use JSON Output Mode
+# Send ADA
+begin cardano send <to> <amount>
 
-```bash
-# All commands support --json for machine parsing
-begin balance addr1qy... --json
+# Send ADA with native tokens
+begin cardano send <to> <amount> --asset <policyId.assetName:quantity>
 
-# Output:
-{
-  "address": "addr1qy...",
-  "network": "mainnet",
-  "balance": {
-    "ada": "125.430000",
-    "lovelace": "125430000"
-  },
-  "tokens": [
-    {"name": "HOSKY", "quantity": "1000000", "unit": "a0028f..."},
-    {"name": "SNEK", "quantity": "500", "unit": "b0028f..."}
-  ]
-}
+# Offline signing workflow
+begin cardano send <to> <amount> --dry-run --output tx.unsigned
+begin sign tx.unsigned --output tx.signed
+begin submit tx.signed
 ```
 
 ### 3. Non-Interactive Operations
@@ -122,14 +113,13 @@ echo "Sent! TX: $TX_HASH"
 npm install -g @beginwallet/cli
 ```
 
-### Step 2: Configure
+Cardano Balance (mainnet)
+Address: addr1qy2...xyz
+Balance: 125.430000 ADA
 
-```bash
-# Set Blockfrost API key (get free key at blockfrost.io)
-export BLOCKFROST_API_KEY=mainnetXXXXXXXX
-
-# Verify setup
-begin --version
+Native Tokens:
+  • HOSKY: 1000000
+  • SNEK: 500
 ```
 
 ### Step 3: Create or Restore a Wallet
@@ -480,6 +470,7 @@ begin send addr1... 10 --yes
 
 For maximum security, sign transactions on an air-gapped machine:
 
+**Example:**
 ```bash
 # On online machine: build unsigned transaction
 begin send addr1... 10 --build-only --out unsigned.tx
@@ -501,7 +492,7 @@ begin submit --tx signed.tx
 
 ---
 
-## Development
+For enhanced security, you can build transactions on an online machine and sign them on an air-gapped offline machine:
 
 ```bash
 # Clone
@@ -511,8 +502,7 @@ cd begin-cli
 # Install dependencies
 npm install
 
-# Build
-npm run build
+# 2. Transfer tx.unsigned to OFFLINE machine (USB drive, QR code, etc.)
 
 # Run locally
 node dist/cli.js balance addr1...
@@ -520,8 +510,7 @@ node dist/cli.js balance addr1...
 # Watch mode
 npm run dev
 
-# Type check
-npm run typecheck
+# 4. Transfer tx.signed back to ONLINE machine
 
 # Link for global testing
 npm link
@@ -535,10 +524,14 @@ begin-cli/
 │   ├── cli.tsx              # Entry point, argument parsing
 │   ├── app.tsx              # Main app component, routing
 │   ├── index.ts             # Library exports
+│   ├── lib/
+│   │   └── transaction.ts   # Transaction building utilities
 │   ├── commands/
-│   │   └── cardano/
-│   │       ├── balance.tsx  # Balance check
-│   │       └── send.tsx     # Send transactions
+│   │   ├── cardano/
+│   │   │   ├── balance.tsx  # Balance check component
+│   │   │   └── send.tsx     # Send transaction component
+│   │   ├── sign.tsx         # Sign transaction component
+│   │   └── submit.tsx       # Submit transaction component
 │   └── services/
 │       └── blockfrost.ts    # Blockfrost API client
 ├── docs/
