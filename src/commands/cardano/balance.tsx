@@ -1,13 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { Box, Text } from 'ink';
+import { Box, Text, useApp } from 'ink';
 import { fetchBalance, type BalanceResult } from '../../services/blockfrost.js';
+import { outputSuccess, outputError, formatAda, formatAddress } from '../../lib/output.js';
+import { NetworkError, ErrorCode } from '../../lib/errors.js';
 
 interface CardanoBalanceProps {
   address: string;
   network: string;
+  json?: boolean;
 }
 
-export function CardanoBalance({ address, network }: CardanoBalanceProps) {
+export function CardanoBalance({ address, network, json = false }: CardanoBalanceProps) {
+  const { exit } = useApp();
   const [loading, setLoading] = useState(true);
   const [result, setResult] = useState<BalanceResult | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -16,16 +20,42 @@ export function CardanoBalance({ address, network }: CardanoBalanceProps) {
     const checkBalance = async () => {
       try {
         const balance = await fetchBalance(address, network);
+        
+        if (json) {
+          outputSuccess({
+            address,
+            network,
+            lovelace: balance.lovelace.toString(),
+            ada: Number(balance.lovelace) / 1_000_000,
+            tokens: balance.tokens.map(t => ({
+              unit: t.unit,
+              name: t.name,
+              quantity: t.quantity,
+            })),
+          }, { json: true });
+        }
+        
         setResult(balance);
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Unknown error');
+        const message = err instanceof Error ? err.message : 'Unknown error';
+        
+        if (json) {
+          outputError(new NetworkError(message, ErrorCode.PROVIDER_ERROR), { json: true });
+        }
+        
+        setError(message);
       } finally {
         setLoading(false);
       }
     };
 
     checkBalance();
-  }, [address, network]);
+  }, [address, network, json]);
+
+  // JSON mode exits early via outputSuccess/outputError
+  if (json) {
+    return loading ? null : null;
+  }
 
   if (loading) {
     return (
@@ -47,8 +77,6 @@ export function CardanoBalance({ address, network }: CardanoBalanceProps) {
     return <Text color="red">No result</Text>;
   }
 
-  const adaBalance = (Number(result.lovelace) / 1_000_000).toFixed(6);
-
   return (
     <Box flexDirection="column" padding={1}>
       <Box marginBottom={1}>
@@ -58,12 +86,12 @@ export function CardanoBalance({ address, network }: CardanoBalanceProps) {
       
       <Box>
         <Text color="gray">Address: </Text>
-        <Text>{address.slice(0, 20)}...{address.slice(-10)}</Text>
+        <Text>{formatAddress(address)}</Text>
       </Box>
       
       <Box marginTop={1}>
         <Text color="gray">Balance: </Text>
-        <Text bold color="green">{adaBalance} ADA</Text>
+        <Text bold color="green">{formatAda(result.lovelace)}</Text>
       </Box>
 
       {result.tokens.length > 0 && (

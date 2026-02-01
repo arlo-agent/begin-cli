@@ -3,18 +3,21 @@ import { Box, Text } from 'ink';
 import { CardanoBalance } from './commands/cardano/balance.js';
 import { CardanoSend } from './commands/cardano/send.js';
 
+export interface AppFlags {
+  network: string;
+  json: boolean;
+}
+
 interface AppProps {
   command?: string;
   subcommand?: string;
   args: string[];
-  flags: {
-    network: string;
-  };
+  flags: AppFlags;
   showHelp: () => void;
 }
 
 export function App({ command, subcommand, args, flags, showHelp }: AppProps) {
-  // No command provided
+  // No command provided (non-JSON mode only - JSON handled in cli.tsx)
   if (!command) {
     showHelp();
     return null;
@@ -32,7 +35,7 @@ export function App({ command, subcommand, args, flags, showHelp }: AppProps) {
           </Box>
         );
       }
-      return <CardanoBalance address={address} network={flags.network} />;
+      return <CardanoBalance address={address} network={flags.network} json={flags.json} />;
     }
 
     if (subcommand === 'send') {
@@ -54,7 +57,7 @@ export function App({ command, subcommand, args, flags, showHelp }: AppProps) {
           </Box>
         );
       }
-      return <CardanoSend to={to} amount={amount} network={flags.network} />;
+      return <CardanoSend to={to} amount={amount} network={flags.network} json={flags.json} />;
     }
 
     return (

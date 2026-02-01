@@ -1,18 +1,41 @@
-import React, { useState } from 'react';
-import { Box, Text, useInput } from 'ink';
+import React, { useState, useEffect } from 'react';
+import { Box, Text, useInput, useApp } from 'ink';
+import { outputSuccess, outputError } from '../../lib/output.js';
+import { UserError, ErrorCode } from '../../lib/errors.js';
 
 interface CardanoSendProps {
   to: string;
   amount: number;
   network: string;
+  json?: boolean;
 }
 
 type SendState = 'confirm' | 'sending' | 'success' | 'cancelled';
 
-export function CardanoSend({ to, amount, network }: CardanoSendProps) {
-  const [state, setState] = useState<SendState>('confirm');
+export function CardanoSend({ to, amount, network, json = false }: CardanoSendProps) {
+  const { exit } = useApp();
+  const [state, setState] = useState<SendState>(json ? 'sending' : 'confirm');
+
+  // In JSON mode, auto-proceed (skip interactive confirmation)
+  useEffect(() => {
+    if (json && state === 'sending') {
+      // Simulate sending (mock for now)
+      setTimeout(() => {
+        const mockTxHash = `mock_tx_${Date.now().toString(16)}`;
+        outputSuccess({
+          txHash: mockTxHash,
+          to,
+          amount,
+          network,
+          status: 'submitted',
+          note: 'This is a mock transaction',
+        }, { json: true });
+      }, 100);
+    }
+  }, [json, state, to, amount, network]);
 
   useInput((input, key) => {
+    if (json) return; // Skip input handling in JSON mode
     if (state !== 'confirm') return;
 
     if (input === 'y' || input === 'Y') {
@@ -21,13 +44,18 @@ export function CardanoSend({ to, amount, network }: CardanoSendProps) {
       setTimeout(() => {
         setState('success');
         // Exit after showing success
-        setTimeout(() => process.exit(0), 1500);
+        setTimeout(() => exit(), 1500);
       }, 2000);
     } else if (input === 'n' || input === 'N' || key.escape) {
       setState('cancelled');
-      setTimeout(() => process.exit(0), 500);
+      setTimeout(() => exit(), 500);
     }
   });
+
+  // JSON mode returns nothing (exits via outputSuccess)
+  if (json) {
+    return null;
+  }
 
   if (state === 'cancelled') {
     return (
