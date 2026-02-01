@@ -15,6 +15,8 @@ const cli = meow(
     sign <tx-file>                  Sign an unsigned transaction
     submit <signed-tx-file>         Submit a signed transaction
 
+    wallet address               Show wallet addresses (payment, enterprise, stake)
+
   Options
     --network, -n     Network to use (mainnet, preprod, preview) [default: mainnet]
     --wallet, -w      Wallet name from keystore (uses default if not specified)
