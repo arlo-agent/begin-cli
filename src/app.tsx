@@ -12,6 +12,7 @@ interface AppProps {
   flags: {
     network: string;
     wallet?: string;
+    password?: string;
     dryRun: boolean;
     output?: string;
     json: boolean;
@@ -35,14 +36,15 @@ export function App({ command, subcommand, args, flags, showHelp }: AppProps) {
       return (
         <Box flexDirection="column">
           <Text color="red">Error: Transaction file is required</Text>
-          <Text color="gray">Usage: begin sign {'<tx-file>'} [--wallet {'<path>'}]</Text>
+          <Text color="gray">Usage: begin sign {'<tx-file>'} [--wallet {'<name>'}] [--password {'<pass>'}]</Text>
         </Box>
       );
     }
     return (
       <Sign
         txFile={txFile}
-        walletPath={flags.wallet}
+        walletName={flags.wallet}
+        password={flags.password}
         network={flags.network}
         outputFile={flags.output}
         jsonOutput={flags.json}
@@ -114,7 +116,8 @@ export function App({ command, subcommand, args, flags, showHelp }: AppProps) {
           to={to}
           amount={amount}
           network={flags.network}
-          walletPath={flags.wallet}
+          walletName={flags.wallet}
+          password={flags.password}
           assets={flags.asset}
           dryRun={flags.dryRun}
           outputFile={flags.output}

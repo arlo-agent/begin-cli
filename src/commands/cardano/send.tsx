@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Box, Text, useInput, useApp } from 'ink';
+import TextInput from 'ink-text-input';
 import {
   loadWallet,
   buildSendAdaTx,
@@ -8,10 +9,10 @@ import {
   submitTransaction,
   waitForConfirmation,
   adaToLovelace,
-  lovelaceToAda,
   saveTxToFile,
   parseAssets,
   getWalletAddress,
+  checkWalletAvailability,
   type TransactionConfig,
 } from '../../lib/transaction.js';
 
@@ -19,7 +20,8 @@ interface CardanoSendProps {
   to: string;
   amount: number;
   network: string;
-  walletPath?: string;
+  walletName?: string;
+  password?: string;
   assets?: string[];
   dryRun?: boolean;
   outputFile?: string;
@@ -27,6 +29,8 @@ interface CardanoSendProps {
 }
 
 type SendState = 
+  | 'checking'
+  | 'password'
   | 'loading'
   | 'confirm'
   | 'building'
@@ -48,48 +52,95 @@ interface TxInfo {
   txHash?: string;
 }
 
+interface WalletInfo {
+  source: 'env' | 'wallet';
+  walletName?: string;
+  needsPassword: boolean;
+}
+
 export function CardanoSend({
   to,
   amount,
   network,
-  walletPath,
+  walletName,
+  password: initialPassword,
   assets = [],
   dryRun = false,
   outputFile,
   jsonOutput = false,
 }: CardanoSendProps) {
   const { exit } = useApp();
-  const [state, setState] = useState<SendState>('loading');
+  const [state, setState] = useState<SendState>('checking');
   const [txInfo, setTxInfo] = useState<TxInfo | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [confirmationAttempts, setConfirmationAttempts] = useState(0);
+  const [password, setPassword] = useState(initialPassword || '');
+  const [walletInfo, setWalletInfo] = useState<WalletInfo | null>(null);
 
   const config: TransactionConfig = { network };
 
-  // Initialize and load wallet
+  // Check wallet availability on mount
   useEffect(() => {
-    const init = async () => {
-      try {
-        const wallet = await loadWallet(walletPath || '~/.begin/wallet.key', config);
-        const fromAddress = await getWalletAddress(wallet);
-        
-        setTxInfo({
-          fromAddress,
-          toAddress: to,
-          amountAda: amount,
-          assets,
-          estimatedFee: '~0.17', // Rough estimate before building
-        });
-        
-        setState('confirm');
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to load wallet');
-        setState('error');
-      }
-    };
+    const availability = checkWalletAvailability(walletName);
+    
+    if (!availability.available) {
+      setError(availability.error || 'No wallet available');
+      setState('error');
+      setTimeout(() => exit(), 2000);
+      return;
+    }
 
-    init();
+    setWalletInfo({
+      source: availability.source!,
+      walletName: availability.walletName,
+      needsPassword: availability.needsPassword,
+    });
+
+    // If using env var or password already provided, proceed to loading
+    if (!availability.needsPassword || initialPassword) {
+      initWallet(initialPassword, availability.walletName);
+    } else {
+      setState('password');
+    }
   }, []);
+
+  // Handle password submission
+  const handlePasswordSubmit = () => {
+    if (password.trim()) {
+      initWallet(password, walletInfo?.walletName);
+    }
+  };
+
+  // Initialize wallet and get address
+  const initWallet = async (pwd?: string, wName?: string) => {
+    try {
+      setState('loading');
+      
+      const wallet = await loadWallet(
+        { walletName: wName, password: pwd },
+        config
+      );
+      const fromAddress = await getWalletAddress(wallet);
+      
+      setTxInfo({
+        fromAddress,
+        toAddress: to,
+        amountAda: amount,
+        assets,
+        estimatedFee: '~0.17', // Rough estimate before building
+      });
+      
+      setState('confirm');
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to load wallet';
+      if (message.includes('Incorrect password')) {
+        setError('Incorrect password. Please try again.');
+      } else {
+        setError(message);
+      }
+      setState('error');
+      setTimeout(() => exit(), 2000);
+    }
+  };
 
   // Handle keyboard input for confirmation
   useInput((input, key) => {
@@ -108,7 +159,10 @@ export function CardanoSend({
     try {
       setState('building');
       
-      const wallet = await loadWallet(walletPath || '~/.begin/wallet.key', config);
+      const wallet = await loadWallet(
+        { walletName: walletInfo?.walletName, password: password || initialPassword },
+        config
+      );
       
       // Build transaction
       let result;
@@ -181,11 +235,47 @@ export function CardanoSend({
     }
   };
 
+  // Render checking state
+  if (state === 'checking') {
+    return (
+      <Box padding={1}>
+        <Text color="cyan">⏳ Checking wallet availability...</Text>
+      </Box>
+    );
+  }
+
+  // Render password prompt
+  if (state === 'password') {
+    return (
+      <Box flexDirection="column" padding={1}>
+        <Box marginBottom={1}>
+          <Text color="cyan">🔐 Enter password for wallet </Text>
+          <Text bold color="yellow">{walletInfo?.walletName}</Text>
+        </Box>
+        <Box>
+          <Text color="gray">Password: </Text>
+          <TextInput
+            value={password}
+            onChange={setPassword}
+            onSubmit={handlePasswordSubmit}
+            mask="*"
+          />
+        </Box>
+      </Box>
+    );
+  }
+
   // Render loading state
   if (state === 'loading') {
     return (
-      <Box padding={1}>
+      <Box flexDirection="column" padding={1}>
         <Text color="cyan">⏳ Loading wallet...</Text>
+        {walletInfo?.source === 'wallet' && (
+          <Text color="gray">Decrypting {walletInfo.walletName}...</Text>
+        )}
+        {walletInfo?.source === 'env' && (
+          <Text color="gray">Using environment variable</Text>
+        )}
       </Box>
     );
   }
@@ -270,7 +360,7 @@ export function CardanoSend({
           </Box>
           <Box marginTop={1}>
             <Text color="gray">
-              Sign with: begin sign {'<tx-file>'} --wallet {'<wallet-path>'}
+              Sign with: begin sign {'<tx-file>'} --wallet {'<wallet-name>'}
             </Text>
           </Box>
         </Box>
@@ -301,6 +391,9 @@ export function CardanoSend({
         <Text bold color="cyan">Send ADA</Text>
         <Text color="gray"> ({network})</Text>
         {dryRun && <Text color="yellow"> [DRY RUN]</Text>}
+        {walletInfo?.source === 'wallet' && (
+          <Text color="gray"> [{walletInfo.walletName}]</Text>
+        )}
       </Box>
 
       <Box flexDirection="column" borderStyle="round" borderColor="gray" padding={1}>

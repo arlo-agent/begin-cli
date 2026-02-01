@@ -18,6 +18,13 @@ import {
 } from '@meshsdk/core';
 import * as fs from 'fs';
 import * as path from 'path';
+import {
+  getMnemonic,
+  walletExists,
+  getDefaultWallet,
+  hasEnvMnemonic,
+  listWallets,
+} from './keystore.js';
 
 // Network configuration
 const BLOCKFROST_URLS: Record<string, string> = {
@@ -72,18 +79,36 @@ export function createProvider(config: TransactionConfig): BlockfrostProvider {
 }
 
 /**
- * Loads a wallet from mnemonic stored in a file
- * File format: 24-word mnemonic, one line or space-separated
+ * Options for loading a wallet
+ */
+export interface WalletOptions {
+  /** Name of wallet in encrypted keystore */
+  walletName?: string;
+  /** Password for decrypting wallet (required for file-based wallets) */
+  password?: string;
+}
+
+/**
+ * Loads a wallet from the encrypted keystore or environment variable
+ * 
+ * Priority:
+ * 1. Specific wallet name if provided (requires password)
+ * 2. BEGIN_CLI_MNEMONIC environment variable (for CI/agents)
+ * 3. Default wallet from config (requires password)
+ * 
+ * @param options - Wallet loading options
+ * @param config - Network configuration
+ * @returns MeshWallet instance
  */
 export async function loadWallet(
-  walletPath: string,
+  options: WalletOptions,
   config: TransactionConfig
 ): Promise<MeshWallet> {
   const provider = createProvider(config);
   
-  // Read mnemonic from file
-  const mnemonicRaw = fs.readFileSync(walletPath, 'utf-8').trim();
-  const mnemonic = mnemonicRaw.split(/\s+/);
+  // Get mnemonic from keystore
+  const mnemonicStr = getMnemonic(options.password, options.walletName);
+  const mnemonic = mnemonicStr.split(/\s+/);
   
   if (mnemonic.length !== 24) {
     throw new Error('Invalid mnemonic: expected 24 words');
@@ -100,6 +125,80 @@ export async function loadWallet(
   });
 
   return wallet;
+}
+
+/**
+ * Check if a wallet source is available
+ * Returns info about what's available for error messaging
+ */
+export function checkWalletAvailability(walletName?: string): {
+  available: boolean;
+  source?: 'env' | 'wallet';
+  walletName?: string;
+  needsPassword: boolean;
+  error?: string;
+} {
+  // If specific wallet requested, check it exists
+  if (walletName) {
+    if (walletExists(walletName)) {
+      return {
+        available: true,
+        source: 'wallet',
+        walletName,
+        needsPassword: true,
+      };
+    }
+    return {
+      available: false,
+      needsPassword: false,
+      error: `Wallet "${walletName}" not found. Run 'begin wallet list' to see available wallets.`,
+    };
+  }
+
+  // Check environment variable
+  if (hasEnvMnemonic()) {
+    return {
+      available: true,
+      source: 'env',
+      needsPassword: false,
+    };
+  }
+
+  // Check default wallet
+  const defaultWallet = getDefaultWallet();
+  if (defaultWallet && walletExists(defaultWallet)) {
+    return {
+      available: true,
+      source: 'wallet',
+      walletName: defaultWallet,
+      needsPassword: true,
+    };
+  }
+
+  // Check for single wallet
+  const wallets = listWallets();
+  if (wallets.length === 1) {
+    return {
+      available: true,
+      source: 'wallet',
+      walletName: wallets[0],
+      needsPassword: true,
+    };
+  }
+
+  if (wallets.length > 1) {
+    return {
+      available: false,
+      needsPassword: false,
+      error: `Multiple wallets found. Specify one with --wallet or set a default with 'begin wallet default <name>'.`,
+    };
+  }
+
+  return {
+    available: false,
+    needsPassword: false,
+    error: `No wallet available. Set BEGIN_CLI_MNEMONIC environment variable or create a wallet with 'begin wallet create'.`,
+  };
 }
 
 /**

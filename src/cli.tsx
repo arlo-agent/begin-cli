@@ -17,7 +17,8 @@ const cli = meow(
 
   Options
     --network, -n     Network to use (mainnet, preprod, preview) [default: mainnet]
-    --wallet, -w      Path to wallet file [default: ~/.begin/wallet.key]
+    --wallet, -w      Wallet name from keystore (uses default if not specified)
+    --password, -p    Password for wallet decryption (or set interactively)
     --dry-run, -d     Build transaction but don't submit (save unsigned tx)
     --output, -o      Output file path for unsigned/signed transaction
     --json, -j        Output result as JSON
@@ -27,14 +28,17 @@ const cli = meow(
     --help            Show this help message
     --version         Show version
 
+  Environment
+    BEGIN_CLI_MNEMONIC    Mnemonic for CI/agent use (bypasses keystore)
+
   Examples
     # Check balance
     $ begin cardano balance addr1qy...
     $ begin cardano balance addr1qy... --network preprod
 
-    # Send ADA
+    # Send ADA (uses default wallet, prompts for password)
     $ begin cardano send addr1qy... 10
-    $ begin cardano send addr1qy... 10 --dry-run --output my-tx.unsigned
+    $ begin cardano send addr1qy... 10 --wallet my-wallet --password mypass
     $ begin cardano send addr1qy... 10 --json
 
     # Send ADA with native tokens
@@ -42,15 +46,18 @@ const cli = meow(
 
     # Offline signing workflow
     $ begin cardano send addr1qy... 10 --dry-run --output tx.unsigned
-    $ begin sign tx.unsigned --output tx.signed
+    $ begin sign tx.unsigned --wallet my-wallet
     $ begin submit tx.signed
 
-    # Sign transaction
-    $ begin sign tx.unsigned --wallet ~/.begin/wallet.key
+    # Sign transaction (with specific wallet)
+    $ begin sign tx.unsigned --wallet my-wallet --password mypass
 
     # Submit transaction
     $ begin submit tx.signed --network preprod
     $ begin submit tx.signed --no-wait --json
+
+    # CI/Agent use (via environment variable)
+    $ BEGIN_CLI_MNEMONIC="word1 word2 ..." begin cardano send addr1... 10
 `,
   {
     importMeta: import.meta,
@@ -63,6 +70,10 @@ const cli = meow(
       wallet: {
         type: 'string',
         shortFlag: 'w',
+      },
+      password: {
+        type: 'string',
+        shortFlag: 'p',
       },
       dryRun: {
         type: 'boolean',
