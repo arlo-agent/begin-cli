@@ -2,6 +2,10 @@ import React from 'react';
 import { Box, Text } from 'ink';
 import { CardanoBalance } from './commands/cardano/balance.js';
 import { CardanoSend } from './commands/cardano/send.js';
+import { StakePools } from './commands/stake/pools.js';
+import { StakeDelegate } from './commands/stake/delegate.js';
+import { StakeStatus } from './commands/stake/status.js';
+import { StakeWithdraw } from './commands/stake/withdraw.js';
 import { Sign } from './commands/sign.js';
 import { Submit } from './commands/submit.js';
 import { WalletAddress } from './commands/wallet/address.js';
@@ -136,6 +140,42 @@ export function App({ command, subcommand, args, flags, showHelp }: AppProps) {
     );
   }
 
+  // Route to stake commands
+  if (command === 'stake') {
+    if (subcommand === 'pools') {
+      const search = args[0]; // Optional search term
+      return <StakePools search={search} network={flags.network} json={flags.json} />;
+    }
+
+    if (subcommand === 'delegate') {
+      const poolId = args[0];
+      if (!poolId) {
+        return (
+          <Box flexDirection="column">
+            <Text color="red">Error: Pool ID is required</Text>
+            <Text color="gray">Usage: begin stake delegate {'<pool-id>'}</Text>
+            <Text color="gray">Use `begin stake pools` to find pools</Text>
+          </Box>
+        );
+      }
+      return <StakeDelegate poolId={poolId} network={flags.network} json={flags.json} />;
+    }
+
+    if (subcommand === 'status') {
+      return <StakeStatus network={flags.network} json={flags.json} />;
+    }
+
+    if (subcommand === 'withdraw') {
+      return <StakeWithdraw network={flags.network} json={flags.json} />;
+    }
+    
+    return (
+      <Box flexDirection="column">
+        <Text color="red">Unknown stake command: {subcommand || '(none)'}</Text>
+        <Text color="gray">Available commands: pools, delegate, status, withdraw</Text>
+      </Box>
+    );
+  }
   // Route to wallet commands
   if (command === 'wallet') {
     if (subcommand === 'address') {

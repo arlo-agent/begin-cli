@@ -17,6 +17,11 @@ const cli = meow(
 
     wallet address               Show wallet addresses (payment, enterprise, stake)
 
+    stake pools [search]         List/search stake pools
+    stake delegate <pool-id>     Delegate stake to a pool
+    stake status                 Check delegation status and rewards
+    stake withdraw               Withdraw staking rewards
+
   Options
     --network, -n     Network to use (mainnet, preprod, preview) [default: mainnet]
     --wallet, -w      Wallet name from keystore (uses default if not specified)
@@ -38,6 +43,11 @@ const cli = meow(
     $ begin cardano balance addr1qy...
     $ begin cardano balance addr1qy... --network preprod
 
+    $ begin stake pools SNEK
+    $ begin stake delegate pool1z5uqdk7dzdxaae5633fqfcu2eqzy3a3rgtuvy087fdld7yws0xt
+    $ begin stake status --json
+    $ begin stake withdraw
+    
     # Send ADA (uses default wallet, prompts for password)
     $ begin cardano send addr1qy... 10
     $ begin cardano send addr1qy... 10 --wallet my-wallet --password mypass
