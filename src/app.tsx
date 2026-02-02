@@ -9,6 +9,8 @@ import { StakeWithdraw } from './commands/stake/withdraw.js';
 import { Sign } from './commands/sign.js';
 import { Submit } from './commands/submit.js';
 import { WalletAddress } from './commands/wallet/address.js';
+import { Swap } from './commands/swap/index.js';
+import { SwapQuote } from './commands/swap/quote.js';
 import type { NetworkType } from './lib/address.js';
 
 interface AppProps {
@@ -24,6 +26,14 @@ interface AppProps {
     json: boolean;
     wait: boolean;
     asset?: string[];
+    full?: boolean;
+    // Swap-specific flags
+    from?: string;
+    to?: string;
+    amount?: string;
+    slippage: number;
+    multiHop: boolean;
+    yes: boolean;
   };
   showHelp: () => void;
 }
@@ -195,6 +205,68 @@ export function App({ command, subcommand, args, flags, showHelp }: AppProps) {
         <Text color="red">Unknown wallet command: {subcommand || '(none)'}</Text>
         <Text color="gray">Available commands: address</Text>
       </Box>
+    );
+  }
+
+  // Route to swap commands
+  if (command === 'swap') {
+    // Swap quote subcommand: begin swap quote --from ADA --to MIN --amount 100
+    if (subcommand === 'quote') {
+      if (!flags.from || !flags.to || !flags.amount) {
+        return (
+          <Box flexDirection="column">
+            <Text color="red">Error: --from, --to, and --amount are required</Text>
+            <Text color="gray">Usage: begin swap quote --from {'<token>'} --to {'<token>'} --amount {'<amount>'}</Text>
+            <Text color="gray">Options:</Text>
+            <Text color="gray">  --slippage, -s   Slippage tolerance % (default: 0.5)</Text>
+            <Text color="gray">  --multi-hop      Allow multi-hop routing (default: true)</Text>
+            <Text color="gray">  --json, -j       Output as JSON</Text>
+          </Box>
+        );
+      }
+      return (
+        <SwapQuote
+          from={flags.from}
+          to={flags.to}
+          amount={flags.amount}
+          slippage={flags.slippage}
+          multiHop={flags.multiHop}
+          network={flags.network}
+          json={flags.json}
+        />
+      );
+    }
+
+    // Main swap command: begin swap --from ADA --to MIN --amount 100
+    if (!flags.from || !flags.to || !flags.amount) {
+      return (
+        <Box flexDirection="column">
+          <Text color="red">Error: --from, --to, and --amount are required</Text>
+          <Text color="gray">Usage: begin swap --from {'<token>'} --to {'<token>'} --amount {'<amount>'}</Text>
+          <Text color="gray">Options:</Text>
+          <Text color="gray">  --slippage, -s   Slippage tolerance % (default: 0.5)</Text>
+          <Text color="gray">  --multi-hop      Allow multi-hop routing (default: true)</Text>
+          <Text color="gray">  --yes, -y        Skip confirmation prompt</Text>
+          <Text color="gray">  --json, -j       Output as JSON</Text>
+          <Text color="gray">Subcommands:</Text>
+          <Text color="gray">  quote            Get a swap quote without executing</Text>
+        </Box>
+      );
+    }
+
+    return (
+      <Swap
+        from={flags.from}
+        to={flags.to}
+        amount={flags.amount}
+        slippage={flags.slippage}
+        multiHop={flags.multiHop}
+        yes={flags.yes}
+        network={flags.network}
+        walletName={flags.wallet}
+        password={flags.password}
+        json={flags.json}
+      />
     );
   }
 

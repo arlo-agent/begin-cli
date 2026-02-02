@@ -22,6 +22,9 @@ const cli = meow(
     stake status                 Check delegation status and rewards
     stake withdraw               Withdraw staking rewards
 
+    swap [options]               Swap tokens via Minswap aggregator
+    swap quote [options]         Get a swap quote without executing
+
   Options
     --network, -n     Network to use (mainnet, preprod, preview) [default: mainnet]
     --wallet, -w      Wallet name from keystore (uses default if not specified)
@@ -34,6 +37,14 @@ const cli = meow(
                       Can be specified multiple times
     --help            Show this help message
     --version         Show version
+
+  Swap Options
+    --from            Token to swap from (ADA, MIN, policyId.assetName, etc.)
+    --to              Token to swap to
+    --amount          Amount of input token to swap
+    --slippage, -s    Slippage tolerance in % [default: 0.5]
+    --multi-hop       Allow multi-hop routing [default: true]
+    --yes, -y         Skip confirmation prompt
 
   Environment
     BEGIN_CLI_MNEMONIC    Mnemonic for CI/agent use (bypasses keystore)
@@ -55,6 +66,11 @@ const cli = meow(
 
     # Send ADA with native tokens
     $ begin cardano send addr1qy... 2 --asset abc123...def.HOSKY:1000
+
+    # Swap tokens
+    $ begin swap quote --from ADA --to MIN --amount 100
+    $ begin swap --from ADA --to MIN --amount 100 --slippage 0.5
+    $ begin swap --from ADA --to MIN --amount 100 --yes --json
 
     # Offline signing workflow
     $ begin cardano send addr1qy... 10 --dry-run --output tx.unsigned
@@ -109,6 +125,34 @@ const cli = meow(
         type: 'string',
         shortFlag: 'a',
         isMultiple: true,
+      },
+      full: {
+        type: 'boolean',
+        default: false,
+      },
+      // Swap-specific flags
+      from: {
+        type: 'string',
+      },
+      to: {
+        type: 'string',
+      },
+      amount: {
+        type: 'string',
+      },
+      slippage: {
+        type: 'number',
+        shortFlag: 's',
+        default: 0.5,
+      },
+      multiHop: {
+        type: 'boolean',
+        default: true,
+      },
+      yes: {
+        type: 'boolean',
+        shortFlag: 'y',
+        default: false,
       },
     },
   }
