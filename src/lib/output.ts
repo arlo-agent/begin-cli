@@ -1,4 +1,12 @@
-import { BeginError } from './errors.js';
+/**
+ * Output helpers for JSON vs pretty print modes.
+ */
+
+import { BeginError, toBeginError, ExitCode } from './errors.js';
+
+export interface OutputContext {
+  json: boolean;
+}
 
 export interface JsonSuccess<T = unknown> {
   success: true;
@@ -9,69 +17,114 @@ export interface JsonError {
   success: false;
   error: string;
   code: string;
+  details?: Record<string, unknown>;
 }
 
 export type JsonOutput<T = unknown> = JsonSuccess<T> | JsonError;
 
-/**
- * Output context for commands
- */
-export interface OutputContext {
-  json: boolean;
+// Global output context (set by CLI)
+let globalContext: OutputContext = { json: false };
+
+export function setOutputContext(ctx: OutputContext): void {
+  globalContext = ctx;
+}
+
+export function getOutputContext(): OutputContext {
+  return globalContext;
+}
+
+export function isJsonMode(): boolean {
+  return globalContext.json;
 }
 
 /**
- * Print JSON success output and exit
+ * Output success data
+ * - In JSON mode: prints {"success": true, "data": {...}}
+ * - In pretty mode: does nothing (Ink handles display)
  */
-export function outputSuccess<T>(data: T, ctx: OutputContext): void {
-  if (ctx.json) {
-    const output: JsonSuccess<T> = { success: true, data };
-    console.log(JSON.stringify(output, null, 2));
-    process.exit(0);
-  }
+export function outputSuccess<T>(data: T): void {
+  if (!globalContext.json) return;
+  const output: JsonSuccess<T> = { success: true, data };
+  console.log(JSON.stringify(output, null, 2));
 }
 
 /**
- * Print JSON error output and exit
+ * Output error
+ * - In JSON mode: prints {"success": false, "error": "...", "code": "..."}
+ * - In pretty mode: prints to stderr
  */
-export function outputError(error: Error | BeginError, ctx: OutputContext): never {
-  const exitCode = error instanceof BeginError ? error.exitCode : 1;
-  const code = error instanceof BeginError ? error.code : 'UNKNOWN_ERROR';
-
-  if (ctx.json) {
-    const output: JsonError = {
-      success: false,
-      error: error.message,
-      code,
-    };
-    console.log(JSON.stringify(output, null, 2));
+export function outputError(err: unknown): void {
+  const beginErr = toBeginError(err);
+  if (globalContext.json) {
+    console.log(JSON.stringify(beginErr.toJSON(), null, 2));
   } else {
-    console.error(`Error: ${error.message}`);
+    console.error(`Error: ${beginErr.message}`);
   }
-
-  process.exit(exitCode);
 }
 
 /**
- * Format ADA amount with symbol
+ * Exit with proper code based on error.
+ */
+export function exitWithError(err: unknown): never {
+  const beginErr = toBeginError(err);
+  outputError(beginErr);
+  process.exit(beginErr.exitCode);
+}
+
+/**
+ * Exit with success.
+ */
+export function exitSuccess<T>(data?: T): never {
+  if (data !== undefined) outputSuccess(data);
+  process.exit(ExitCode.SUCCESS);
+}
+
+/**
+ * Format ADA amount from lovelace (safe BigInt math).
  */
 export function formatAda(lovelace: bigint | number | string): string {
-  const ada = Number(lovelace) / 1_000_000;
-  return `₳${ada.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 6 })}`;
+  const amount = typeof lovelace === 'bigint' ? lovelace : BigInt(lovelace);
+  const whole = amount / 1_000_000n;
+  const frac = amount % 1_000_000n;
+  return `${whole.toString()}.${frac.toString().padStart(6, '0')}`;
 }
 
 /**
- * Format address for display (truncated)
+ * Truncate address for display.
+ */
+export function truncateAddress(address: string, startLen = 20, endLen = 10): string {
+  if (address.length <= startLen + endLen + 3) return address;
+  return `${address.slice(0, startLen)}...${address.slice(-endLen)}`;
+}
+
+/**
+ * Back-compat alias (older code used formatAddress()).
  */
 export function formatAddress(address: string, length = 16): string {
-  if (address.length <= length * 2) return address;
-  return `${address.slice(0, length)}...${address.slice(-length)}`;
+  return truncateAddress(address, length, length);
 }
 
 /**
- * Create a table-like output for terminal
+ * Format timestamp (Date or unix seconds) as ISO.
  */
-export function formatTable(rows: [string, string][]): string {
-  const maxKeyLen = Math.max(...rows.map(([k]) => k.length));
-  return rows.map(([k, v]) => `${k.padEnd(maxKeyLen)}  ${v}`).join('\n');
+export function formatTimestamp(date: Date | number): string {
+  const d = typeof date === 'number' ? new Date(date * 1000) : date;
+  return d.toISOString();
+}
+
+/**
+ * Result object for Ink commands that want to return structured data.
+ */
+export interface CommandResult<T = unknown> {
+  success: boolean;
+  data?: T;
+  error?: BeginError;
+}
+
+export function successResult<T>(data: T): CommandResult<T> {
+  return { success: true, data };
+}
+
+export function errorResult(err: unknown): CommandResult<never> {
+  return { success: false, error: toBeginError(err) };
 }

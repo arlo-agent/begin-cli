@@ -1,106 +1,140 @@
+/**
+ * Configuration file management for begin-cli
+ * Config location: ~/.begin-cli/config.json
+ */
+
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
-import { BeginError, ErrorCode } from './errors.js';
+import { errors } from './errors.js';
+
+export type Network = 'mainnet' | 'preprod' | 'preview';
+export type Provider = 'blockfrost' | 'koios' | 'ogmios';
 
 export interface Config {
+  /** Default wallet name to use */
   defaultWallet: string;
-  network: 'mainnet' | 'preprod' | 'preview';
-  provider: 'blockfrost' | 'koios' | 'ogmios';
+  /** Default network (mainnet, preprod, preview) */
+  network: Network;
+  /** Blockchain data provider */
+  provider: Provider;
+  /** Blockfrost API keys by network */
+  blockfrost?: {
+    mainnet?: string;
+    preprod?: string;
+    preview?: string;
+  };
+  /** Koios API configuration */
+  koios?: {
+    baseUrl?: string;
+  };
 }
 
 const DEFAULT_CONFIG: Config = {
   defaultWallet: 'main',
-  network: 'preprod',
+  network: 'mainnet',
   provider: 'blockfrost',
 };
 
 const CONFIG_DIR = join(homedir(), '.begin-cli');
-const CONFIG_PATH = join(CONFIG_DIR, 'config.json');
+const CONFIG_FILE = join(CONFIG_DIR, 'config.json');
 
-/**
- * Ensure config directory exists
- */
 function ensureConfigDir(): void {
   if (!existsSync(CONFIG_DIR)) {
-    mkdirSync(CONFIG_DIR, { recursive: true });
+    mkdirSync(CONFIG_DIR, { recursive: true, mode: 0o700 });
   }
 }
 
 /**
- * Load config from ~/.begin-cli/config.json
- * Returns default config if file doesn't exist
+ * Load configuration from file.
+ * Returns default config if file doesn't exist.
  */
 export function loadConfig(): Config {
   try {
-    if (!existsSync(CONFIG_PATH)) {
+    if (!existsSync(CONFIG_FILE)) {
       return { ...DEFAULT_CONFIG };
     }
-    const content = readFileSync(CONFIG_PATH, 'utf-8');
-    const parsed = JSON.parse(content);
-    return { ...DEFAULT_CONFIG, ...parsed };
+
+    const content = readFileSync(CONFIG_FILE, 'utf-8');
+    const parsed = JSON.parse(content) as Partial<Config>;
+
+    return {
+      ...DEFAULT_CONFIG,
+      ...parsed,
+    };
   } catch (err) {
-    throw new BeginError(
-      `Failed to read config: ${err instanceof Error ? err.message : 'Unknown error'}`,
-      ErrorCode.CONFIG_READ
-    );
+    if (err instanceof SyntaxError) {
+      throw errors.configError('Invalid config file: malformed JSON');
+    }
+    throw errors.configError(`Failed to read config: ${err instanceof Error ? err.message : String(err)}`);
   }
 }
 
 /**
- * Save config to ~/.begin-cli/config.json
+ * Save configuration to file.
  */
-export function saveConfig(config: Partial<Config>): void {
+export function saveConfig(config: Config): void {
   try {
     ensureConfigDir();
-    const current = loadConfig();
-    const merged = { ...current, ...config };
-    writeFileSync(CONFIG_PATH, JSON.stringify(merged, null, 2) + '\n');
+    writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2) + '\n', { mode: 0o600 });
   } catch (err) {
-    throw new BeginError(
-      `Failed to write config: ${err instanceof Error ? err.message : 'Unknown error'}`,
-      ErrorCode.CONFIG_WRITE
-    );
+    throw errors.configError(`Failed to save config: ${err instanceof Error ? err.message : String(err)}`);
   }
 }
 
 /**
- * Get a specific config value
+ * Update specific config fields.
  */
+export function updateConfig(updates: Partial<Config>): Config {
+  const current = loadConfig();
+  const updated = { ...current, ...updates };
+  saveConfig(updated);
+  return updated;
+}
+
 export function getConfigValue<K extends keyof Config>(key: K): Config[K] {
   const config = loadConfig();
   return config[key];
 }
 
-/**
- * Set a specific config value
- */
 export function setConfigValue<K extends keyof Config>(key: K, value: Config[K]): void {
-  saveConfig({ [key]: value });
+  const config = loadConfig();
+  config[key] = value;
+  saveConfig(config);
 }
 
-/**
- * Get config directory path
- */
+export function resetConfig(): void {
+  saveConfig({ ...DEFAULT_CONFIG });
+}
+
 export function getConfigDir(): string {
-  ensureConfigDir();
   return CONFIG_DIR;
 }
 
-/**
- * Get wallets directory path
- */
-export function getWalletsDir(): string {
-  const dir = join(CONFIG_DIR, 'wallets');
-  if (!existsSync(dir)) {
-    mkdirSync(dir, { recursive: true });
-  }
-  return dir;
+export function getConfigPath(): string {
+  return CONFIG_FILE;
 }
 
-/**
- * Validate network value
- */
-export function isValidNetwork(network: string): network is Config['network'] {
+export function configExists(): boolean {
+  return existsSync(CONFIG_FILE);
+}
+
+export function isValidNetwork(network: string): network is Network {
   return ['mainnet', 'preprod', 'preview'].includes(network);
+}
+
+export function isValidProvider(provider: string): provider is Provider {
+  return ['blockfrost', 'koios', 'ogmios'].includes(provider);
+}
+
+export function getBlockfrostKey(network: Network): string | undefined {
+  const config = loadConfig();
+  return config.blockfrost?.[network];
+}
+
+export function setBlockfrostKey(network: Network, apiKey: string): void {
+  const config = loadConfig();
+  if (!config.blockfrost) config.blockfrost = {};
+  config.blockfrost[network] = apiKey;
+  saveConfig(config);
 }
