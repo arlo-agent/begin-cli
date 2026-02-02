@@ -12,6 +12,8 @@ const cli = meow(
   Commands
     cardano balance <address>       Check ADA balance for an address
     cardano send <to> <amount>      Send ADA to an address
+    cardano utxos <address>      List all UTXOs for an address
+    cardano history <address>    Show transaction history
     sign <tx-file>                  Sign an unsigned transaction
     submit <signed-tx-file>         Submit a signed transaction
 
@@ -38,9 +40,21 @@ const cli = meow(
   Environment
     BEGIN_CLI_MNEMONIC    Mnemonic for CI/agent use (bypasses keystore)
 
+  Environment Variables
+    BLOCKFROST_API_KEY           API key for all networks
+    BLOCKFROST_API_KEY_MAINNET   API key for mainnet (overrides generic)
+    BLOCKFROST_API_KEY_PREPROD   API key for preprod (overrides generic)
+    BLOCKFROST_API_KEY_PREVIEW   API key for preview (overrides generic)
+    
+  Get a free Blockfrost API key at: https://blockfrost.io
+
   Examples
     # Check balance
     $ begin cardano balance addr1qy...
+    $ begin cardano balance addr1qy... --json
+    $ begin cardano utxos addr1qy... --network preprod
+    $ begin cardano history addr1qy... --limit 20 --page 2
+
     $ begin cardano balance addr1qy... --network preprod
 
     $ begin stake pools SNEK
@@ -101,6 +115,15 @@ const cli = meow(
         shortFlag: 'j',
         default: false,
       },
+      limit: {
+        type: 'number',
+        shortFlag: 'l',
+        default: 10,
+      },
+      page: {
+        type: 'number',
+        shortFlag: 'p',
+        default: 1,
       wait: {
         type: 'boolean',
         default: true,
@@ -116,12 +139,20 @@ const cli = meow(
 
 const [command, subcommand, ...args] = cli.input;
 
+// Type assertion for flags
+const flags = cli.flags as {
+  network: string;
+  json: boolean;
+  limit: number;
+  page: number;
+};
+
 render(
   <App
     command={command}
     subcommand={subcommand}
     args={args}
-    flags={cli.flags}
+    flags={flags}
     showHelp={cli.showHelp}
   />
 );

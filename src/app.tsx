@@ -1,7 +1,11 @@
 import React from 'react';
 import { Box, Text } from 'ink';
 import { CardanoBalance } from './commands/cardano/balance.js';
+import { CardanoUtxos } from './commands/cardano/utxos.js';
+import { CardanoHistory } from './commands/cardano/history.js';
 import { CardanoSend } from './commands/cardano/send.js';
+import type { Network } from './lib/config.js';
+import { isValidNetwork } from './lib/config.js';
 import { StakePools } from './commands/stake/pools.js';
 import { StakeDelegate } from './commands/stake/delegate.js';
 import { StakeStatus } from './commands/stake/status.js';
@@ -23,12 +27,17 @@ interface AppProps {
     output?: string;
     json: boolean;
     wait: boolean;
+    limit: number;
+    page: number;
     asset?: string[];
   };
   showHelp: () => void;
 }
 
 export function App({ command, subcommand, args, flags, showHelp }: AppProps) {
+  // Validate network
+  const network: Network = isValidNetwork(flags.network) ? flags.network : 'mainnet';
+
   // No command provided
   if (!command) {
     showHelp();
@@ -91,7 +100,41 @@ export function App({ command, subcommand, args, flags, showHelp }: AppProps) {
           </Box>
         );
       }
-      return <CardanoBalance address={address} network={flags.network} />;
+      return <CardanoBalance address={address} network={network} json={flags.json} />;
+    }
+
+    if (subcommand === 'utxos') {
+      const address = args[0];
+      if (!address) {
+        return (
+          <Box flexDirection="column">
+            <Text color="red">Error: Address is required</Text>
+            <Text color="gray">Usage: begin cardano utxos {'<address>'}</Text>
+          </Box>
+        );
+      }
+      return <CardanoUtxos address={address} network={network} json={flags.json} />;
+    }
+
+    if (subcommand === 'history') {
+      const address = args[0];
+      if (!address) {
+        return (
+          <Box flexDirection="column">
+            <Text color="red">Error: Address is required</Text>
+            <Text color="gray">Usage: begin cardano history {'<address>'}</Text>
+          </Box>
+        );
+      }
+      return (
+        <CardanoHistory
+          address={address}
+          network={network}
+          json={flags.json}
+          limit={flags.limit}
+          page={flags.page}
+        />
+      );
     }
 
     if (subcommand === 'send') {
@@ -135,7 +178,7 @@ export function App({ command, subcommand, args, flags, showHelp }: AppProps) {
     return (
       <Box flexDirection="column">
         <Text color="red">Unknown cardano command: {subcommand || '(none)'}</Text>
-        <Text color="gray">Available commands: balance, send</Text>
+        <Text color="gray">Available commands: balance, utxos, history, send</Text>
       </Box>
     );
   }
