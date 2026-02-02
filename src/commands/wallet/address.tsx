@@ -1,144 +1,277 @@
+/**
+ * 'begin wallet address' command
+ * 
+ * Shows derived addresses from the wallet:
+ * - Payment address (base address for receiving/sending)
+ * - Enterprise address (payment only, no staking)
+ * - Stake address (for staking operations)
+ */
+
 import React, { useState, useEffect } from 'react';
-import { Box, Text } from 'ink';
-import { generateQRCode, truncateAddress } from '../../lib/qr.js';
+import { Box, Text, Newline } from 'ink';
+import {
+  deriveAddresses,
+  shortenAddress,
+  type NetworkType,
+  type DerivedAddresses,
+} from '../../lib/address.js';
+import {
+  getMnemonic,
+  hasEnvMnemonic,
+  getPreferredSource,
+  MNEMONIC_ENV_VAR,
+} from '../../lib/keystore.js';
 
 interface WalletAddressProps {
-  wallet: string;
-  showQR: boolean;
-  json: boolean;
-  network: string;
+  network: NetworkType;
+  walletName?: string;
+  password?: string;
+  full?: boolean;
+  json?: boolean;
 }
 
-interface WalletConfig {
-  name: string;
-  address: string;
-  network: string;
-}
+type LoadingState = 'loading' | 'need_password' | 'success' | 'error';
 
-/**
- * Mock function to get wallet info
- * In a real implementation, this would read from wallet storage
- */
-async function getWallet(walletName: string, _network: string): Promise<WalletConfig | null> {
-  // TODO: Implement actual wallet lookup from storage
-  // This would typically read from ~/.begin/wallets/{walletName}.json
-  
-  // For demonstration, return null (wallet not found)
-  // In production, this would parse wallet files
-  return null;
-}
-
-export function WalletAddress({ wallet, showQR, json, network }: WalletAddressProps) {
-  const [loading, setLoading] = useState(true);
-  const [walletConfig, setWalletConfig] = useState<WalletConfig | null>(null);
-  const [qrCode, setQrCode] = useState<string | null>(null);
+export function WalletAddress({
+  network,
+  walletName,
+  password,
+  full = false,
+  json = false,
+}: WalletAddressProps) {
+  const [state, setState] = useState<LoadingState>('loading');
+  const [addresses, setAddresses] = useState<DerivedAddresses | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [source, setSource] = useState<string>('');
 
   useEffect(() => {
-    const loadWallet = async () => {
+    const deriveAddrs = async () => {
       try {
-        const config = await getWallet(wallet, network);
-        if (!config) {
-          throw new Error(`Wallet "${wallet}" not found. Create it first with: begin wallet create ${wallet}`);
+        // Check if we have a source
+        const preferredSource = getPreferredSource();
+        
+        if (!preferredSource && !walletName) {
+          setError(
+            `No wallet available.\n` +
+            `\nOptions:\n` +
+            `  1. Set ${MNEMONIC_ENV_VAR} environment variable\n` +
+            `  2. Create a wallet with: begin wallet create\n` +
+            `  3. Import a wallet with: begin wallet import`
+          );
+          setState('error');
+          return;
         }
-        setWalletConfig(config);
+
+        // If using file-based wallet and no password provided
+        const needsPassword =
+          !hasEnvMnemonic() && !password && (walletName || preferredSource?.type === 'file');
+
+        if (needsPassword) {
+          setState('need_password');
+          return;
+        }
+
+        // Get mnemonic from appropriate source
+        const mnemonic = getMnemonic(password, walletName);
+        
+        // Set source for display
+        if (hasEnvMnemonic()) {
+          setSource(`environment (${MNEMONIC_ENV_VAR})`);
+        } else if (walletName) {
+          setSource(`wallet: ${walletName}`);
+        } else if (preferredSource?.walletName) {
+          setSource(`wallet: ${preferredSource.walletName}`);
+        }
+
+        // Derive addresses
+        const derived = await deriveAddresses(mnemonic, network);
+        setAddresses(derived);
+        setState('success');
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Unknown error');
-      } finally {
-        setLoading(false);
+        setState('error');
       }
     };
 
-    loadWallet();
-  }, [wallet, network]);
+    deriveAddrs();
+  }, [network, walletName, password]);
 
-  // Generate QR code once we have the wallet
-  useEffect(() => {
-    const genQR = async () => {
-      if (walletConfig?.address && showQR && !json) {
-        try {
-          const qr = await generateQRCode(walletConfig.address);
-          setQrCode(qr);
-        } catch {
-          setQrCode(null);
-        }
-      }
-    };
-
-    genQR();
-  }, [walletConfig, showQR, json]);
-
-  if (loading) {
-    if (json) return null;
+  // Loading state
+  if (state === 'loading') {
     return (
       <Box>
-        <Text>⏳ Loading wallet...</Text>
+        <Text>⏳ Deriving addresses...</Text>
       </Box>
     );
   }
 
-  if (error) {
-    if (json) {
-      console.log(JSON.stringify({ error }, null, 2));
-      return null;
-    }
+  // Need password
+  if (state === 'need_password') {
     return (
-      <Box flexDirection="column">
+      <Box flexDirection="column" padding={1}>
+        <Text color="yellow">🔐 Password required to decrypt wallet</Text>
+        <Newline />
+        <Text color="gray">Use --password flag or set {MNEMONIC_ENV_VAR} environment variable</Text>
+        <Newline />
+        <Text color="gray">Example: begin wallet address --password your-password</Text>
+      </Box>
+    );
+  }
+
+  // Error state
+  if (state === 'error') {
+    return (
+      <Box flexDirection="column" padding={1}>
         <Text color="red">Error: {error}</Text>
       </Box>
     );
   }
 
-  if (!walletConfig) {
-    if (json) {
-      console.log(JSON.stringify({ error: 'Wallet not found' }, null, 2));
-      return null;
-    }
-    return <Text color="red">Wallet not found</Text>;
+  // No addresses (shouldn't happen)
+  if (!addresses) {
+    return <Text color="red">No addresses derived</Text>;
   }
 
-  // JSON output mode
+  // JSON output
   if (json) {
     const output = {
-      wallet: walletConfig.name,
-      address: walletConfig.address,
-      network: walletConfig.network,
+      network: addresses.network,
+      paymentAddress: addresses.baseAddress,
+      enterpriseAddress: addresses.enterpriseAddress,
+      stakeAddress: addresses.stakeAddress,
     };
-    console.log(JSON.stringify(output, null, 2));
-    return null;
+    return <Text>{JSON.stringify(output, null, 2)}</Text>;
   }
 
-  // Terminal display mode
+  // Regular output
   return (
     <Box flexDirection="column" padding={1}>
+      {/* Header */}
       <Box marginBottom={1}>
-        <Text bold color="cyan">Wallet Address</Text>
+        <Text bold color="cyan">Wallet Addresses</Text>
         <Text color="gray"> ({network})</Text>
       </Box>
 
-      <Box>
-        <Text color="gray">Wallet: </Text>
-        <Text bold>{walletConfig.name}</Text>
-      </Box>
-
-      <Box marginTop={1}>
-        <Text color="gray">Address:</Text>
-      </Box>
-      <Box>
-        <Text color="green">{walletConfig.address}</Text>
-      </Box>
-
-      {showQR && qrCode && (
-        <Box flexDirection="column" marginTop={1}>
-          <Text>{qrCode}</Text>
+      {/* Source info */}
+      {source && (
+        <Box marginBottom={1}>
+          <Text color="gray">Source: </Text>
+          <Text color="blue">{source}</Text>
         </Box>
       )}
 
-      {!showQR && (
+      {/* Payment Address (Base) */}
+      <Box flexDirection="column" marginBottom={1}>
+        <Box>
+          <Text color="green">💳 Payment Address</Text>
+          <Text color="gray"> (base address for receiving/sending)</Text>
+        </Box>
+        <Box paddingLeft={2}>
+          {full ? (
+            <Text>{addresses.baseAddress}</Text>
+          ) : (
+            <Text>{shortenAddress(addresses.baseAddress, 20, 12)}</Text>
+          )}
+        </Box>
+      </Box>
+
+      {/* Enterprise Address */}
+      {addresses.enterpriseAddress && (
+        <Box flexDirection="column" marginBottom={1}>
+          <Box>
+            <Text color="yellow">🏢 Enterprise Address</Text>
+            <Text color="gray"> (payment only, no staking)</Text>
+          </Box>
+          <Box paddingLeft={2}>
+            {full ? (
+              <Text>{addresses.enterpriseAddress}</Text>
+            ) : (
+              <Text>{shortenAddress(addresses.enterpriseAddress, 20, 12)}</Text>
+            )}
+          </Box>
+        </Box>
+      )}
+
+      {/* Stake Address */}
+      {addresses.stakeAddress && (
+        <Box flexDirection="column" marginBottom={1}>
+          <Box>
+            <Text color="magenta">🥩 Stake Address</Text>
+            <Text color="gray"> (for staking operations)</Text>
+          </Box>
+          <Box paddingLeft={2}>
+            {full ? (
+              <Text>{addresses.stakeAddress}</Text>
+            ) : (
+              <Text>{shortenAddress(addresses.stakeAddress, 16, 10)}</Text>
+            )}
+          </Box>
+        </Box>
+      )}
+
+      {/* Hint for full addresses */}
+      {!full && (
         <Box marginTop={1}>
-          <Text color="gray" italic>Use --qr flag to display QR code</Text>
+          <Text color="gray" dimColor>
+            Use --full to show complete addresses
+          </Text>
         </Box>
       )}
     </Box>
   );
+}
+
+/**
+ * Simple component to show a single address (useful for scripting)
+ */
+interface SingleAddressProps {
+  network: NetworkType;
+  addressType: 'payment' | 'enterprise' | 'stake';
+  walletName?: string;
+  password?: string;
+}
+
+export function SingleAddress({
+  network,
+  addressType,
+  walletName,
+  password,
+}: SingleAddressProps) {
+  const [address, setAddress] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const derive = async () => {
+      try {
+        const mnemonic = getMnemonic(password, walletName);
+        const addresses = await deriveAddresses(mnemonic, network);
+        
+        switch (addressType) {
+          case 'payment':
+            setAddress(addresses.baseAddress);
+            break;
+          case 'enterprise':
+            setAddress(addresses.enterpriseAddress);
+            break;
+          case 'stake':
+            setAddress(addresses.stakeAddress);
+            break;
+        }
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Unknown error');
+      }
+    };
+
+    derive();
+  }, [network, addressType, walletName, password]);
+
+  if (error) {
+    return <Text color="red">{error}</Text>;
+  }
+
+  if (!address) {
+    return null;
+  }
+
+  return <Text>{address}</Text>;
 }
