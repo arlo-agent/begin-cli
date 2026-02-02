@@ -18,9 +18,9 @@ const cli = meow(
     wallet address               Show wallet addresses (payment, enterprise, stake)
 
     stake pools [search]         List/search stake pools
-    stake delegate <pool-id>     Delegate stake to a pool
+    stake delegate <pool-id>     Delegate stake to a pool (supports --yes)
     stake status                 Check delegation status and rewards
-    stake withdraw               Withdraw staking rewards
+    stake withdraw               Withdraw staking rewards (supports --yes)
 
     swap [options]               Swap tokens via Minswap aggregator
     swap quote [options]         Get a swap quote without executing

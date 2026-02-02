@@ -97,11 +97,11 @@ export function App({ command, subcommand, args, flags, showHelp }: AppProps) {
         return (
           <Box flexDirection="column">
             <Text color="red">Error: Address is required</Text>
-            <Text color="gray">Usage: begin cardano balance {'<address>'}</Text>
+            <Text color="gray">Usage: begin cardano balance {'<address>'} [--json]</Text>
           </Box>
         );
       }
-      return <CardanoBalance address={address} network={flags.network} />;
+      return <CardanoBalance address={address} network={flags.network} json={flags.json} />;
     }
 
     if (subcommand === 'send') {
@@ -114,6 +114,7 @@ export function App({ command, subcommand, args, flags, showHelp }: AppProps) {
             <Text color="gray">Options:</Text>
             <Text color="gray">  --dry-run, -d    Build but don't submit</Text>
             <Text color="gray">  --asset, -a      Add native token (policyId.name:amount)</Text>
+            <Text color="gray">  --yes, -y        Skip confirmation prompt</Text>
             <Text color="gray">  --json, -j       Output as JSON</Text>
           </Box>
         );
@@ -176,7 +177,7 @@ export function App({ command, subcommand, args, flags, showHelp }: AppProps) {
     }
 
     if (subcommand === 'withdraw') {
-      return <StakeWithdraw network={flags.network} json={flags.json} />;
+      return <StakeWithdraw network={flags.network} json={flags.json} yes={flags.yes} />;
     }
     
     return (

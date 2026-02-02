@@ -26,6 +26,7 @@ interface CardanoSendProps {
   dryRun?: boolean;
   outputFile?: string;
   jsonOutput?: boolean;
+  yes?: boolean;
 }
 
 type SendState = 
@@ -68,6 +69,7 @@ export function CardanoSend({
   dryRun = false,
   outputFile,
   jsonOutput = false,
+  yes = false,
 }: CardanoSendProps) {
   const { exit } = useApp();
   const [state, setState] = useState<SendState>('checking');
@@ -129,7 +131,12 @@ export function CardanoSend({
         estimatedFee: '~0.17', // Rough estimate before building
       });
       
-      setState('confirm');
+      // If --yes flag, skip confirmation
+      if (yes) {
+        handleSend();
+      } else {
+        setState('confirm');
+      }
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to load wallet';
       if (message.includes('Incorrect password')) {
