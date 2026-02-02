@@ -17,6 +17,7 @@ import {
   checkWalletAvailability,
   type TransactionConfig,
 } from '../../lib/transaction.js';
+import { getPasswordFromEnv, PASSWORD_ENV_VAR } from '../../lib/keystore.js';
 import { outputSuccess, exitWithError } from '../../lib/output.js';
 import { ExitCode, errors } from '../../lib/errors.js';
 
@@ -149,13 +150,16 @@ export function CardanoSend({
       needsPassword: availability.needsPassword,
     });
 
-    if (!availability.needsPassword || initialPassword) {
-      initWallet(initialPassword, availability.walletName, availability.source);
+    // Password priority: --password flag > BEGIN_CLI_WALLET_PASSWORD env var > interactive prompt
+    const effectivePassword = initialPassword || getPasswordFromEnv() || undefined;
+
+    if (!availability.needsPassword || effectivePassword) {
+      initWallet(effectivePassword, availability.walletName, availability.source);
       return;
     }
 
     if (jsonOutput) {
-      setError('Password required (pass --password or use BEGIN_CLI_MNEMONIC)');
+      setError(`Password required (pass --password, set ${PASSWORD_ENV_VAR}, or use BEGIN_CLI_MNEMONIC)`);
       setState('error');
       exitWithError(errors.missingArgument('password'));
       return;
@@ -174,8 +178,11 @@ export function CardanoSend({
     try {
       setState('building');
 
+      // Password priority: local state (from prompt) > --password flag > env var
+      const effectivePassword = password || initialPassword || getPasswordFromEnv() || undefined;
+
       const wallet = await loadWallet(
-        { walletName: walletInfo?.walletName, password: password || initialPassword },
+        { walletName: walletInfo?.walletName, password: effectivePassword },
         config
       );
 

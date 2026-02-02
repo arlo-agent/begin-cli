@@ -51,7 +51,8 @@ const cli = meow(
     --version         Show version
 
   Environment
-    BEGIN_CLI_MNEMONIC    Mnemonic for CI/agent use (bypasses keystore)
+    BEGIN_CLI_MNEMONIC           Mnemonic for CI/agent use (bypasses keystore)
+    BEGIN_CLI_WALLET_PASSWORD    Wallet password for automation (--password overrides)
 
   Environment Variables
     BLOCKFROST_API_KEY           API key for all networks

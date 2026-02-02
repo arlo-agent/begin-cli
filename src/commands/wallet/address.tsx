@@ -20,7 +20,9 @@ import {
   getMnemonic,
   hasEnvMnemonic,
   getPreferredSource,
+  getPasswordFromEnv,
   MNEMONIC_ENV_VAR,
+  PASSWORD_ENV_VAR,
 } from '../../lib/keystore.js';
 
 interface WalletAddressProps {
@@ -66,9 +68,12 @@ export function WalletAddress({
           return;
         }
 
+        // Password priority: --password flag > BEGIN_CLI_WALLET_PASSWORD env var > interactive prompt
+        const effectivePassword = password || getPasswordFromEnv() || undefined;
+
         // If using file-based wallet and no password provided
         const needsPassword =
-          !hasEnvMnemonic() && !password && (walletName || preferredSource?.type === 'file');
+          !hasEnvMnemonic() && !effectivePassword && (walletName || preferredSource?.type === 'file');
 
         if (needsPassword) {
           setState('need_password');
@@ -76,7 +81,7 @@ export function WalletAddress({
         }
 
         // Get mnemonic from appropriate source
-        const mnemonic = getMnemonic(password, walletName);
+        const mnemonic = getMnemonic(effectivePassword, walletName);
         
         // Set source for display
         if (hasEnvMnemonic()) {
@@ -133,7 +138,7 @@ export function WalletAddress({
       <Box flexDirection="column" padding={1}>
         <Text color="yellow">🔐 Password required to decrypt wallet</Text>
         <Newline />
-        <Text color="gray">Use --password flag or set {MNEMONIC_ENV_VAR} environment variable</Text>
+        <Text color="gray">Use --password flag, set {PASSWORD_ENV_VAR}, or set {MNEMONIC_ENV_VAR}</Text>
         <Newline />
         <Text color="gray">Example: begin wallet address --password your-password</Text>
       </Box>
