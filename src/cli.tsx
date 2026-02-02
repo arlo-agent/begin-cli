@@ -30,6 +30,9 @@ const cli = meow(
     stake status                     Check delegation status and rewards (mock)
     stake withdraw                   Withdraw staking rewards (mock)
 
+    mint --image <path> --name <name> --to <addr>
+                                     Mint an NFT via NMKR and send to address
+
     sign <tx-file>                   Sign an unsigned transaction file
     submit <signed-tx-file>          Submit a signed transaction file
 
@@ -47,6 +50,12 @@ const cli = meow(
     --no-wait         Don't wait for confirmation (submit only)
     --asset, -a       Native asset to send (format: policyId.assetName:amount)
                       Can be specified multiple times
+    --image, -i       Image file path for NFT minting (mint only)
+    --name            NFT token name (mint only, no spaces)
+    --display-name    NFT display name (mint only, defaults to --name)
+    --description     NFT description (mint only)
+    --to, -t          Receiver address for minted NFT (mint only)
+    -y, --yes         Skip confirmation prompts
     --help            Show this help message
     --version         Show version
 
@@ -58,8 +67,11 @@ const cli = meow(
     BLOCKFROST_API_KEY_MAINNET   API key for mainnet (overrides generic)
     BLOCKFROST_API_KEY_PREPROD   API key for preprod (overrides generic)
     BLOCKFROST_API_KEY_PREVIEW   API key for preview (overrides generic)
+    NMKR_API_KEY                 NMKR API key for NFT minting
+    NMKR_PROJECT_UID             NMKR Project UID for NFT minting
 
   Get a free Blockfrost API key at: https://blockfrost.io
+  Get an NMKR API key at: https://www.nmkr.io
 
   Examples
     # Receive (QR)
@@ -86,6 +98,10 @@ const cli = meow(
     $ begin sign tx.unsigned --wallet my-wallet --password mypass
     $ begin submit tx.signed --network preprod --no-wait --json
     $ BEGIN_CLI_MNEMONIC="word1 word2 ..." begin cardano send addr1... 10
+
+    # Mint NFT via NMKR
+    $ begin mint --image ./avatar.png --name "MyNFT" --to addr1qy...
+    $ begin mint --image ./art.png --name "Art001" --description "My art" --yes
 `,
   {
     importMeta: import.meta,
@@ -102,6 +118,12 @@ const cli = meow(
       page: { type: 'number', default: 1 },
       wait: { type: 'boolean', default: true },
       asset: { type: 'string', shortFlag: 'a', isMultiple: true },
+      yes: { type: 'boolean', shortFlag: 'y', default: false },
+      image: { type: 'string', shortFlag: 'i' },
+      name: { type: 'string' },
+      displayName: { type: 'string' },
+      description: { type: 'string' },
+      to: { type: 'string', shortFlag: 't' },
     },
   }
 );
@@ -125,6 +147,12 @@ const rawFlags = cli.flags as {
   limit: number;
   page: number;
   asset?: string[];
+  yes: boolean;
+  image?: string;
+  name?: string;
+  displayName?: string;
+  description?: string;
+  to?: string;
 };
 
 const network = rawFlags.network ?? config.network ?? 'mainnet';
@@ -145,6 +173,12 @@ const flags: AppFlags = {
   limit: rawFlags.limit,
   page: rawFlags.page,
   asset: rawFlags.asset,
+  yes: rawFlags.yes,
+  image: rawFlags.image,
+  name: rawFlags.name,
+  displayName: rawFlags.displayName,
+  description: rawFlags.description,
+  to: rawFlags.to,
 };
 
 setOutputContext({ json: flags.json });

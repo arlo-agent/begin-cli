@@ -14,6 +14,7 @@ import { Submit } from './commands/submit.js';
 import { WalletAddress } from './commands/wallet/address.js';
 import { WalletCreate } from './commands/wallet/create.js';
 import { WalletRestore } from './commands/wallet/restore.js';
+import { MintCommand } from './commands/mint/index.js';
 import { isValidNetwork, type Network } from './lib/config.js';
 import type { NetworkType } from './lib/address.js';
 
@@ -30,6 +31,13 @@ export interface AppFlags {
   limit: number;
   page: number;
   asset?: string[];
+  yes: boolean;
+  // Mint command flags
+  image?: string;
+  name?: string;
+  displayName?: string;
+  description?: string;
+  to?: string;
 }
 
 interface AppProps {
@@ -238,6 +246,33 @@ export function App({ command, subcommand, args, flags, showHelp }: AppProps) {
         <Text color="red">Unknown wallet command: {subcommand || '(none)'}</Text>
         <Text color="gray">Available commands: address, create, restore</Text>
       </Box>
+    );
+  }
+
+  // ---- Mint command ----
+  if (command === 'mint') {
+    // Validate required flags
+    if (!flags.image) {
+      return invalidUsage('Image path is required', 'begin mint --image <path> --name <name> --to <addr>');
+    }
+    if (!flags.name) {
+      return invalidUsage('NFT name is required', 'begin mint --image <path> --name <name> --to <addr>');
+    }
+    if (!flags.to) {
+      return invalidUsage('Receiver address is required', 'begin mint --image <path> --name <name> --to <addr>');
+    }
+
+    return (
+      <MintCommand
+        imagePath={flags.image}
+        name={flags.name}
+        displayName={flags.displayName}
+        description={flags.description}
+        toAddress={flags.to}
+        network={flags.network}
+        yes={flags.yes}
+        jsonOutput={flags.json}
+      />
     );
   }
 
