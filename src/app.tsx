@@ -4,6 +4,7 @@ import { CardanoBalance } from './commands/cardano/balance.js';
 import { CardanoUtxos } from './commands/cardano/utxos.js';
 import { CardanoHistory } from './commands/cardano/history.js';
 import { CardanoSend } from './commands/cardano/send.js';
+import { Receive } from './commands/receive.js';
 import { StakePools } from './commands/stake/pools.js';
 import { StakeDelegate } from './commands/stake/delegate.js';
 import { StakeStatus } from './commands/stake/status.js';
@@ -20,6 +21,7 @@ export interface AppFlags {
   network: string;
   wallet?: string;
   password?: string;
+  qr: boolean;
   dryRun: boolean;
   output?: string;
   json: boolean;
@@ -64,6 +66,19 @@ export function App({ command, subcommand, args, flags, showHelp }: AppProps) {
     );
   }
   const network = flags.network as Network;
+
+  // ---- Top-level commands ----
+  if (command === 'receive') {
+    // Accept either a raw address (positional) or a wallet name via --wallet
+    const target = flags.wallet ?? subcommand ?? args[0];
+    if (!target) {
+      return invalidUsage(
+        'Wallet name or address is required',
+        "begin receive <address> [--qr] | begin receive --wallet <name> [--qr]"
+      );
+    }
+    return <Receive target={target} showQR={flags.qr} json={flags.json} network={flags.network} />;
+  }
 
   // ---- Top-level commands ----
   if (command === 'sign') {
@@ -192,6 +207,7 @@ export function App({ command, subcommand, args, flags, showHelp }: AppProps) {
           walletName={flags.wallet}
           password={flags.password}
           full={flags.full}
+          qr={flags.qr}
           json={flags.json}
         />
       );

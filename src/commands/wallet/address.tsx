@@ -15,6 +15,7 @@ import {
   type NetworkType,
   type DerivedAddresses,
 } from '../../lib/address.js';
+import { generateQRCode } from '../../lib/qr.js';
 import {
   getMnemonic,
   hasEnvMnemonic,
@@ -27,6 +28,7 @@ interface WalletAddressProps {
   walletName?: string;
   password?: string;
   full?: boolean;
+  qr?: boolean;
   json?: boolean;
 }
 
@@ -37,12 +39,14 @@ export function WalletAddress({
   walletName,
   password,
   full = false,
+  qr = false,
   json = false,
 }: WalletAddressProps) {
   const [state, setState] = useState<LoadingState>('loading');
   const [addresses, setAddresses] = useState<DerivedAddresses | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [source, setSource] = useState<string>('');
+  const [qrCode, setQrCode] = useState<string | null>(null);
 
   useEffect(() => {
     const deriveAddrs = async () => {
@@ -95,6 +99,24 @@ export function WalletAddress({
 
     deriveAddrs();
   }, [network, walletName, password]);
+
+  useEffect(() => {
+    const genQR = async () => {
+      if (!qr || json || !addresses?.baseAddress) {
+        setQrCode(null);
+        return;
+      }
+
+      try {
+        const qrStr = await generateQRCode(addresses.baseAddress);
+        setQrCode(qrStr);
+      } catch {
+        setQrCode(null);
+      }
+    };
+
+    genQR();
+  }, [addresses, qr, json]);
 
   // Loading state
   if (state === 'loading') {
@@ -173,6 +195,11 @@ export function WalletAddress({
             <Text>{shortenAddress(addresses.baseAddress, 20, 12)}</Text>
           )}
         </Box>
+        {qr && qrCode && (
+          <Box marginTop={1} paddingLeft={2}>
+            <Text>{qrCode}</Text>
+          </Box>
+        )}
       </Box>
 
       {/* Enterprise Address */}

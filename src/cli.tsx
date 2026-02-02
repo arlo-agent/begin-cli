@@ -13,6 +13,9 @@ const cli = meow(
     $ begin <command> [subcommand] [...args] [options]
 
   Commands
+    receive <address>                Display address with optional QR code for receiving ADA
+    receive --wallet <name>          Display wallet address with optional QR code (mock)
+
     cardano balance <address>        Check ADA balance for an address
     cardano utxos <address>          List UTXOs for an address
     cardano history <address>        Show transaction history for an address
@@ -34,6 +37,7 @@ const cli = meow(
     --network, -n     Network to use (mainnet, preprod, preview) [default: mainnet]
     --wallet, -w      Wallet name from keystore (uses default if not specified)
     --password        Password for wallet decryption (or set interactively)
+    --qr              Display QR code (receive only)
     --dry-run, -d     Build transaction but don't submit (save unsigned tx)
     --output, -o      Output file path for unsigned/signed transaction
     --json, -j        Output result as JSON
@@ -58,6 +62,10 @@ const cli = meow(
   Get a free Blockfrost API key at: https://blockfrost.io
 
   Examples
+    # Receive (QR)
+    $ begin receive addr1qy... --qr
+    $ begin receive --wallet my-wallet --qr
+
     # Cardano read-only
     $ begin cardano balance addr1qy...
     $ begin cardano utxos addr1qy... --json
@@ -85,6 +93,7 @@ const cli = meow(
       network: { type: 'string', shortFlag: 'n' },
       wallet: { type: 'string', shortFlag: 'w' },
       password: { type: 'string' },
+      qr: { type: 'boolean', default: false },
       dryRun: { type: 'boolean', shortFlag: 'd', default: false },
       output: { type: 'string', shortFlag: 'o' },
       json: { type: 'boolean', shortFlag: 'j', default: false },
@@ -107,6 +116,7 @@ const rawFlags = cli.flags as {
   network?: string;
   wallet?: string;
   password?: string;
+  qr: boolean;
   dryRun: boolean;
   output?: string;
   json: boolean;
@@ -126,6 +136,7 @@ const flags: AppFlags = {
   network,
   wallet: rawFlags.wallet ?? config.defaultWallet,
   password: rawFlags.password,
+  qr: rawFlags.qr,
   dryRun: rawFlags.dryRun,
   output: rawFlags.output,
   json: rawFlags.json,
