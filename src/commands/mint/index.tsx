@@ -15,8 +15,8 @@ import {
   formatFileSize,
   type ImageFileInfo,
 } from '../../lib/mint.js';
-import { outputSuccess, exitWithError } from '../../lib/output.js';
-import { errors } from '../../lib/errors.js';
+import { outputSuccess, exitWithError, isJsonMode } from '../../lib/output.js';
+import { errors, ExitCode } from '../../lib/errors.js';
 
 // ============================================================================
 // Types
@@ -111,9 +111,11 @@ export function MintCommand({
           description,
         });
         if (!metaValidation.valid) {
-          // Log warnings but don't fail
-          for (const err of metaValidation.errors) {
-            console.warn(`⚠ ${err}`);
+          // Log warnings but don't fail (skip in JSON mode)
+          if (!isJsonMode()) {
+            for (const err of metaValidation.errors) {
+              console.warn(`⚠ ${err}`);
+            }
           }
         }
 
@@ -208,7 +210,7 @@ export function MintCommand({
           toAddress,
           network,
         });
-        process.exit(0);
+        process.exit(ExitCode.SUCCESS);
       }
 
       setState('success');
