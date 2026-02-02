@@ -41,6 +41,7 @@ interface CardanoSendProps {
   dryRun?: boolean;
   outputFile?: string;
   jsonOutput?: boolean;
+  yes?: boolean;
 }
 
 type SendState =
@@ -87,6 +88,7 @@ export function CardanoSend({
   dryRun = false,
   outputFile,
   jsonOutput = false,
+  yes = false,
 }: CardanoSendProps) {
   const { exit } = useApp();
   const [state, setState] = useState<SendState>('checking');
@@ -297,12 +299,12 @@ export function CardanoSend({
     }
   };
 
-  // Auto-proceed in JSON mode once ready (no interactive confirmation)
+  // Auto-proceed in JSON mode or with --yes flag (no interactive confirmation)
   useEffect(() => {
-    if (jsonOutput && state === 'confirm') {
+    if ((jsonOutput || yes) && state === 'confirm') {
       handleSend();
     }
-  }, [jsonOutput, state]);
+  }, [jsonOutput, yes, state]);
 
   // Handle keyboard input for confirmation
   useInput((input, key) => {
