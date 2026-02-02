@@ -1,6 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { Box, Text } from 'ink';
+import { readFile } from 'node:fs/promises';
+import { join } from 'node:path';
 import { generateQRCode, isValidCardanoAddress, truncateAddress } from '../lib/qr.js';
+import { deriveAddresses, type NetworkType } from '../lib/address.js';
+import { getMnemonic, walletExists, WALLETS_DIR, MNEMONIC_ENV_VAR } from '../lib/keystore.js';
 
 interface ReceiveProps {
   /** Either a wallet name or a raw address */
@@ -11,59 +15,84 @@ interface ReceiveProps {
   json: boolean;
   /** Network for wallet lookups */
   network: string;
+  /** Password for decrypting file-based wallets (if needed) */
+  password?: string;
 }
 
-interface WalletConfig {
-  name: string;
-  address: string;
-  network: string;
-}
+type ResolvedTarget =
+  | { isWallet: false; address: string }
+  | { isWallet: true; walletName: string; address: string; source: 'wallet_file' | 'keystore' };
 
-/**
- * Mock function to get wallet address by name
- * In a real implementation, this would read from wallet storage
- */
-async function getWalletAddress(walletName: string, _network: string): Promise<string | null> {
-  // TODO: Implement actual wallet lookup from storage
-  // For now, we'll check if it looks like an address and return it,
-  // otherwise return null to indicate wallet not found
-  if (isValidCardanoAddress(walletName)) {
-    return walletName;
+async function getSavedPaymentAddress(walletName: string): Promise<string | null> {
+  // Some wallet formats store a cleartext receive address in the file (e.g. addresses.payment).
+  // If present, we can show it without decrypting mnemonic.
+  try {
+    const filePath = join(WALLETS_DIR, `${walletName}.json`);
+    const raw = await readFile(filePath, 'utf8');
+    const parsed = JSON.parse(raw) as unknown as { addresses?: { payment?: unknown } };
+    const payment = parsed?.addresses?.payment;
+    return typeof payment === 'string' && payment.trim().length > 0 ? payment.trim() : null;
+  } catch {
+    return null;
   }
-  
-  // Simulate wallet lookup - in production this would read from ~/.begin/wallets/
-  const mockWallets: Record<string, WalletConfig> = {
-    // Add mock wallets for testing
-  };
-  
-  const wallet = mockWallets[walletName];
-  return wallet?.address || null;
 }
 
-export function Receive({ target, showQR, json, network }: ReceiveProps) {
+async function resolveTargetToAddress(opts: {
+  target: string;
+  network: NetworkType;
+  password?: string;
+}): Promise<ResolvedTarget> {
+  const { target, network, password } = opts;
+
+  // Raw address passed
+  if (isValidCardanoAddress(target)) {
+    return { isWallet: false, address: target };
+  }
+
+  // Wallet name passed — must exist on disk
+  if (!walletExists(target)) {
+    throw new Error(`Wallet "${target}" not found. Provide a valid wallet name or Cardano address.`);
+  }
+
+  // Fast path: cleartext payment address exists in wallet file
+  const saved = await getSavedPaymentAddress(target);
+  if (saved && isValidCardanoAddress(saved)) {
+    return { isWallet: true, walletName: target, address: saved, source: 'wallet_file' };
+  }
+
+  // Fallback: decrypt mnemonic from keystore and derive address (requires password)
+  if (!password) {
+    throw new Error(
+      `Password required to decrypt wallet "${target}". ` +
+        `Use --password or set ${MNEMONIC_ENV_VAR} to bypass file wallets.`
+    );
+  }
+
+  const mnemonic = getMnemonic(password, target);
+  const derived = await deriveAddresses(mnemonic, network);
+  return { isWallet: true, walletName: target, address: derived.baseAddress, source: 'keystore' };
+}
+
+export function Receive({ target, showQR, json, network, password }: ReceiveProps) {
   const [loading, setLoading] = useState(true);
   const [address, setAddress] = useState<string | null>(null);
   const [qrCode, setQrCode] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isWallet, setIsWallet] = useState(false);
+  const [walletSource, setWalletSource] = useState<'wallet_file' | 'keystore' | null>(null);
 
   useEffect(() => {
     const resolveAddress = async () => {
       try {
-        // Check if target is already an address
-        if (isValidCardanoAddress(target)) {
-          setAddress(target);
-          setIsWallet(false);
-        } else {
-          // Try to look up as wallet name
-          const walletAddress = await getWalletAddress(target, network);
-          if (walletAddress) {
-            setAddress(walletAddress);
-            setIsWallet(true);
-          } else {
-            throw new Error(`Wallet "${target}" not found. Provide a valid wallet name or Cardano address.`);
-          }
-        }
+        const resolved = await resolveTargetToAddress({
+          target,
+          network: network as NetworkType,
+          password,
+        });
+
+        setAddress(resolved.address);
+        setIsWallet(resolved.isWallet);
+        setWalletSource(resolved.isWallet ? resolved.source : null);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Unknown error');
         setLoading(false);
@@ -74,7 +103,7 @@ export function Receive({ target, showQR, json, network }: ReceiveProps) {
     };
 
     resolveAddress();
-  }, [target, network]);
+  }, [target, network, password]);
 
   // Generate QR code once we have the address
   useEffect(() => {
@@ -149,6 +178,11 @@ export function Receive({ target, showQR, json, network }: ReceiveProps) {
         <Box>
           <Text color="gray">Wallet: </Text>
           <Text bold>{target}</Text>
+          {walletSource && (
+            <Text color="gray">
+              {walletSource === 'wallet_file' ? ' (from wallet file)' : ' (derived from mnemonic)'}
+            </Text>
+          )}
         </Box>
       )}
 

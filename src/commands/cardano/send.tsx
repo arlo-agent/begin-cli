@@ -12,11 +12,24 @@ import {
   saveTxToFile,
   parseAssets,
   getWalletAddress,
+  getWalletUtxos,
+  calculateBalance,
   checkWalletAvailability,
   type TransactionConfig,
 } from '../../lib/transaction.js';
 import { outputSuccess, exitWithError } from '../../lib/output.js';
 import { ExitCode, errors } from '../../lib/errors.js';
+
+function lovelaceToAdaDisplay(lovelace: string): string {
+  try {
+    const v = BigInt(lovelace);
+    const whole = v / 1_000_000n;
+    const frac = v % 1_000_000n;
+    return `${whole.toString()}.${frac.toString().padStart(6, '0')}`;
+  } catch {
+    return '0.000000';
+  }
+}
 
 interface CardanoSendProps {
   to: string;
@@ -49,6 +62,9 @@ interface TxInfo {
   amountAda: number;
   assets: string[];
   estimatedFee: string;
+  availableAda?: string;
+  utxoCount?: number;
+  walletSource?: 'env' | 'wallet';
   unsignedTx?: string;
   unsignedTxPath?: string;
   signedTx?: string;
@@ -81,12 +97,15 @@ export function CardanoSend({
 
   const config: TransactionConfig = { network };
 
-  const initWallet = async (pwd?: string, wName?: string) => {
+  const initWallet = async (pwd?: string, wName?: string, source?: WalletInfo['source']) => {
     try {
       setState('loading');
 
       const wallet = await loadWallet({ walletName: wName, password: pwd }, config);
       const fromAddress = await getWalletAddress(wallet);
+      const utxos = await getWalletUtxos(wallet);
+      const { lovelace } = calculateBalance(utxos);
+      const availableAda = lovelaceToAdaDisplay(lovelace);
 
       setTxInfo({
         fromAddress,
@@ -94,6 +113,9 @@ export function CardanoSend({
         amountAda: amount,
         assets,
         estimatedFee: '~0.17', // rough estimate before building
+        availableAda,
+        utxoCount: utxos.length,
+        walletSource: source,
       });
 
       setState('confirm');
@@ -126,7 +148,7 @@ export function CardanoSend({
     });
 
     if (!availability.needsPassword || initialPassword) {
-      initWallet(initialPassword, availability.walletName);
+      initWallet(initialPassword, availability.walletName, availability.source);
       return;
     }
 
@@ -142,7 +164,7 @@ export function CardanoSend({
 
   const handlePasswordSubmit = () => {
     if (password.trim()) {
-      initWallet(password, walletInfo?.walletName);
+      initWallet(password, walletInfo?.walletName, walletInfo?.source);
     }
   };
 
@@ -155,11 +177,69 @@ export function CardanoSend({
         config
       );
 
+      const fromAddress = await getWalletAddress(wallet);
+      const utxos = await getWalletUtxos(wallet);
+      const { lovelace } = calculateBalance(utxos);
+      const availableAda = lovelaceToAdaDisplay(lovelace);
+      setTxInfo((prev) =>
+        prev
+          ? { ...prev, fromAddress, availableAda, utxoCount: utxos.length, walletSource: walletInfo?.source }
+          : {
+              fromAddress,
+              toAddress: to,
+              amountAda: amount,
+              assets,
+              estimatedFee: '~0.17',
+              availableAda,
+              utxoCount: utxos.length,
+              walletSource: walletInfo?.source,
+            }
+      );
+
+      if (utxos.length === 0 || BigInt(lovelace) === 0n) {
+        const sourceHint =
+          walletInfo?.source === 'env'
+            ? 'Note: BEGIN_CLI_MNEMONIC is set, so this command is using it. Unset it or pass --wallet <name>.'
+            : walletInfo?.source === 'wallet'
+              ? 'If you expected funds here, double-check you selected the correct wallet name and password.'
+              : 'Double-check your wallet source and configuration.';
+        throw new Error(
+          [
+            `No spendable UTxOs found for this wallet on ${network}.`,
+            `From address: ${fromAddress}`,
+            sourceHint,
+            `Also verify you’re on the right network (mainnet vs preprod/preview) and that the recipient address matches it.`,
+          ].join('\n')
+        );
+      }
+
       // Build transaction
-      const result =
-        assets.length > 0
-          ? await buildMultiAssetTx(wallet, to, amount, parseAssets(assets))
-          : await buildSendAdaTx(wallet, to, amount);
+      let result;
+      try {
+        result =
+          assets.length > 0
+            ? await buildMultiAssetTx(wallet, to, amount, parseAssets(assets))
+            : await buildSendAdaTx(wallet, to, amount);
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        if (msg.includes('UTxO Balance Insufficient')) {
+          const sourceHint =
+            walletInfo?.source === 'env'
+              ? 'BEGIN_CLI_MNEMONIC is set, so this command is using it (which may not be the wallet you checked).'
+              : 'If you expected funds here, ensure you’re using the correct wallet (--wallet) and network (--network).';
+          throw new Error(
+            [
+              'UTxO Balance Insufficient.',
+              `Wallet balance (from UTxOs): ~${availableAda} ADA across ${utxos.length} UTxOs`,
+              `From address: ${fromAddress}`,
+              `Network: ${network}`,
+              sourceHint,
+              'Tip: run `begin wallet address --full` and `begin cardano utxos <address> --network <network>` to confirm the UTxOs you are actually spending from.',
+            ].join('\n')
+          );
+        }
+        throw e;
+      }
 
       setTxInfo((prev) => (prev ? { ...prev, unsignedTx: result.unsignedTx } : null));
 
@@ -393,6 +473,17 @@ export function CardanoSend({
           <Text bold color="green">{amount} ADA</Text>
           <Text color="gray"> ({adaToLovelace(amount)} lovelace)</Text>
         </Box>
+
+        {typeof txInfo?.availableAda === 'string' && typeof txInfo?.utxoCount === 'number' && (
+          <Box>
+            <Text color="gray">Available: </Text>
+            <Text color="green">{txInfo.availableAda} ADA</Text>
+            <Text color="gray"> across </Text>
+            <Text>{txInfo.utxoCount}</Text>
+            <Text color="gray"> UTxOs</Text>
+            {txInfo.walletSource === 'env' && <Text color="yellow"> (from BEGIN_CLI_MNEMONIC)</Text>}
+          </Box>
+        )}
 
         {assets.length > 0 && (
           <Box flexDirection="column" marginTop={1}>

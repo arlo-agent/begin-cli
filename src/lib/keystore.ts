@@ -8,7 +8,7 @@
  * Config file: ~/.begin-cli/config.json stores default wallet selection
  */
 
-import { createCipheriv, createDecipheriv, randomBytes, scryptSync } from 'crypto';
+import { createDecipheriv, scryptSync } from 'crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync, readdirSync, unlinkSync } from 'fs';
 import { homedir } from 'os';
 import { join } from 'path';
@@ -24,21 +24,26 @@ export const CONFIG_FILE = join(CONFIG_DIR, 'config.json');
 // Encryption settings
 const ALGORITHM = 'aes-256-gcm';
 const KEY_LENGTH = 32;
-const IV_LENGTH = 16;
-const SALT_LENGTH = 32;
-const AUTH_TAG_LENGTH = 16;
 const SCRYPT_N = 16384;
 const SCRYPT_R = 8;
 const SCRYPT_P = 1;
 
-export interface WalletFile {
+// Newer wallet format (written by src/lib/wallet.ts)
+export interface WalletFileV1 {
+  version: 1;
   name: string;
-  encryptedMnemonic: string;
-  salt: string;
-  iv: string;
-  authTag: string;
+  networkId: 0 | 1;
+  encrypted: {
+    salt: string; // hex
+    iv: string; // hex
+    authTag: string; // hex
+    ciphertext: string; // hex
+  };
   createdAt: string;
-  network?: string;
+  addresses?: {
+    payment?: string;
+    stake?: string;
+  };
 }
 
 export interface Config {
@@ -81,108 +86,55 @@ export function hasEnvMnemonic(): boolean {
 }
 
 /**
- * Encrypt a mnemonic with a password
- * 
- * @param mnemonic - The mnemonic to encrypt
- * @param password - User password for encryption
- * @returns Encrypted data with salt, iv, and authTag
+ * Minimal runtime type helpers for wallet file parsing.
  */
-export function encryptMnemonic(
-  mnemonic: string,
-  password: string
-): { encrypted: string; salt: string; iv: string; authTag: string } {
-  const salt = randomBytes(SALT_LENGTH);
-  const iv = randomBytes(IV_LENGTH);
-  
-  // Derive key from password using scrypt
-  const key = scryptSync(password, salt, KEY_LENGTH, {
+function isRecord(v: unknown): v is Record<string, unknown> {
+  return typeof v === 'object' && v !== null;
+}
+
+function isWalletFileV1(v: unknown): v is WalletFileV1 {
+  if (!isRecord(v)) return false;
+  if (v.version !== 1) return false;
+  if (typeof v.name !== 'string') return false;
+  if (v.networkId !== 0 && v.networkId !== 1) return false;
+  if (!isRecord(v.encrypted)) return false;
+
+  const e = v.encrypted as Record<string, unknown>;
+  return (
+    typeof e.salt === 'string' &&
+    typeof e.iv === 'string' &&
+    typeof e.authTag === 'string' &&
+    typeof e.ciphertext === 'string' &&
+    typeof v.createdAt === 'string'
+  );
+}
+
+function decryptMnemonicV1(encrypted: WalletFileV1['encrypted'], password: string): string {
+  const key = scryptSync(password, Buffer.from(encrypted.salt, 'hex'), KEY_LENGTH, {
     N: SCRYPT_N,
     r: SCRYPT_R,
     p: SCRYPT_P,
   });
-  
-  const cipher = createCipheriv(ALGORITHM, key, iv);
-  
-  let encrypted = cipher.update(mnemonic, 'utf8', 'hex');
-  encrypted += cipher.final('hex');
-  
-  const authTag = cipher.getAuthTag();
-  
-  return {
-    encrypted,
-    salt: salt.toString('hex'),
-    iv: iv.toString('hex'),
-    authTag: authTag.toString('hex'),
-  };
-}
 
-/**
- * Decrypt an encrypted mnemonic with a password
- * 
- * @param encrypted - Encrypted mnemonic hex string
- * @param password - User password
- * @param salt - Salt hex string
- * @param iv - IV hex string
- * @param authTag - Auth tag hex string
- * @returns Decrypted mnemonic
- */
-export function decryptMnemonic(
-  encrypted: string,
-  password: string,
-  salt: string,
-  iv: string,
-  authTag: string
-): string {
-  const key = scryptSync(password, Buffer.from(salt, 'hex'), KEY_LENGTH, {
-    N: SCRYPT_N,
-    r: SCRYPT_R,
-    p: SCRYPT_P,
-  });
-  
-  const decipher = createDecipheriv(ALGORITHM, key, Buffer.from(iv, 'hex'));
-  decipher.setAuthTag(Buffer.from(authTag, 'hex'));
-  
-  let decrypted = decipher.update(encrypted, 'hex', 'utf8');
-  decrypted += decipher.final('utf8');
-  
-  return decrypted;
-}
+  const decipher = createDecipheriv(ALGORITHM, key, Buffer.from(encrypted.iv, 'hex'));
+  decipher.setAuthTag(Buffer.from(encrypted.authTag, 'hex'));
 
-/**
- * Save a wallet to encrypted file storage
- * 
- * @param name - Wallet name (alphanumeric, dashes, underscores)
- * @param mnemonic - Mnemonic to encrypt and save
- * @param password - Password for encryption
- * @param network - Optional default network for this wallet
- */
-export function saveWallet(
-  name: string,
-  mnemonic: string,
-  password: string,
-  network?: string
-): void {
-  // Validate name
-  if (!/^[a-zA-Z0-9_-]+$/.test(name)) {
-    throw new Error('Wallet name must be alphanumeric (dashes and underscores allowed)');
+  const decrypted = Buffer.concat([
+    decipher.update(Buffer.from(encrypted.ciphertext, 'hex')),
+    decipher.final(),
+  ]).toString('utf8');
+
+  // v1 stores mnemonic as a JSON string array
+  try {
+    const parsed = JSON.parse(decrypted) as unknown;
+    if (Array.isArray(parsed) && parsed.every((w) => typeof w === 'string')) {
+      return (parsed as string[]).join(' ');
+    }
+  } catch {
+    // fall through: may already be a plain string mnemonic
   }
-  
-  ensureConfigDirs();
-  
-  const { encrypted, salt, iv, authTag } = encryptMnemonic(mnemonic, password);
-  
-  const walletFile: WalletFile = {
-    name,
-    encryptedMnemonic: encrypted,
-    salt,
-    iv,
-    authTag,
-    createdAt: new Date().toISOString(),
-    network,
-  };
-  
-  const filePath = join(WALLETS_DIR, `${name}.json`);
-  writeFileSync(filePath, JSON.stringify(walletFile, null, 2), { mode: 0o600 });
+
+  return decrypted;
 }
 
 /**
@@ -199,17 +151,21 @@ export function loadWallet(name: string, password: string): string {
     throw new Error(`Wallet "${name}" not found`);
   }
   
-  const data = JSON.parse(readFileSync(filePath, 'utf8')) as WalletFile;
-  
   try {
-    return decryptMnemonic(
-      data.encryptedMnemonic,
-      password,
-      data.salt,
-      data.iv,
-      data.authTag
+    const parsed: unknown = JSON.parse(readFileSync(filePath, 'utf8'));
+
+    // v1 format (versioned, encrypted.ciphertext)
+    if (isWalletFileV1(parsed)) {
+      return decryptMnemonicV1(parsed.encrypted, password);
+    }
+
+    throw new Error(
+      'Unsupported wallet file format. ' +
+        'This CLI only supports version: 1 wallets. ' +
+        'If this wallet was created by an older build, restore it again with `begin wallet restore <name>`.'
     );
   } catch (error) {
+    // Hide details to avoid leaking format/crypto specifics; keep UX consistent.
     throw new Error('Incorrect password or corrupted wallet file');
   }
 }
@@ -271,13 +227,17 @@ export function getWalletInfo(name: string): { name: string; createdAt: string; 
     throw new Error(`Wallet "${name}" not found`);
   }
   
-  const data = JSON.parse(readFileSync(filePath, 'utf8')) as WalletFile;
-  
-  return {
-    name: data.name,
-    createdAt: data.createdAt,
-    network: data.network,
-  };
+  const parsed: unknown = JSON.parse(readFileSync(filePath, 'utf8'));
+
+  if (isWalletFileV1(parsed)) {
+    return {
+      name: parsed.name,
+      createdAt: parsed.createdAt,
+      network: parsed.networkId === 1 ? 'mainnet' : 'testnet',
+    };
+  }
+
+  throw new Error('Unsupported wallet file format (expected version: 1)');
 }
 
 /**

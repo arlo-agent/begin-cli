@@ -14,7 +14,7 @@ const cli = meow(
 
   Commands
     receive <address>                Display address with optional QR code for receiving ADA
-    receive --wallet <name>          Display wallet address with optional QR code (mock)
+    receive --wallet <name>          Display wallet receive address with optional QR code
 
     cardano balance <address>        Check ADA balance for an address
     cardano utxos <address>          List UTXOs for an address

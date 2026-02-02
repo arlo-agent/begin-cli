@@ -19,13 +19,22 @@ const NETWORK_IDS: Record<Network, number> = {
  * Priority: ENV network-specific > ENV generic > config
  */
 function getApiKey(network: Network): string | undefined {
-  // Check environment variables first
-  const envSuffix = network === 'mainnet' ? '' : `_${network.toUpperCase()}`;
-  const networkSpecificKey = process.env[`BLOCKFROST_API_KEY${envSuffix}`];
-  if (networkSpecificKey) return networkSpecificKey;
+  // Check environment variables first (support both documented forms)
+  if (network === 'mainnet') {
+    // Prefer explicit mainnet var if set
+    const mainnetKey = process.env.BLOCKFROST_API_KEY_MAINNET;
+    if (mainnetKey) return mainnetKey;
+    // Fallback to generic
+    const genericKey = process.env.BLOCKFROST_API_KEY;
+    if (genericKey) return genericKey;
+  } else {
+    const envSuffix = `_${network.toUpperCase()}`; // _PREPROD / _PREVIEW
+    const networkSpecificKey = process.env[`BLOCKFROST_API_KEY${envSuffix}`];
+    if (networkSpecificKey) return networkSpecificKey;
 
-  const genericKey = process.env.BLOCKFROST_API_KEY;
-  if (genericKey) return genericKey;
+    const genericKey = process.env.BLOCKFROST_API_KEY;
+    if (genericKey) return genericKey;
+  }
 
   // Fall back to config
   return getBlockfrostKey(network);

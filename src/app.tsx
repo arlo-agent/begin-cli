@@ -70,14 +70,22 @@ export function App({ command, subcommand, args, flags, showHelp }: AppProps) {
   // ---- Top-level commands ----
   if (command === 'receive') {
     // Accept either a raw address (positional) or a wallet name via --wallet
-    const target = flags.wallet ?? subcommand ?? args[0];
+    const target = subcommand ?? args[0] ?? flags.wallet;
     if (!target) {
       return invalidUsage(
         'Wallet name or address is required',
         "begin receive <address> [--qr] | begin receive --wallet <name> [--qr]"
       );
     }
-    return <Receive target={target} showQR={flags.qr} json={flags.json} network={flags.network} />;
+    return (
+      <Receive
+        target={target}
+        showQR={flags.qr}
+        json={flags.json}
+        network={flags.network}
+        password={flags.password}
+      />
+    );
   }
 
   // ---- Top-level commands ----
