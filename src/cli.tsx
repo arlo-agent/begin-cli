@@ -2,8 +2,10 @@
 import React from 'react';
 import { render } from 'ink';
 import meow from 'meow';
-import { App } from './app.js';
-import { setOutputContext } from './lib/output.js';
+import { App, type AppFlags } from './app.js';
+import { loadConfig, isValidNetwork } from './lib/config.js';
+import { setOutputContext, exitWithError } from './lib/output.js';
+import { errors } from './lib/errors.js';
 
 const cli = meow(
   `
@@ -80,66 +82,29 @@ const cli = meow(
   {
     importMeta: import.meta,
     flags: {
-      network: {
-        type: 'string',
-        shortFlag: 'n',
-        default: 'mainnet',
-      },
-      wallet: {
-        type: 'string',
-        shortFlag: 'w',
-      },
-      password: {
-        type: 'string',
-      },
-      dryRun: {
-        type: 'boolean',
-        shortFlag: 'd',
-        default: false,
-      },
-      output: {
-        type: 'string',
-        shortFlag: 'o',
-      },
-      json: {
-        type: 'boolean',
-        shortFlag: 'j',
-        default: false,
-      },
-      full: {
-        type: 'boolean',
-        default: false,
-      },
-      limit: {
-        type: 'number',
-        shortFlag: 'l',
-        default: 10,
-      },
-      page: {
-        type: 'number',
-        default: 1,
-      },
-      wait: {
-        type: 'boolean',
-        default: true,
-      },
-      asset: {
-        type: 'string',
-        shortFlag: 'a',
-        isMultiple: true,
-      },
+      network: { type: 'string', shortFlag: 'n' },
+      wallet: { type: 'string', shortFlag: 'w' },
+      password: { type: 'string' },
+      dryRun: { type: 'boolean', shortFlag: 'd', default: false },
+      output: { type: 'string', shortFlag: 'o' },
+      json: { type: 'boolean', shortFlag: 'j', default: false },
+      full: { type: 'boolean', default: false },
+      limit: { type: 'number', shortFlag: 'l', default: 10 },
+      page: { type: 'number', default: 1 },
+      wait: { type: 'boolean', default: true },
+      asset: { type: 'string', shortFlag: 'a', isMultiple: true },
     },
   }
 );
 
-// Set output context for JSON mode
-setOutputContext({ json: cli.flags.json });
-
 const [command, subcommand, ...args] = cli.input;
 
-// Type assertion for flags
-const flags = cli.flags as {
-  network: string;
+// Load config defaults
+const config = loadConfig();
+
+// Type assertion for raw flags (meow is loosely typed)
+const rawFlags = cli.flags as {
+  network?: string;
   wallet?: string;
   password?: string;
   dryRun: boolean;
@@ -152,7 +117,32 @@ const flags = cli.flags as {
   asset?: string[];
 };
 
-render(
+const network = rawFlags.network ?? config.network ?? 'mainnet';
+if (!isValidNetwork(network)) {
+  exitWithError(errors.invalidArgument('network', `must be one of mainnet, preprod, preview (got ${network})`));
+}
+
+const flags: AppFlags = {
+  network,
+  wallet: rawFlags.wallet ?? config.defaultWallet,
+  password: rawFlags.password,
+  dryRun: rawFlags.dryRun,
+  output: rawFlags.output,
+  json: rawFlags.json,
+  full: rawFlags.full,
+  wait: rawFlags.wait,
+  limit: rawFlags.limit,
+  page: rawFlags.page,
+  asset: rawFlags.asset,
+};
+
+setOutputContext({ json: flags.json });
+
+if (flags.json && !command) {
+  exitWithError(errors.missingArgument('command'));
+}
+
+const { waitUntilExit } = render(
   <App
     command={command}
     subcommand={subcommand}
@@ -161,3 +151,7 @@ render(
     showHelp={cli.showHelp}
   />
 );
+
+waitUntilExit()
+  .then(() => process.exit(0))
+  .catch(() => process.exit(1));

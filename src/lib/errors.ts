@@ -1,5 +1,6 @@
 /**
- * Error classes and codes for begin-cli
+ * Error classes and codes for begin-cli.
+ *
  * Exit codes:
  *   0 - Success
  *   1 - General error (system/network issues)
@@ -19,7 +20,7 @@ export enum ErrorCode {
   CONFIG_ERROR = 'CONFIG_ERROR',
   PROVIDER_ERROR = 'PROVIDER_ERROR',
   WALLET_ERROR = 'WALLET_ERROR',
-  
+
   // User errors (exit code 2)
   INVALID_ARGUMENT = 'INVALID_ARGUMENT',
   MISSING_ARGUMENT = 'MISSING_ARGUMENT',
@@ -30,7 +31,6 @@ export enum ErrorCode {
   UNKNOWN_COMMAND = 'UNKNOWN_COMMAND',
 }
 
-// Map error codes to exit codes
 const userErrorCodes = new Set<ErrorCode>([
   ErrorCode.INVALID_ARGUMENT,
   ErrorCode.MISSING_ARGUMENT,
@@ -46,11 +46,7 @@ export class BeginError extends Error {
   public readonly exitCode: ExitCode;
   public readonly details?: Record<string, unknown>;
 
-  constructor(
-    message: string,
-    code: ErrorCode = ErrorCode.UNKNOWN_ERROR,
-    details?: Record<string, unknown>
-  ) {
+  constructor(message: string, code: ErrorCode = ErrorCode.UNKNOWN_ERROR, details?: Record<string, unknown>) {
     super(message);
     this.name = 'BeginError';
     this.code = code;
@@ -84,7 +80,11 @@ export const errors = {
     new BeginError('Invalid Cardano address', ErrorCode.INVALID_ADDRESS, address ? { address } : undefined),
 
   invalidAmount: (amount?: string) =>
-    new BeginError('Invalid amount: must be a positive number', ErrorCode.INVALID_AMOUNT, amount ? { amount } : undefined),
+    new BeginError(
+      'Invalid amount: must be a positive number',
+      ErrorCode.INVALID_AMOUNT,
+      amount ? { amount } : undefined
+    ),
 
   walletNotFound: (name: string) =>
     new BeginError(`Wallet not found: ${name}`, ErrorCode.WALLET_NOT_FOUND, { wallet: name }),
@@ -99,26 +99,17 @@ export const errors = {
   unknownCommand: (command: string) =>
     new BeginError(`Unknown command: ${command}`, ErrorCode.UNKNOWN_COMMAND, { command }),
 
-  networkError: (message: string) =>
-    new BeginError(message, ErrorCode.NETWORK_ERROR),
+  networkError: (message: string) => new BeginError(message, ErrorCode.NETWORK_ERROR),
 
-  providerError: (message: string) =>
-    new BeginError(message, ErrorCode.PROVIDER_ERROR),
+  providerError: (message: string) => new BeginError(message, ErrorCode.PROVIDER_ERROR),
 
-  configError: (message: string) =>
-    new BeginError(message, ErrorCode.CONFIG_ERROR),
+  configError: (message: string) => new BeginError(message, ErrorCode.CONFIG_ERROR),
 
-  walletError: (message: string) =>
-    new BeginError(message, ErrorCode.WALLET_ERROR),
+  walletError: (message: string) => new BeginError(message, ErrorCode.WALLET_ERROR),
 };
 
-// Convert any error to BeginError
 export function toBeginError(err: unknown): BeginError {
-  if (err instanceof BeginError) {
-    return err;
-  }
-  if (err instanceof Error) {
-    return new BeginError(err.message, ErrorCode.UNKNOWN_ERROR);
-  }
+  if (err instanceof BeginError) return err;
+  if (err instanceof Error) return new BeginError(err.message, ErrorCode.UNKNOWN_ERROR);
   return new BeginError(String(err), ErrorCode.UNKNOWN_ERROR);
 }

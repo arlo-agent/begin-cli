@@ -3,10 +3,10 @@
  * Uses @meshsdk/core with BlockfrostProvider
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Box, Text } from 'ink';
 import { createProvider, hasApiKey, type Asset } from '../../lib/provider.js';
-import { outputSuccess, outputError } from '../../lib/output.js';
+import { outputSuccess, outputError, truncateAddress } from '../../lib/output.js';
 import { ExitCode } from '../../lib/errors.js';
 import type { Network } from '../../lib/config.js';
 
@@ -30,6 +30,12 @@ interface CardanoBalanceProps {
   json: boolean;
 }
 
+function lovelaceToAda(lovelace: bigint): string {
+  const whole = lovelace / 1_000_000n;
+  const frac = lovelace % 1_000_000n;
+  return `${whole.toString()}.${frac.toString().padStart(6, '0')}`;
+}
+
 function parseAssetUnit(unit: string): { policyId: string; assetName: string; assetNameHex: string } {
   const policyId = unit.slice(0, 56);
   const assetNameHex = unit.slice(56);
@@ -48,16 +54,15 @@ async function fetchBalance(address: string, network: Network): Promise<BalanceI
   const provider = createProvider(network);
   const utxos = await provider.fetchAddressUTxOs(address);
 
-  // Aggregate all amounts across UTXOs
-  let totalLovelace = BigInt(0);
+  let totalLovelace = 0n;
   const tokenMap = new Map<string, bigint>();
 
   for (const utxo of utxos) {
-    for (const asset of utxo.output.amount) {
+    for (const asset of utxo.output.amount as Asset[]) {
       if (asset.unit === 'lovelace') {
         totalLovelace += BigInt(asset.quantity);
       } else {
-        const current = tokenMap.get(asset.unit) || BigInt(0);
+        const current = tokenMap.get(asset.unit) || 0n;
         tokenMap.set(asset.unit, current + BigInt(asset.quantity));
       }
     }
@@ -66,16 +71,9 @@ async function fetchBalance(address: string, network: Network): Promise<BalanceI
   const tokens: TokenInfo[] = [];
   for (const [unit, quantity] of tokenMap) {
     const { policyId, assetName, assetNameHex } = parseAssetUnit(unit);
-    tokens.push({
-      policyId,
-      assetName,
-      assetNameHex,
-      quantity: quantity.toString(),
-      unit,
-    });
+    tokens.push({ policyId, assetName, assetNameHex, quantity: quantity.toString(), unit });
   }
 
-  // Sort tokens by policy ID then asset name
   tokens.sort((a, b) => {
     if (a.policyId !== b.policyId) return a.policyId.localeCompare(b.policyId);
     return a.assetName.localeCompare(b.assetName);
@@ -83,7 +81,7 @@ async function fetchBalance(address: string, network: Network): Promise<BalanceI
 
   return {
     lovelace: totalLovelace.toString(),
-    ada: (Number(totalLovelace) / 1_000_000).toFixed(6),
+    ada: lovelaceToAda(totalLovelace),
     tokens,
   };
 }
@@ -172,7 +170,7 @@ export function CardanoBalance({ address, network, json }: CardanoBalanceProps) 
 
       <Box>
         <Text color="gray">Address: </Text>
-        <Text>{address.slice(0, 20)}...{address.slice(-10)}</Text>
+        <Text>{truncateAddress(address)}</Text>
       </Box>
 
       <Box marginTop={1}>

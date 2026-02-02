@@ -16,23 +16,25 @@ import { WalletRestore } from './commands/wallet/restore.js';
 import { isValidNetwork, type Network } from './lib/config.js';
 import type { NetworkType } from './lib/address.js';
 
+export interface AppFlags {
+  network: string;
+  wallet?: string;
+  password?: string;
+  dryRun: boolean;
+  output?: string;
+  json: boolean;
+  full: boolean;
+  wait: boolean;
+  limit: number;
+  page: number;
+  asset?: string[];
+}
+
 interface AppProps {
   command?: string;
   subcommand?: string;
   args: string[];
-  flags: {
-    network: string;
-    wallet?: string;
-    password?: string;
-    dryRun: boolean;
-    output?: string;
-    json: boolean;
-    full: boolean;
-    wait: boolean;
-    limit: number;
-    page: number;
-    asset?: string[];
-  };
+  flags: AppFlags;
   showHelp: () => void;
 }
 
@@ -46,7 +48,7 @@ function invalidUsage(message: string, usage: string) {
 }
 
 export function App({ command, subcommand, args, flags, showHelp }: AppProps) {
-  // No command provided
+  // No command provided (non-JSON mode only - JSON handled in cli.tsx)
   if (!command) {
     showHelp();
     return null;

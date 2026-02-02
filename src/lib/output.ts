@@ -1,5 +1,5 @@
 /**
- * Output helpers for JSON vs pretty print modes
+ * Output helpers for JSON vs pretty print modes.
  */
 
 import { BeginError, toBeginError, ExitCode } from './errors.js';
@@ -40,13 +40,12 @@ export function isJsonMode(): boolean {
 /**
  * Output success data
  * - In JSON mode: prints {"success": true, "data": {...}}
- * - In pretty mode: does nothing (let Ink handle display)
+ * - In pretty mode: does nothing (Ink handles display)
  */
 export function outputSuccess<T>(data: T): void {
-  if (globalContext.json) {
-    const output: JsonSuccess<T> = { success: true, data };
-    console.log(JSON.stringify(output, null, 2));
-  }
+  if (!globalContext.json) return;
+  const output: JsonSuccess<T> = { success: true, data };
+  console.log(JSON.stringify(output, null, 2));
 }
 
 /**
@@ -56,7 +55,6 @@ export function outputSuccess<T>(data: T): void {
  */
 export function outputError(err: unknown): void {
   const beginErr = toBeginError(err);
-  
   if (globalContext.json) {
     console.log(JSON.stringify(beginErr.toJSON(), null, 2));
   } else {
@@ -65,7 +63,7 @@ export function outputError(err: unknown): void {
 }
 
 /**
- * Exit with proper code based on error
+ * Exit with proper code based on error.
  */
 export function exitWithError(err: unknown): never {
   const beginErr = toBeginError(err);
@@ -74,36 +72,40 @@ export function exitWithError(err: unknown): never {
 }
 
 /**
- * Exit with success
+ * Exit with success.
  */
 export function exitSuccess<T>(data?: T): never {
-  if (data !== undefined) {
-    outputSuccess(data);
-  }
+  if (data !== undefined) outputSuccess(data);
   process.exit(ExitCode.SUCCESS);
 }
 
 /**
- * Format ADA amount from lovelace
+ * Format ADA amount from lovelace (safe BigInt math).
  */
 export function formatAda(lovelace: bigint | number | string): string {
-  const amount = BigInt(lovelace);
-  const ada = Number(amount) / 1_000_000;
-  return ada.toFixed(6);
+  const amount = typeof lovelace === 'bigint' ? lovelace : BigInt(lovelace);
+  const whole = amount / 1_000_000n;
+  const frac = amount % 1_000_000n;
+  return `${whole.toString()}.${frac.toString().padStart(6, '0')}`;
 }
 
 /**
- * Truncate address for display
+ * Truncate address for display.
  */
 export function truncateAddress(address: string, startLen = 20, endLen = 10): string {
-  if (address.length <= startLen + endLen + 3) {
-    return address;
-  }
+  if (address.length <= startLen + endLen + 3) return address;
   return `${address.slice(0, startLen)}...${address.slice(-endLen)}`;
 }
 
 /**
- * Format timestamp
+ * Back-compat alias (older code used formatAddress()).
+ */
+export function formatAddress(address: string, length = 16): string {
+  return truncateAddress(address, length, length);
+}
+
+/**
+ * Format timestamp (Date or unix seconds) as ISO.
  */
 export function formatTimestamp(date: Date | number): string {
   const d = typeof date === 'number' ? new Date(date * 1000) : date;
@@ -111,8 +113,7 @@ export function formatTimestamp(date: Date | number): string {
 }
 
 /**
- * Create a result object for commands
- * Used by Ink components to report results
+ * Result object for Ink commands that want to return structured data.
  */
 export interface CommandResult<T = unknown> {
   success: boolean;
