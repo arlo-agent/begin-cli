@@ -12,12 +12,13 @@ interface StakeDelegateProps {
   poolId: string;
   network: string;
   json: boolean;
+  yes?: boolean; // Skip confirmation prompt
   stakeAddress?: string; // Optional - in real impl would derive from wallet
 }
 
 type DelegateState = 'loading' | 'confirm' | 'building' | 'signing' | 'submitting' | 'success' | 'error' | 'cancelled';
 
-export function StakeDelegate({ poolId, network, json, stakeAddress }: StakeDelegateProps) {
+export function StakeDelegate({ poolId, network, json, yes, stakeAddress }: StakeDelegateProps) {
   const [state, setState] = useState<DelegateState>('loading');
   const [pool, setPool] = useState<StakePool | null>(null);
   const [needsRegistration, setNeedsRegistration] = useState(false);
@@ -45,7 +46,13 @@ export function StakeDelegate({ poolId, network, json, stakeAddress }: StakeDele
             setState('error');
             return;
           }
-          setState('confirm');
+          // If --yes flag, skip confirmation
+          if (yes) {
+            setState('building');
+            simulateDelegation();
+          } else {
+            setState('confirm');
+          }
           return;
         }
 
@@ -62,7 +69,13 @@ export function StakeDelegate({ poolId, network, json, stakeAddress }: StakeDele
         const status = await getDelegationStatus(effectiveStakeAddress, network);
         setNeedsRegistration(!status.isRegistered);
 
-        setState('confirm');
+        // If --yes flag, skip confirmation
+        if (yes) {
+          setState('building');
+          simulateDelegation();
+        } else {
+          setState('confirm');
+        }
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load pool data');
         setState('error');
@@ -70,7 +83,8 @@ export function StakeDelegate({ poolId, network, json, stakeAddress }: StakeDele
     };
 
     loadPoolData();
-  }, [poolId, network, effectiveStakeAddress]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [poolId, network, effectiveStakeAddress, yes]);
 
   useInput((input, key) => {
     if (state !== 'confirm') return;
