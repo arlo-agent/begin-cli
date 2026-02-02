@@ -207,6 +207,7 @@ export function App({ command, subcommand, args, flags, showHelp }: AppProps) {
           walletName={flags.wallet}
           password={flags.password}
           full={flags.full}
+          qr={flags.qr}
           json={flags.json}
         />
       );
