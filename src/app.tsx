@@ -30,6 +30,7 @@ export interface AppFlags {
   limit: number;
   page: number;
   asset?: string[];
+  yes?: boolean;
 }
 
 interface AppProps {
@@ -188,15 +189,39 @@ export function App({ command, subcommand, args, flags, showHelp }: AppProps) {
     if (subcommand === 'delegate') {
       const poolId = args[0];
       if (!poolId) return invalidUsage('Pool ID is required', 'begin stake delegate <pool-id>');
-      return <StakeDelegate poolId={poolId} network={flags.network} json={flags.json} />;
+      return (
+        <StakeDelegate
+          poolId={poolId}
+          network={flags.network}
+          json={flags.json}
+          yes={flags.yes}
+          walletName={flags.wallet}
+          password={flags.password}
+        />
+      );
     }
 
     if (subcommand === 'status') {
-      return <StakeStatus network={flags.network} json={flags.json} />;
+      return (
+        <StakeStatus
+          network={flags.network}
+          json={flags.json}
+          walletName={flags.wallet}
+          password={flags.password}
+        />
+      );
     }
 
     if (subcommand === 'withdraw') {
-      return <StakeWithdraw network={flags.network} json={flags.json} />;
+      return (
+        <StakeWithdraw
+          network={flags.network}
+          json={flags.json}
+          yes={flags.yes}
+          walletName={flags.wallet}
+          password={flags.password}
+        />
+      );
     }
 
     return (
