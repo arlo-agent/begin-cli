@@ -1,7 +1,7 @@
 {
-  "name": "begin-cli",
+  "name": "@beginwallet/cli",
   "version": "0.1.0",
-  "description": "A CLI tool for interacting with Cardano blockchain",
+  "description": "The first Cardano CLI wallet designed for AI agents",
   "type": "module",
   "bin": {
     "begin": "./dist/cli.js"
@@ -30,6 +30,7 @@
     "@meshsdk/core": "^1.9.0-beta.98",
     "bip39": "^3.1.0",
     "ink": "^5.0.1",
+    "ink-text-input": "^6.0.0",
     "meow": "^13.2.0",
     "react": "^18.3.1"
   },
