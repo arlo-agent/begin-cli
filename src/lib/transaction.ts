@@ -25,6 +25,7 @@ import {
   walletExists,
   getDefaultWallet,
   hasEnvMnemonic,
+  hasEnvPassword,
   listWallets,
 } from './keystore.js';
 
@@ -138,6 +139,13 @@ export async function loadWallet(
 /**
  * Check if a wallet source is available
  * Returns info about what's available for error messaging
+ * 
+ * Password priority:
+ * 1. --password flag (passed externally)
+ * 2. BEGIN_CLI_WALLET_PASSWORD env var
+ * 3. Interactive prompt
+ * 
+ * needsPassword will be false if BEGIN_CLI_WALLET_PASSWORD is set
  */
 export function checkWalletAvailability(walletName?: string): {
   available: boolean;
@@ -146,6 +154,9 @@ export function checkWalletAvailability(walletName?: string): {
   needsPassword: boolean;
   error?: string;
 } {
+  // Check if password is available via env var (affects needsPassword)
+  const hasPasswordFromEnv = hasEnvPassword();
+
   // If specific wallet requested, check it exists
   if (walletName) {
     if (walletExists(walletName)) {
@@ -153,7 +164,7 @@ export function checkWalletAvailability(walletName?: string): {
         available: true,
         source: 'wallet',
         walletName,
-        needsPassword: true,
+        needsPassword: !hasPasswordFromEnv,
       };
     }
     return {
@@ -163,7 +174,7 @@ export function checkWalletAvailability(walletName?: string): {
     };
   }
 
-  // Check environment variable
+  // Check environment variable for mnemonic
   if (hasEnvMnemonic()) {
     return {
       available: true,
@@ -179,7 +190,7 @@ export function checkWalletAvailability(walletName?: string): {
       available: true,
       source: 'wallet',
       walletName: defaultWallet,
-      needsPassword: true,
+      needsPassword: !hasPasswordFromEnv,
     };
   }
 
@@ -190,7 +201,7 @@ export function checkWalletAvailability(walletName?: string): {
       available: true,
       source: 'wallet',
       walletName: wallets[0],
-      needsPassword: true,
+      needsPassword: !hasPasswordFromEnv,
     };
   }
 

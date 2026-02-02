@@ -16,6 +16,9 @@ import { join } from 'path';
 // Environment variable name for mnemonic
 export const MNEMONIC_ENV_VAR = 'BEGIN_CLI_MNEMONIC';
 
+// Environment variable name for wallet password
+export const PASSWORD_ENV_VAR = 'BEGIN_CLI_WALLET_PASSWORD';
+
 // Base directory for begin-cli config
 export const CONFIG_DIR = join(homedir(), '.begin-cli');
 export const WALLETS_DIR = join(CONFIG_DIR, 'wallets');
@@ -83,6 +86,23 @@ export function getMnemonicFromEnv(): string | null {
  */
 export function hasEnvMnemonic(): boolean {
   return !!process.env[MNEMONIC_ENV_VAR];
+}
+
+/**
+ * Get password from environment variable
+ * 
+ * @returns Password string or null if not set
+ */
+export function getPasswordFromEnv(): string | null {
+  const password = process.env[PASSWORD_ENV_VAR];
+  return password || null;
+}
+
+/**
+ * Check if password environment variable is set
+ */
+export function hasEnvPassword(): boolean {
+  return !!process.env[PASSWORD_ENV_VAR];
 }
 
 /**

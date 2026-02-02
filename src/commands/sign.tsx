@@ -9,6 +9,7 @@ import {
   checkWalletAvailability,
   type TransactionConfig,
 } from '../lib/transaction.js';
+import { getPasswordFromEnv, PASSWORD_ENV_VAR } from '../lib/keystore.js';
 
 interface SignProps {
   txFile: string;
@@ -72,9 +73,12 @@ export function Sign({
       needsPassword: availability.needsPassword,
     });
 
+    // Password priority: --password flag > BEGIN_CLI_WALLET_PASSWORD env var > interactive prompt
+    const effectivePassword = initialPassword || getPasswordFromEnv() || undefined;
+
     // If using env var or password already provided, proceed to signing
-    if (!availability.needsPassword || initialPassword) {
-      doSign(initialPassword);
+    if (!availability.needsPassword || effectivePassword) {
+      doSign(effectivePassword);
     } else {
       setState('password');
     }

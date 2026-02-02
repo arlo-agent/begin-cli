@@ -17,6 +17,7 @@ import {
   checkWalletAvailability,
   type TransactionConfig,
 } from '../../lib/transaction.js';
+import { getPasswordFromEnv, PASSWORD_ENV_VAR } from '../../lib/keystore.js';
 import { outputSuccess, exitWithError } from '../../lib/output.js';
 import { ExitCode, errors } from '../../lib/errors.js';
 
@@ -41,6 +42,7 @@ interface CardanoSendProps {
   dryRun?: boolean;
   outputFile?: string;
   jsonOutput?: boolean;
+  yes?: boolean;
 }
 
 type SendState =
@@ -87,6 +89,7 @@ export function CardanoSend({
   dryRun = false,
   outputFile,
   jsonOutput = false,
+  yes = false,
 }: CardanoSendProps) {
   const { exit } = useApp();
   const [state, setState] = useState<SendState>('checking');
@@ -147,13 +150,16 @@ export function CardanoSend({
       needsPassword: availability.needsPassword,
     });
 
-    if (!availability.needsPassword || initialPassword) {
-      initWallet(initialPassword, availability.walletName, availability.source);
+    // Password priority: --password flag > BEGIN_CLI_WALLET_PASSWORD env var > interactive prompt
+    const effectivePassword = initialPassword || getPasswordFromEnv() || undefined;
+
+    if (!availability.needsPassword || effectivePassword) {
+      initWallet(effectivePassword, availability.walletName, availability.source);
       return;
     }
 
     if (jsonOutput) {
-      setError('Password required (pass --password or use BEGIN_CLI_MNEMONIC)');
+      setError(`Password required (pass --password, set ${PASSWORD_ENV_VAR}, or use BEGIN_CLI_MNEMONIC)`);
       setState('error');
       exitWithError(errors.missingArgument('password'));
       return;
@@ -172,8 +178,11 @@ export function CardanoSend({
     try {
       setState('building');
 
+      // Password priority: local state (from prompt) > --password flag > env var
+      const effectivePassword = password || initialPassword || getPasswordFromEnv() || undefined;
+
       const wallet = await loadWallet(
-        { walletName: walletInfo?.walletName, password: password || initialPassword },
+        { walletName: walletInfo?.walletName, password: effectivePassword },
         config
       );
 
@@ -297,12 +306,12 @@ export function CardanoSend({
     }
   };
 
-  // Auto-proceed in JSON mode once ready (no interactive confirmation)
+  // Auto-proceed in JSON mode or with --yes flag (no interactive confirmation)
   useEffect(() => {
-    if (jsonOutput && state === 'confirm') {
+    if ((jsonOutput || yes) && state === 'confirm') {
       handleSend();
     }
-  }, [jsonOutput, state]);
+  }, [jsonOutput, yes, state]);
 
   // Handle keyboard input for confirmation
   useInput((input, key) => {
