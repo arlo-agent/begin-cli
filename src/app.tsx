@@ -30,6 +30,7 @@ export interface AppFlags {
   limit: number;
   page: number;
   asset?: string[];
+  yes: boolean;
 }
 
 interface AppProps {
@@ -167,6 +168,7 @@ export function App({ command, subcommand, args, flags, showHelp }: AppProps) {
           dryRun={flags.dryRun}
           outputFile={flags.output}
           jsonOutput={flags.json}
+          yes={flags.yes}
         />
       );
     }
