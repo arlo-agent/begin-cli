@@ -26,9 +26,9 @@ const cli = meow(
     wallet restore <name>            Restore a wallet from mnemonic (interactive)
 
     stake pools [search]             List/search stake pools (mock)
-    stake delegate <pool-id>         Delegate stake to a pool (mock)
+    stake delegate <pool-id>         Delegate stake to a pool (mock, supports --yes)
     stake status                     Check delegation status and rewards (mock)
-    stake withdraw                   Withdraw staking rewards (mock)
+    stake withdraw                   Withdraw staking rewards (mock, supports --yes)
 
     sign <tx-file>                   Sign an unsigned transaction file
     submit <signed-tx-file>          Submit a signed transaction file
@@ -102,6 +102,7 @@ const cli = meow(
       page: { type: 'number', default: 1 },
       wait: { type: 'boolean', default: true },
       asset: { type: 'string', shortFlag: 'a', isMultiple: true },
+      yes: { type: 'boolean', shortFlag: 'y', default: false },
     },
   }
 );
@@ -125,6 +126,7 @@ const rawFlags = cli.flags as {
   limit: number;
   page: number;
   asset?: string[];
+  yes: boolean;
 };
 
 const network = rawFlags.network ?? config.network ?? 'mainnet';
@@ -145,6 +147,7 @@ const flags: AppFlags = {
   limit: rawFlags.limit,
   page: rawFlags.page,
   asset: rawFlags.asset,
+  yes: rawFlags.yes,
 };
 
 setOutputContext({ json: flags.json });
