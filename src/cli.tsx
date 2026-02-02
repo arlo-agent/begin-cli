@@ -8,27 +8,74 @@ import { setOutputContext } from './lib/output.js';
 const cli = meow(
   `
   Usage
-    $ begin <command> [options]
+    $ begin <command> [subcommand] [...args] [options]
 
   Commands
-    balance <address>    Check ADA balance for an address
-    utxos <address>      List UTXOs for an address
-    history <address>    Show transaction history for an address
-    send <to> <amount>   Send ADA to an address
+    cardano balance <address>        Check ADA balance for an address
+    cardano utxos <address>          List UTXOs for an address
+    cardano history <address>        Show transaction history for an address
+    cardano send <to> <amount>       Send ADA (and native assets)
+
+    wallet address                   Show derived wallet addresses
+    wallet create <name>             Create a new wallet (interactive)
+    wallet restore <name>            Restore a wallet from mnemonic (interactive)
+
+    stake pools [search]             List/search stake pools (mock)
+    stake delegate <pool-id>         Delegate stake to a pool (mock)
+    stake status                     Check delegation status and rewards (mock)
+    stake withdraw                   Withdraw staking rewards (mock)
+
+    sign <tx-file>                   Sign an unsigned transaction file
+    submit <signed-tx-file>          Submit a signed transaction file
 
   Options
-    --network, -n   Network to use (mainnet, preprod, preview) [default: mainnet]
-    --json          Output as JSON (machine-readable)
-    --limit         Number of items to show (history) [default: 10]
-    --page          Page number for pagination (history) [default: 1]
-    --help          Show this help message
-    --version       Show version
+    --network, -n     Network to use (mainnet, preprod, preview) [default: mainnet]
+    --wallet, -w      Wallet name from keystore (uses default if not specified)
+    --password        Password for wallet decryption (or set interactively)
+    --dry-run, -d     Build transaction but don't submit (save unsigned tx)
+    --output, -o      Output file path for unsigned/signed transaction
+    --json, -j        Output result as JSON
+    --full            Show full addresses (wallet address)
+    --limit, -l       Number of items to show (history) [default: 10]
+    --page            Page number for pagination (history) [default: 1]
+    --no-wait         Don't wait for confirmation (submit only)
+    --asset, -a       Native asset to send (format: policyId.assetName:amount)
+                      Can be specified multiple times
+    --help            Show this help message
+    --version         Show version
+
+  Environment
+    BEGIN_CLI_MNEMONIC    Mnemonic for CI/agent use (bypasses keystore)
+
+  Environment Variables
+    BLOCKFROST_API_KEY           API key for all networks
+    BLOCKFROST_API_KEY_MAINNET   API key for mainnet (overrides generic)
+    BLOCKFROST_API_KEY_PREPROD   API key for preprod (overrides generic)
+    BLOCKFROST_API_KEY_PREVIEW   API key for preview (overrides generic)
+
+  Get a free Blockfrost API key at: https://blockfrost.io
 
   Examples
-    $ begin balance addr1qy...
-    $ begin utxos addr1qy... --json
-    $ begin history addr1qy... --limit 20 --page 2
-    $ begin balance addr1qy... --network preprod
+    # Cardano read-only
+    $ begin cardano balance addr1qy...
+    $ begin cardano utxos addr1qy... --json
+    $ begin cardano history addr1qy... --limit 20 --page 2
+
+    # Create/restore wallets
+    $ begin wallet create my-wallet
+    $ begin wallet restore my-wallet
+    $ begin wallet address --full
+
+    # Send ADA (uses default wallet, prompts for password)
+    $ begin cardano send addr1qy... 10
+    $ begin cardano send addr1qy... 10 --wallet my-wallet --password mypass
+    $ begin cardano send addr1qy... 2 --asset abc123...def.HOSKY:1000
+
+    # Offline signing workflow
+    $ begin cardano send addr1qy... 10 --dry-run --output tx.unsigned
+    $ begin sign tx.unsigned --wallet my-wallet --password mypass
+    $ begin submit tx.signed --network preprod --no-wait --json
+    $ BEGIN_CLI_MNEMONIC="word1 word2 ..." begin cardano send addr1... 10
 `,
   {
     importMeta: import.meta,
@@ -38,17 +85,48 @@ const cli = meow(
         shortFlag: 'n',
         default: 'mainnet',
       },
+      wallet: {
+        type: 'string',
+        shortFlag: 'w',
+      },
+      password: {
+        type: 'string',
+      },
+      dryRun: {
+        type: 'boolean',
+        shortFlag: 'd',
+        default: false,
+      },
+      output: {
+        type: 'string',
+        shortFlag: 'o',
+      },
       json: {
+        type: 'boolean',
+        shortFlag: 'j',
+        default: false,
+      },
+      full: {
         type: 'boolean',
         default: false,
       },
       limit: {
         type: 'number',
+        shortFlag: 'l',
         default: 10,
       },
       page: {
         type: 'number',
         default: 1,
+      },
+      wait: {
+        type: 'boolean',
+        default: true,
+      },
+      asset: {
+        type: 'string',
+        shortFlag: 'a',
+        isMultiple: true,
       },
     },
   }
@@ -57,13 +135,29 @@ const cli = meow(
 // Set output context for JSON mode
 setOutputContext({ json: cli.flags.json });
 
-const [command, ...args] = cli.input;
+const [command, subcommand, ...args] = cli.input;
+
+// Type assertion for flags
+const flags = cli.flags as {
+  network: string;
+  wallet?: string;
+  password?: string;
+  dryRun: boolean;
+  output?: string;
+  json: boolean;
+  full: boolean;
+  wait: boolean;
+  limit: number;
+  page: number;
+  asset?: string[];
+};
 
 render(
   <App
     command={command}
+    subcommand={subcommand}
     args={args}
-    flags={cli.flags}
+    flags={flags}
     showHelp={cli.showHelp}
   />
 );
