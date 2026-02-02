@@ -96,14 +96,61 @@ export interface MinswapApiError {
 }
 
 /**
+ * Retry configuration
+ */
+interface RetryConfig {
+  maxRetries: number;
+  baseDelayMs: number;
+  maxDelayMs: number;
+}
+
+const DEFAULT_RETRY_CONFIG: RetryConfig = {
+  maxRetries: 3,
+  baseDelayMs: 1000,
+  maxDelayMs: 10000,
+};
+
+/**
+ * Sleep for a given number of milliseconds
+ */
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * Check if a status code is retryable (429 or 5xx)
+ */
+function isRetryableStatus(status: number): boolean {
+  return status === 429 || (status >= 500 && status < 600);
+}
+
+/**
+ * Calculate delay with exponential backoff and jitter
+ */
+function calculateBackoffDelay(
+  attempt: number,
+  baseDelayMs: number,
+  maxDelayMs: number
+): number {
+  // Exponential backoff: baseDelay * 2^attempt
+  const exponentialDelay = baseDelayMs * Math.pow(2, attempt);
+  // Cap at maxDelay
+  const cappedDelay = Math.min(exponentialDelay, maxDelayMs);
+  // Add jitter (±25%)
+  const jitter = cappedDelay * 0.25 * (Math.random() * 2 - 1);
+  return Math.floor(cappedDelay + jitter);
+}
+
+/**
  * Minswap Aggregator API client
  */
 export class MinswapClient {
   private baseUrl: string;
   private network: string;
   private partner?: string;
+  private retryConfig: RetryConfig;
 
-  constructor(network: string, partner?: string) {
+  constructor(network: string, partner?: string, retryConfig?: Partial<RetryConfig>) {
     const url = MINSWAP_API_URLS[network];
     if (!url) {
       throw new Error(`Unsupported network: ${network}. Use mainnet or preprod.`);
@@ -111,37 +158,82 @@ export class MinswapClient {
     this.baseUrl = url;
     this.network = network;
     this.partner = partner;
+    this.retryConfig = { ...DEFAULT_RETRY_CONFIG, ...retryConfig };
   }
 
   /**
-   * Make API request with error handling
+   * Make API request with error handling and retry logic
    */
   private async request<T>(
     endpoint: string,
     options: RequestInit = {}
   ): Promise<T> {
     const url = `${this.baseUrl}${endpoint}`;
+    let lastError: Error | null = null;
     
-    const response = await fetch(url, {
-      ...options,
-      headers: {
-        'Content-Type': 'application/json',
-        ...options.headers,
-      },
-    });
-
-    if (!response.ok) {
-      let errorMessage = `Minswap API error: ${response.status}`;
+    for (let attempt = 0; attempt <= this.retryConfig.maxRetries; attempt++) {
       try {
-        const errorData = await response.json() as MinswapApiError;
-        errorMessage = errorData.message || errorData.error || errorMessage;
-      } catch {
-        // Use default error message
+        const response = await fetch(url, {
+          ...options,
+          headers: {
+            'Content-Type': 'application/json',
+            ...options.headers,
+          },
+        });
+
+        if (!response.ok) {
+          // Check if this is a retryable error
+          if (isRetryableStatus(response.status) && attempt < this.retryConfig.maxRetries) {
+            const delay = calculateBackoffDelay(
+              attempt,
+              this.retryConfig.baseDelayMs,
+              this.retryConfig.maxDelayMs
+            );
+            console.warn(
+              `Minswap API returned ${response.status}, retrying in ${delay}ms ` +
+              `(attempt ${attempt + 1}/${this.retryConfig.maxRetries + 1})`
+            );
+            await sleep(delay);
+            continue;
+          }
+
+          let errorMessage = `Minswap API error: ${response.status}`;
+          try {
+            const errorData = await response.json() as MinswapApiError;
+            errorMessage = errorData.message || errorData.error || errorMessage;
+          } catch {
+            // Use default error message
+          }
+          throw new Error(errorMessage);
+        }
+
+        return response.json() as Promise<T>;
+      } catch (err) {
+        lastError = err instanceof Error ? err : new Error(String(err));
+        
+        // Only retry on network errors or retryable status codes
+        // If it's not a network error (i.e., we got a response), don't retry
+        if (err instanceof TypeError && err.message.includes('fetch')) {
+          // Network error - retry
+          if (attempt < this.retryConfig.maxRetries) {
+            const delay = calculateBackoffDelay(
+              attempt,
+              this.retryConfig.baseDelayMs,
+              this.retryConfig.maxDelayMs
+            );
+            console.warn(
+              `Network error, retrying in ${delay}ms ` +
+              `(attempt ${attempt + 1}/${this.retryConfig.maxRetries + 1})`
+            );
+            await sleep(delay);
+            continue;
+          }
+        }
+        throw lastError;
       }
-      throw new Error(errorMessage);
     }
 
-    return response.json() as Promise<T>;
+    throw lastError || new Error('Request failed after retries');
   }
 
   /**

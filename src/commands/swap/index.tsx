@@ -253,7 +253,7 @@ export function Swap({
       setState('signing');
 
       const signedTx = await wallet.signTx(buildResult.cbor);
-      const witnessSet = extractWitnessSet(signedTx);
+      const witnessSet = await extractWitnessSet(signedTx);
 
       // Submit transaction
       setState('submitting');
@@ -301,13 +301,13 @@ export function Swap({
   // JSON output for non-success states
   if (json && state === 'error') {
     console.log(JSON.stringify({ error, from, to, amount }, null, 2));
-    process.exit(1);
+    exit();
     return null;
   }
 
   if (json && state === 'cancelled') {
     console.log(JSON.stringify({ status: 'cancelled' }));
-    process.exit(0);
+    exit();
     return null;
   }
 

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Box, Text } from 'ink';
+import { Box, Text, useApp } from 'ink';
 import {
   createMinswapClient,
   MockMinswapClient,
@@ -37,6 +37,7 @@ export function SwapQuote({
   network,
   json,
 }: SwapQuoteProps) {
+  const { exit } = useApp();
   const [state, setState] = useState<QuoteState>('resolving');
   const [error, setError] = useState<string | null>(null);
   const [fromToken, setFromToken] = useState<ResolvedToken | null>(null);
@@ -105,7 +106,7 @@ export function SwapQuote({
 
     if (state === 'error') {
       console.log(JSON.stringify({ error, from, to, amount }, null, 2));
-      process.exit(1);
+      exit();
       return null;
     }
 
@@ -142,7 +143,7 @@ export function SwapQuote({
           2
         )
       );
-      process.exit(0);
+      exit();
       return null;
     }
 

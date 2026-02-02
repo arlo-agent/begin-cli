@@ -294,8 +294,9 @@ export function formatSwapQuote(
  * 
  * @param signedTxCbor - Signed transaction CBOR hex string
  * @returns Witness set hex string
+ * @throws Error if witness set extraction fails
  */
-export function extractWitnessSet(signedTxCbor: string): string {
+export async function extractWitnessSet(signedTxCbor: string): Promise<string> {
   // The signed transaction is a CBOR array: [body, witnessSet, isValid, auxiliaryData]
   // We need to extract the witnessSet (index 1)
   // 
@@ -304,21 +305,23 @@ export function extractWitnessSet(signedTxCbor: string): string {
   // A proper implementation would use a CBOR library
   
   // Note: In production, use @emurgo/cardano-serialization-lib or similar
-  // For now, we return the signed tx and let the API handle extraction
-  // or implement proper CBOR parsing
   
   try {
-    // Try to use MeshJS if available
-    const { deserializeTx } = require('@meshsdk/core');
+    // Dynamically import MeshJS core-cst for transaction deserialization
+    const { deserializeTx } = await import('@meshsdk/core-cst');
     const tx = deserializeTx(signedTxCbor);
     
     // Get witness set from deserialized tx
-    const witnessSet = tx.witness_set();
-    return witnessSet.to_hex();
-  } catch {
-    // Fallback: return the full signed tx
-    // The API may be able to extract witnesses itself
-    return signedTxCbor;
+    const witnessSet = tx.witnessSet();
+    return witnessSet.toCbor();
+  } catch (err) {
+    // Log warning and throw an error - don't silently fall back
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    console.warn(`Warning: Failed to extract witness set: ${message}`);
+    throw new Error(
+      `Failed to extract witness set from signed transaction: ${message}. ` +
+      `Ensure @meshsdk/core-cst is properly installed.`
+    );
   }
 }
 
