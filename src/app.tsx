@@ -12,6 +12,8 @@ import { StakeWithdraw } from './commands/stake/withdraw.js';
 import { Sign } from './commands/sign.js';
 import { Submit } from './commands/submit.js';
 import { WalletAddress } from './commands/wallet/address.js';
+import { Swap, SwapCancel, SwapOrders } from './commands/swap/index.js';
+import { SwapQuote } from './commands/swap/quote.js';
 import { WalletCreate } from './commands/wallet/create.js';
 import { WalletRestore } from './commands/wallet/restore.js';
 import { isValidNetwork, type Network } from './lib/config.js';
@@ -30,7 +32,16 @@ export interface AppFlags {
   limit: number;
   page: number;
   asset?: string[];
-  yes?: boolean;
+  // Swap-specific flags
+  from?: string;
+  to?: string;
+  amount?: string;
+  slippage: number;
+  multiHop: boolean;
+  yes: boolean;
+  address?: string;
+  id?: string[];
+  protocol?: string;
 }
 
 interface AppProps {
@@ -161,13 +172,14 @@ export function App({ command, subcommand, args, flags, showHelp }: AppProps) {
         <CardanoSend
           to={to}
           amount={amount}
-          network={flags.network}
+          network={network}
           walletName={flags.wallet}
           password={flags.password}
           assets={flags.asset}
           dryRun={flags.dryRun}
           outputFile={flags.output}
           jsonOutput={flags.json}
+          yes={flags.yes}
         />
       );
     }
@@ -189,7 +201,16 @@ export function App({ command, subcommand, args, flags, showHelp }: AppProps) {
     if (subcommand === 'delegate') {
       const poolId = args[0];
       if (!poolId) return invalidUsage('Pool ID is required', 'begin stake delegate <pool-id>');
-      return <StakeDelegate poolId={poolId} network={flags.network} json={flags.json} yes={flags.yes} />;
+      return (
+        <StakeDelegate
+          poolId={poolId}
+          network={flags.network}
+          json={flags.json}
+          yes={flags.yes}
+          walletName={flags.wallet}
+          password={flags.password}
+        />
+      );
     }
 
     if (subcommand === 'status') {
@@ -197,7 +218,15 @@ export function App({ command, subcommand, args, flags, showHelp }: AppProps) {
     }
 
     if (subcommand === 'withdraw') {
-      return <StakeWithdraw network={flags.network} json={flags.json} yes={flags.yes} />;
+      return (
+        <StakeWithdraw
+          network={flags.network}
+          json={flags.json}
+          yes={flags.yes}
+          walletName={flags.wallet}
+          password={flags.password}
+        />
+      );
     }
 
     return (
@@ -239,6 +268,107 @@ export function App({ command, subcommand, args, flags, showHelp }: AppProps) {
         <Text color="red">Unknown wallet command: {subcommand || '(none)'}</Text>
         <Text color="gray">Available commands: address, create, restore</Text>
       </Box>
+    );
+  }
+
+  // Route to swap commands
+  if (command === 'swap') {
+    // Swap quote subcommand: begin swap quote --from ADA --to MIN --amount 100
+    if (subcommand === 'quote') {
+      if (!flags.from || !flags.to || !flags.amount) {
+        return (
+          <Box flexDirection="column">
+            <Text color="red">Error: --from, --to, and --amount are required</Text>
+            <Text color="gray">Usage: begin swap quote --from {'<token>'} --to {'<token>'} --amount {'<amount>'}</Text>
+            <Text color="gray">Options:</Text>
+            <Text color="gray">  --slippage, -s   Slippage tolerance % (default: 0.5)</Text>
+            <Text color="gray">  --multi-hop      Allow multi-hop routing (default: true)</Text>
+            <Text color="gray">  --json, -j       Output as JSON</Text>
+          </Box>
+        );
+      }
+      return (
+        <SwapQuote
+          from={flags.from}
+          to={flags.to}
+          amount={flags.amount}
+          slippage={flags.slippage}
+          multiHop={flags.multiHop}
+          network={flags.network}
+          json={flags.json}
+        />
+      );
+    }
+
+    if (subcommand === 'orders') {
+      return (
+        <SwapOrders
+          network={flags.network}
+          walletName={flags.wallet}
+          password={flags.password}
+          address={flags.address}
+          json={flags.json}
+        />
+      );
+    }
+
+    if (subcommand === 'cancel') {
+      if (!flags.id || flags.id.length === 0) {
+        return (
+          <Box flexDirection="column">
+            <Text color="red">Error: --id is required</Text>
+            <Text color="gray">Usage: begin swap cancel --id {'<tx-in>'}</Text>
+            <Text color="gray">Options:</Text>
+            <Text color="gray">  --id, -i         Pending order tx_in (can repeat)</Text>
+            <Text color="gray">  --protocol       Protocol if not found in pending orders</Text>
+            <Text color="gray">  --yes, -y        Skip confirmation prompt</Text>
+            <Text color="gray">  --json, -j       Output as JSON</Text>
+          </Box>
+        );
+      }
+      return (
+        <SwapCancel
+          network={flags.network}
+          walletName={flags.wallet}
+          password={flags.password}
+          ids={flags.id}
+          protocol={flags.protocol}
+          yes={flags.yes}
+          json={flags.json}
+        />
+      );
+    }
+
+    // Main swap command: begin swap --from ADA --to MIN --amount 100
+    if (!flags.from || !flags.to || !flags.amount) {
+      return (
+        <Box flexDirection="column">
+          <Text color="red">Error: --from, --to, and --amount are required</Text>
+          <Text color="gray">Usage: begin swap --from {'<token>'} --to {'<token>'} --amount {'<amount>'}</Text>
+          <Text color="gray">Options:</Text>
+          <Text color="gray">  --slippage, -s   Slippage tolerance % (default: 0.5)</Text>
+          <Text color="gray">  --multi-hop      Allow multi-hop routing (default: true)</Text>
+          <Text color="gray">  --yes, -y        Skip confirmation prompt</Text>
+          <Text color="gray">  --json, -j       Output as JSON</Text>
+          <Text color="gray">Subcommands:</Text>
+          <Text color="gray">  quote            Get a swap quote without executing</Text>
+        </Box>
+      );
+    }
+
+    return (
+      <Swap
+        from={flags.from}
+        to={flags.to}
+        amount={flags.amount}
+        slippage={flags.slippage}
+        multiHop={flags.multiHop}
+        yes={flags.yes}
+        network={flags.network}
+        walletName={flags.wallet}
+        password={flags.password}
+        json={flags.json}
+      />
     );
   }
 

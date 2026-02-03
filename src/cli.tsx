@@ -26,12 +26,17 @@ const cli = meow(
     wallet restore <name>            Restore a wallet from mnemonic (interactive)
 
     stake pools [search]             List/search stake pools (mock)
-    stake delegate <pool-id>         Delegate stake to a pool (mock, supports --yes)
+    stake delegate <pool-id>         Delegate stake to a pool (mock) (supports --yes)
     stake status                     Check delegation status and rewards (mock)
-    stake withdraw                   Withdraw staking rewards (mock, supports --yes)
+    stake withdraw                   Withdraw staking rewards (mock) (supports --yes)
 
     sign <tx-file>                   Sign an unsigned transaction file
     submit <signed-tx-file>          Submit a signed transaction file
+
+    swap [options]               Swap tokens via Minswap aggregator
+    swap quote [options]         Get a swap quote without executing
+    swap orders [options]        List pending swap orders
+    swap cancel --id <tx-in>     Cancel pending swap order(s)
 
   Options
     --network, -n     Network to use (mainnet, preprod, preview) [default: mainnet]
@@ -49,6 +54,17 @@ const cli = meow(
                       Can be specified multiple times
     --help            Show this help message
     --version         Show version
+
+  Swap Options
+    --from            Token to swap from (ADA, MIN, policyId.assetName, etc.)
+    --to              Token to swap to
+    --amount          Amount of input token to swap
+    --slippage, -s    Slippage tolerance in % [default: 0.5]
+    --multi-hop       Allow multi-hop routing [default: true]
+    --yes, -y         Skip confirmation prompt
+    --id, -i          Pending order tx_in (repeatable for cancel)
+    --address         Wallet address for swap orders (read-only)
+    --protocol        Protocol override for cancel if not in pending list
 
   Environment
     BEGIN_CLI_MNEMONIC    Mnemonic for CI/agent use (bypasses keystore)
@@ -81,6 +97,14 @@ const cli = meow(
     $ begin cardano send addr1qy... 10 --wallet my-wallet --password mypass
     $ begin cardano send addr1qy... 2 --asset abc123...def.HOSKY:1000
 
+    # Swap tokens
+    $ begin swap quote --from ADA --to MIN --amount 100
+    $ begin swap --from ADA --to MIN --amount 100 --slippage 0.5
+    $ begin swap --from ADA --to MIN --amount 100 --yes --json
+    $ begin swap orders
+    $ begin swap orders --address addr1qy...
+    $ begin swap cancel --id <tx_in> --yes
+
     # Offline signing workflow
     $ begin cardano send addr1qy... 10 --dry-run --output tx.unsigned
     $ begin sign tx.unsigned --wallet my-wallet --password mypass
@@ -92,7 +116,7 @@ const cli = meow(
     flags: {
       network: { type: 'string', shortFlag: 'n' },
       wallet: { type: 'string', shortFlag: 'w' },
-      password: { type: 'string' },
+      password: { type: 'string', shortFlag: 'p' },
       qr: { type: 'boolean', default: false },
       dryRun: { type: 'boolean', shortFlag: 'd', default: false },
       output: { type: 'string', shortFlag: 'o' },
@@ -102,7 +126,16 @@ const cli = meow(
       page: { type: 'number', default: 1 },
       wait: { type: 'boolean', default: true },
       asset: { type: 'string', shortFlag: 'a', isMultiple: true },
+      // Swap-specific flags
+      from: { type: 'string' },
+      to: { type: 'string' },
+      amount: { type: 'string' },
+      slippage: { type: 'number', shortFlag: 's', default: 0.5 },
+      multiHop: { type: 'boolean', default: true },
       yes: { type: 'boolean', shortFlag: 'y', default: false },
+      id: { type: 'string', shortFlag: 'i', isMultiple: true },
+      address: { type: 'string' },
+      protocol: { type: 'string' },
     },
   }
 );
@@ -126,7 +159,16 @@ const rawFlags = cli.flags as {
   limit: number;
   page: number;
   asset?: string[];
+  // Swap-specific flags
+  from?: string;
+  to?: string;
+  amount?: string;
+  slippage: number;
+  multiHop: boolean;
   yes: boolean;
+  id?: string[];
+  address?: string;
+  protocol?: string;
 };
 
 const network = rawFlags.network ?? config.network ?? 'mainnet';
@@ -147,7 +189,15 @@ const flags: AppFlags = {
   limit: rawFlags.limit,
   page: rawFlags.page,
   asset: rawFlags.asset,
+  from: rawFlags.from,
+  to: rawFlags.to,
+  amount: rawFlags.amount,
+  slippage: rawFlags.slippage,
+  multiHop: rawFlags.multiHop,
   yes: rawFlags.yes,
+  id: rawFlags.id,
+  address: rawFlags.address,
+  protocol: rawFlags.protocol,
 };
 
 setOutputContext({ json: flags.json });
