@@ -18,6 +18,8 @@ import {
 } from '@meshsdk/core';
 import * as fs from 'fs';
 import * as path from 'path';
+import { getBlockfrostKey, isValidNetwork, type Network } from './config.js';
+import { errors } from './errors.js';
 import {
   getMnemonic,
   walletExists,
@@ -25,13 +27,6 @@ import {
   hasEnvMnemonic,
   listWallets,
 } from './keystore.js';
-
-// Network configuration
-const BLOCKFROST_URLS: Record<string, string> = {
-  mainnet: 'https://cardano-mainnet.blockfrost.io/api/v0',
-  preprod: 'https://cardano-preprod.blockfrost.io/api/v0',
-  preview: 'https://cardano-preview.blockfrost.io/api/v0',
-};
 
 export interface TransactionConfig {
   network: string;
@@ -65,17 +60,30 @@ export interface SubmitResult {
  * Creates a BlockfrostProvider for the specified network
  */
 export function createProvider(config: TransactionConfig): BlockfrostProvider {
-  const apiKey = config.apiKey || process.env.BLOCKFROST_API_KEY;
-  
+  if (!isValidNetwork(config.network)) {
+    throw errors.invalidArgument('network', `must be one of mainnet, preprod, preview (got ${config.network})`);
+  }
+
+  const network = config.network as Network;
+
+  // Priority: explicit config.apiKey > ENV network-specific > ENV generic > config file
+  const apiKey =
+    config.apiKey ||
+    (network === 'mainnet'
+      ? (process.env.BLOCKFROST_API_KEY_MAINNET || process.env.BLOCKFROST_API_KEY)
+      : (process.env[`BLOCKFROST_API_KEY_${network.toUpperCase()}`] || process.env.BLOCKFROST_API_KEY)) ||
+    getBlockfrostKey(network);
+
   if (!apiKey) {
-    throw new Error(
-      'BLOCKFROST_API_KEY is required. Get one at https://blockfrost.io'
+    throw errors.providerError(
+      `No Blockfrost API key found for ${network}.\n` +
+        `Set BLOCKFROST_API_KEY (or BLOCKFROST_API_KEY_${network.toUpperCase()} / BLOCKFROST_API_KEY_MAINNET) or configure via 'begin config set blockfrost.${network} <key>'.\n` +
+        `Get a free API key at: https://blockfrost.io`
     );
   }
 
-  const networkId = config.network === 'mainnet' ? 1 : 0;
-  
-  return new BlockfrostProvider(apiKey, networkId);
+  // Mesh's BlockfrostProvider uses the project key (network-specific) to route requests.
+  return new BlockfrostProvider(apiKey);
 }
 
 /**

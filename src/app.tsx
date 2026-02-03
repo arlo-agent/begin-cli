@@ -1,7 +1,10 @@
 import React from 'react';
 import { Box, Text } from 'ink';
 import { CardanoBalance } from './commands/cardano/balance.js';
+import { CardanoUtxos } from './commands/cardano/utxos.js';
+import { CardanoHistory } from './commands/cardano/history.js';
 import { CardanoSend } from './commands/cardano/send.js';
+import { Receive } from './commands/receive.js';
 import { StakePools } from './commands/stake/pools.js';
 import { StakeDelegate } from './commands/stake/delegate.js';
 import { StakeStatus } from './commands/stake/status.js';
@@ -11,51 +14,93 @@ import { Submit } from './commands/submit.js';
 import { WalletAddress } from './commands/wallet/address.js';
 import { Swap } from './commands/swap/index.js';
 import { SwapQuote } from './commands/swap/quote.js';
+import { WalletCreate } from './commands/wallet/create.js';
+import { WalletRestore } from './commands/wallet/restore.js';
+import { isValidNetwork, type Network } from './lib/config.js';
 import type { NetworkType } from './lib/address.js';
+
+export interface AppFlags {
+  network: string;
+  wallet?: string;
+  password?: string;
+  qr: boolean;
+  dryRun: boolean;
+  output?: string;
+  json: boolean;
+  full: boolean;
+  wait: boolean;
+  limit: number;
+  page: number;
+  asset?: string[];
+  // Swap-specific flags
+  from?: string;
+  to?: string;
+  amount?: string;
+  slippage: number;
+  multiHop: boolean;
+  yes: boolean;
+}
 
 interface AppProps {
   command?: string;
   subcommand?: string;
   args: string[];
-  flags: {
-    network: string;
-    wallet?: string;
-    password?: string;
-    dryRun: boolean;
-    output?: string;
-    json: boolean;
-    wait: boolean;
-    asset?: string[];
-    full?: boolean;
-    // Swap-specific flags
-    from?: string;
-    to?: string;
-    amount?: string;
-    slippage: number;
-    multiHop: boolean;
-    yes: boolean;
-  };
+  flags: AppFlags;
   showHelp: () => void;
 }
 
+function invalidUsage(message: string, usage: string) {
+  return (
+    <Box flexDirection="column">
+      <Text color="red">Error: {message}</Text>
+      <Text color="gray">Usage: {usage}</Text>
+    </Box>
+  );
+}
+
 export function App({ command, subcommand, args, flags, showHelp }: AppProps) {
-  // No command provided
+  // No command provided (non-JSON mode only - JSON handled in cli.tsx)
   if (!command) {
     showHelp();
     return null;
   }
 
-  // Sign command: begin sign <tx-file>
-  if (command === 'sign') {
-    const txFile = subcommand; // subcommand is actually the first arg here
-    if (!txFile) {
-      return (
-        <Box flexDirection="column">
-          <Text color="red">Error: Transaction file is required</Text>
-          <Text color="gray">Usage: begin sign {'<tx-file>'} [--wallet {'<name>'}] [--password {'<pass>'}]</Text>
-        </Box>
+  // Validate network
+  if (!isValidNetwork(flags.network)) {
+    return (
+      <Box flexDirection="column">
+        <Text color="red">Error: Invalid network '{flags.network}'</Text>
+        <Text color="gray">Valid networks: mainnet, preprod, preview</Text>
+      </Box>
+    );
+  }
+  const network = flags.network as Network;
+
+  // ---- Top-level commands ----
+  if (command === 'receive') {
+    // Accept either a raw address (positional) or a wallet name via --wallet
+    const target = subcommand ?? args[0] ?? flags.wallet;
+    if (!target) {
+      return invalidUsage(
+        'Wallet name or address is required',
+        "begin receive <address> [--qr] | begin receive --wallet <name> [--qr]"
       );
     }
+    return (
+      <Receive
+        target={target}
+        showQR={flags.qr}
+        json={flags.json}
+        network={flags.network}
+        password={flags.password}
+      />
+    );
+  }
+
+  // ---- Top-level commands ----
+  if (command === 'sign') {
+    const txFile = subcommand;
+    if (!txFile) return invalidUsage('Transaction file is required', "begin sign <tx-file> [options]");
     return (
       <Sign
         txFile={txFile}
@@ -68,65 +113,58 @@ export function App({ command, subcommand, args, flags, showHelp }: AppProps) {
     );
   }
 
-  // Submit command: begin submit <signed-tx-file>
   if (command === 'submit') {
     const txFile = subcommand;
-    if (!txFile) {
-      return (
-        <Box flexDirection="column">
-          <Text color="red">Error: Signed transaction file is required</Text>
-          <Text color="gray">Usage: begin submit {'<signed-tx-file>'} [--network {'<network>'}]</Text>
-        </Box>
-      );
-    }
+    if (!txFile) return invalidUsage('Signed transaction file is required', "begin submit <signed-tx-file> [options]");
+    return <Submit txFile={txFile} network={flags.network} wait={flags.wait} jsonOutput={flags.json} />;
+  }
+
+  // ---- Back-compat: allow legacy non-namespaced cardano commands ----
+  if (command === 'balance' || command === 'utxos' || command === 'history' || command === 'send') {
     return (
-      <Submit
-        txFile={txFile}
-        network={flags.network}
-        wait={flags.wait}
-        jsonOutput={flags.json}
+      <App
+        command="cardano"
+        subcommand={command}
+        args={[subcommand, ...args].filter((v): v is string => typeof v === 'string' && v.length > 0)}
+        flags={flags}
+        showHelp={showHelp}
       />
     );
   }
 
-  // Route to cardano commands
+  // ---- Namespaced commands ----
   if (command === 'cardano') {
     if (subcommand === 'balance') {
       const address = args[0];
-      if (!address) {
-        return (
-          <Box flexDirection="column">
-            <Text color="red">Error: Address is required</Text>
-            <Text color="gray">Usage: begin cardano balance {'<address>'}</Text>
-          </Box>
-        );
-      }
-      return <CardanoBalance address={address} network={flags.network} />;
+      if (!address) return invalidUsage('Address is required', 'begin cardano balance <address>');
+      return <CardanoBalance address={address} network={network} json={flags.json} />;
+    }
+
+    if (subcommand === 'utxos') {
+      const address = args[0];
+      if (!address) return invalidUsage('Address is required', 'begin cardano utxos <address>');
+      return <CardanoUtxos address={address} network={network} json={flags.json} />;
+    }
+
+    if (subcommand === 'history') {
+      const address = args[0];
+      if (!address) return invalidUsage('Address is required', 'begin cardano history <address>');
+      return (
+        <CardanoHistory
+          address={address}
+          network={network}
+          json={flags.json}
+          limit={flags.limit}
+          page={flags.page}
+        />
+      );
     }
 
     if (subcommand === 'send') {
       const [to, amountStr] = args;
-      if (!to || !amountStr) {
-        return (
-          <Box flexDirection="column">
-            <Text color="red">Error: Recipient address and amount are required</Text>
-            <Text color="gray">Usage: begin cardano send {'<to>'} {'<amount>'} [options]</Text>
-            <Text color="gray">Options:</Text>
-            <Text color="gray">  --dry-run, -d    Build but don't submit</Text>
-            <Text color="gray">  --asset, -a      Add native token (policyId.name:amount)</Text>
-            <Text color="gray">  --json, -j       Output as JSON</Text>
-          </Box>
-        );
-      }
-      const amount = parseFloat(amountStr);
-      if (isNaN(amount) || amount <= 0) {
-        return (
-          <Box flexDirection="column">
-            <Text color="red">Error: Invalid amount</Text>
-            <Text color="gray">Amount must be a positive number</Text>
-          </Box>
-        );
-      }
+      if (!to || !amountStr) return invalidUsage('Recipient address and amount are required', 'begin cardano send <to> <amount> [options]');
+      const amount = Number(amountStr);
+      if (!Number.isFinite(amount) || amount <= 0) return invalidUsage('Amount must be a positive number', 'begin cardano send <to> <amount> [options]');
       return (
         <CardanoSend
           to={to}
@@ -145,29 +183,20 @@ export function App({ command, subcommand, args, flags, showHelp }: AppProps) {
     return (
       <Box flexDirection="column">
         <Text color="red">Unknown cardano command: {subcommand || '(none)'}</Text>
-        <Text color="gray">Available commands: balance, send</Text>
+        <Text color="gray">Available commands: balance, utxos, history, send</Text>
       </Box>
     );
   }
 
-  // Route to stake commands
   if (command === 'stake') {
     if (subcommand === 'pools') {
-      const search = args[0]; // Optional search term
-      return <StakePools search={search} network={flags.network} json={flags.json} />;
+      const search = args[0];
+      return <StakePools search={search} network={flags.network} json={flags.json} limit={flags.limit} />;
     }
 
     if (subcommand === 'delegate') {
       const poolId = args[0];
-      if (!poolId) {
-        return (
-          <Box flexDirection="column">
-            <Text color="red">Error: Pool ID is required</Text>
-            <Text color="gray">Usage: begin stake delegate {'<pool-id>'}</Text>
-            <Text color="gray">Use `begin stake pools` to find pools</Text>
-          </Box>
-        );
-      }
+      if (!poolId) return invalidUsage('Pool ID is required', 'begin stake delegate <pool-id>');
       return <StakeDelegate poolId={poolId} network={flags.network} json={flags.json} />;
     }
 
@@ -178,7 +207,7 @@ export function App({ command, subcommand, args, flags, showHelp }: AppProps) {
     if (subcommand === 'withdraw') {
       return <StakeWithdraw network={flags.network} json={flags.json} />;
     }
-    
+
     return (
       <Box flexDirection="column">
         <Text color="red">Unknown stake command: {subcommand || '(none)'}</Text>
@@ -186,7 +215,7 @@ export function App({ command, subcommand, args, flags, showHelp }: AppProps) {
       </Box>
     );
   }
-  // Route to wallet commands
+
   if (command === 'wallet') {
     if (subcommand === 'address') {
       return (
@@ -195,15 +224,28 @@ export function App({ command, subcommand, args, flags, showHelp }: AppProps) {
           walletName={flags.wallet}
           password={flags.password}
           full={flags.full}
+          qr={flags.qr}
           json={flags.json}
         />
       );
     }
 
+    if (subcommand === 'create') {
+      const name = args[0];
+      if (!name) return invalidUsage('Wallet name is required', 'begin wallet create <name>');
+      return <WalletCreate name={name} network={flags.network} />;
+    }
+
+    if (subcommand === 'restore') {
+      const name = args[0];
+      if (!name) return invalidUsage('Wallet name is required', 'begin wallet restore <name>');
+      return <WalletRestore name={name} network={flags.network} />;
+    }
+
     return (
       <Box flexDirection="column">
         <Text color="red">Unknown wallet command: {subcommand || '(none)'}</Text>
-        <Text color="gray">Available commands: address</Text>
+        <Text color="gray">Available commands: address, create, restore</Text>
       </Box>
     );
   }
