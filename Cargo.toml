@@ -1,0 +1,47 @@
+[package]
+name = "begin-cli"
+version = "0.1.0"
+edition = "2021"
+description = "Multi-chain wallet CLI for Cardano, Bitcoin, and Solana"
+license = "MIT"
+repository = "https://github.com/ArkFinance/begin-cli"
+
+[dependencies]
+# CLI
+clap = { version = "4.5", features = ["derive"] }
+
+# Async runtime
+tokio = { version = "1.43", features = ["full"] }
+
+# HTTP client
+reqwest = { version = "0.12", features = ["json"] }
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# TUI (ratatui-based)
+ratatui = "0.29"
+crossterm = "0.28"
+
+# Error handling
+anyhow = "1.0"
+thiserror = "2.0"
+
+# Crypto primitives
+bip39 = "2.1"
+hex = "0.4"
+getrandom = "0.3"
+
+# Cardano
+pallas-primitives = "0.31"
+pallas-addresses = "0.31"
+
+# Async trait support
+async-trait = "0.1"
+
+# Config directories
+dirs-next = "2.0"
+
+[dev-dependencies]
+tokio-test = "0.4"
