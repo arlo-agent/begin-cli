@@ -6,6 +6,7 @@ import {
   MockMinswapClient,
   type SwapEstimate,
   type MinswapClient,
+  type EstimateRequest,
 } from '../../services/minswap.js';
 import {
   resolveTokenId,
@@ -81,10 +82,11 @@ export function Swap({
   const [fromToken, setFromToken] = useState<ResolvedToken | null>(null);
   const [toToken, setToToken] = useState<ResolvedToken | null>(null);
   const [estimate, setEstimate] = useState<SwapEstimate | null>(null);
+  const [estimateRequest, setEstimateRequest] = useState<EstimateRequest | null>(null);
   const [quote, setQuote] = useState<FormattedQuote | null>(null);
   const [senderAddress, setSenderAddress] = useState<string | null>(null);
   const [unsignedTx, setUnsignedTx] = useState<string | null>(null);
-  const [txHash, setTxHash] = useState<string | null>(null);
+  const [txId, setTxId] = useState<string | null>(null);
   const [estimatedFee, setEstimatedFee] = useState<string | null>(null);
 
   // Wallet and client refs
@@ -111,7 +113,7 @@ export function Swap({
     });
 
     // Create Minswap client
-    const useMock = process.env.MINSWAP_MOCK === 'true' || !process.env.BLOCKFROST_API_KEY;
+    const useMock = process.env.MINSWAP_MOCK === 'true';
     const minswapClient = useMock
       ? new MockMinswapClient(network)
       : createMinswapClient(network);
@@ -186,14 +188,18 @@ export function Swap({
       // Get quote
       setState('quoting');
 
-      const swapEstimate = await minswapClient.estimate({
+      const request: EstimateRequest = {
         tokenIn: resolvedFrom.tokenId,
         tokenOut: resolvedTo.tokenId,
-        amount: amount,
-        slippage: slippage,
+        amount,
+        slippage,
         allowMultiHops: multiHop,
         amountInDecimal: true,
-      });
+      };
+
+      setEstimateRequest(request);
+
+      const swapEstimate = await minswapClient.estimate(request);
 
       setEstimate(swapEstimate);
 
@@ -202,7 +208,7 @@ export function Swap({
 
       // If --yes flag, skip confirmation
       if (yes) {
-        await executeSwap(minswapClient, swapEstimate);
+        await executeSwap(minswapClient, swapEstimate, request);
       } else {
         setState('confirm');
       }
@@ -230,11 +236,16 @@ export function Swap({
   // Execute the swap
   const executeSwap = async (
     minswapClient: MinswapClient,
-    swapEstimate: SwapEstimate
+    swapEstimate: SwapEstimate,
+    requestOverride?: EstimateRequest
   ) => {
     try {
       if (!wallet || !senderAddress) {
         throw new Error('Wallet not loaded');
+      }
+      const request = requestOverride ?? estimateRequest;
+      if (!request) {
+        throw new Error('Missing estimate request');
       }
 
       // Build transaction
@@ -242,12 +253,13 @@ export function Swap({
 
       const buildResult = await minswapClient.buildTx({
         sender: senderAddress,
-        estimate: swapEstimate,
+        minAmountOut: swapEstimate.minAmountOut,
+        estimate: request,
         amountInDecimal: true,
       });
 
       setUnsignedTx(buildResult.cbor);
-      setEstimatedFee(buildResult.estimatedFee);
+      setEstimatedFee(buildResult.estimatedFee ?? null);
 
       // Sign transaction
       setState('signing');
@@ -263,7 +275,7 @@ export function Swap({
         witnessSet: witnessSet,
       });
 
-      setTxHash(submitResult.txHash);
+      setTxId(submitResult.txId);
       setState('success');
 
       if (json) {
@@ -271,7 +283,7 @@ export function Swap({
           JSON.stringify(
             {
               status: 'success',
-              txHash: submitResult.txHash,
+              txId: submitResult.txId,
               network,
               from: {
                 token: fromToken?.ticker,
@@ -435,8 +447,8 @@ export function Swap({
 
         <Box marginTop={1} flexDirection="column">
           <Box>
-            <Text color="gray">TX Hash: </Text>
-            <Text>{txHash}</Text>
+          <Text color="gray">TX ID: </Text>
+          <Text>{txId}</Text>
           </Box>
           <Box>
             <Text color="gray">Swap: </Text>
@@ -455,7 +467,7 @@ export function Swap({
         <Box marginTop={1}>
           <Text color="gray">View on: </Text>
           <Text color="blue">
-            https://{network === 'mainnet' ? '' : network + '.'}cardanoscan.io/transaction/{txHash}
+            https://{network === 'mainnet' ? '' : network + '.'}cardanoscan.io/transaction/{txId}
           </Text>
         </Box>
 
@@ -481,8 +493,8 @@ export function Swap({
     return null;
   }
 
-  const highImpact = isHighPriceImpact(estimate.priceImpact);
-  const criticalImpact = isCriticalPriceImpact(estimate.priceImpact);
+  const highImpact = isHighPriceImpact(estimate.avgPriceImpact);
+  const criticalImpact = isCriticalPriceImpact(estimate.avgPriceImpact);
 
   return (
     <Box flexDirection="column" padding={1}>
@@ -552,7 +564,7 @@ export function Swap({
         {/* Route */}
         <Box marginTop={1}>
           <Text color="gray">Route: </Text>
-          <Text>{formatRoute(estimate.route, fromToken, toToken)}</Text>
+          <Text>{formatRoute(estimate.paths, fromToken, toToken)}</Text>
         </Box>
 
         {/* Fees */}
@@ -587,3 +599,6 @@ export function Swap({
     </Box>
   );
 }
+
+export { SwapCancel } from './cancel.js';
+export { SwapOrders } from './orders.js';

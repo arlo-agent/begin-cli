@@ -11,8 +11,7 @@
 
 // API endpoints by network
 const MINSWAP_API_URLS: Record<string, string> = {
-  mainnet: 'https://aggregator.minswap.org/api/v1',
-  preprod: 'https://preprod-aggregator.minswap.org/api/v1',
+  mainnet: 'https://agg-api.minswap.org/aggregator',
 };
 
 /**
@@ -25,18 +24,54 @@ export interface MinswapToken {
   decimals: number;
   verified: boolean;
   logoUrl?: string;
+  priceByAda?: number | null;
+  projectName?: string | null;
 }
+
+export type Protocol =
+  | 'MinswapV2'
+  | 'Minswap'
+  | 'MinswapStable'
+  | 'MuesliSwap'
+  | 'Splash'
+  | 'SundaeSwapV3'
+  | 'SundaeSwap'
+  | 'VyFinance'
+  | 'CswapV1'
+  | 'WingRidersV2'
+  | 'WingRiders'
+  | 'WingRidersStableV2'
+  | 'Spectrum'
+  | 'SplashStable';
 
 /**
  * Route leg information
  */
-export interface RouteLeg {
-  dex: string;
+export interface SwapPathHop {
   poolId: string;
+  protocol: Protocol;
+  lpToken: string;
   tokenIn: string;
   tokenOut: string;
   amountIn: string;
   amountOut: string;
+  minAmountOut: string;
+  lpFee: string;
+  dexFee: string;
+  deposits: string;
+  priceImpact: number;
+}
+
+export interface EstimateRequest {
+  amount: string;
+  tokenIn: string;
+  tokenOut: string;
+  slippage: number;
+  includeProtocols?: Protocol[];
+  excludeProtocols?: Protocol[];
+  allowMultiHops?: boolean;
+  partner?: string;
+  amountInDecimal?: boolean;
 }
 
 /**
@@ -48,13 +83,14 @@ export interface SwapEstimate {
   amountIn: string;
   amountOut: string;
   minAmountOut: string;
-  priceImpact: number;
-  lpFee: string;
-  dexFee: string;
+  totalLpFee: string;
+  totalDexFee: string;
+  deposits: string;
+  avgPriceImpact: number;
   aggregatorFee: string;
-  route: RouteLeg[];
-  effectivePrice: string;
-  inversePrice: string;
+  aggregatorFeePercent: number;
+  paths: SwapPathHop[][];
+  amountInDecimal: boolean;
 }
 
 /**
@@ -62,28 +98,30 @@ export interface SwapEstimate {
  */
 export interface BuildTxResponse {
   cbor: string;
-  estimatedFee: string;
+  estimatedFee?: string;
 }
 
 /**
  * Submit transaction response
  */
 export interface SubmitTxResponse {
-  txHash: string;
+  txId: string;
 }
 
 /**
  * Pending order information
  */
 export interface PendingOrder {
-  orderId: string;
-  txHash: string;
-  dex: string;
-  tokenIn: string;
-  tokenOut: string;
+  ownerAddress: string;
+  protocol: Protocol;
+  tokenIn: MinswapToken;
+  tokenOut: MinswapToken;
   amountIn: string;
   minAmountOut: string;
-  status: string;
+  createdAt: number;
+  txIn: string;
+  dexFee: string;
+  deposit: string;
 }
 
 /**
@@ -153,7 +191,7 @@ export class MinswapClient {
   constructor(network: string, partner?: string, retryConfig?: Partial<RetryConfig>) {
     const url = MINSWAP_API_URLS[network];
     if (!url) {
-      throw new Error(`Unsupported network: ${network}. Use mainnet or preprod.`);
+      throw new Error(`Unsupported network: ${network}. Use mainnet.`);
     }
     this.baseUrl = url;
     this.network = network;
@@ -236,12 +274,41 @@ export class MinswapClient {
     throw lastError || new Error('Request failed after retries');
   }
 
+  private mapAsset(asset: {
+    token_id: string;
+    logo?: string | null;
+    ticker?: string | null;
+    is_verified?: boolean | null;
+    price_by_ada?: number | null;
+    project_name?: string | null;
+    decimals?: number | null;
+  }): MinswapToken {
+    return {
+      tokenId: asset.token_id,
+      ticker: asset.ticker ?? asset.token_id.slice(0, 8).toUpperCase() + '...',
+      name: asset.project_name ?? asset.ticker ?? 'Unknown Token',
+      decimals: asset.decimals ?? 0,
+      verified: asset.is_verified ?? false,
+      logoUrl: asset.logo ?? undefined,
+      priceByAda: asset.price_by_ada ?? null,
+      projectName: asset.project_name ?? null,
+    };
+  }
+
   /**
    * Get current ADA price in a currency
    */
   async getAdaPrice(currency: string = 'usd'): Promise<{ price: number; change24h: number }> {
     const params = new URLSearchParams({ currency });
-    return this.request(`/ada-price?${params}`);
+    const response = await this.request<{
+      currency: string;
+      value: { price: number; change_24h: number } | null;
+    }>(`/ada-price?${params}`);
+
+    return {
+      price: response.value?.price ?? 0,
+      change24h: response.value?.change_24h ?? 0,
+    };
   }
 
   /**
@@ -251,15 +318,34 @@ export class MinswapClient {
     address: string,
     amountInDecimal: boolean = true
   ): Promise<{
-    address: string;
-    lovelace: string;
-    tokens: Array<{ tokenId: string; amount: string }>;
+    wallet: string;
+    ada: string;
+    minimumLovelace: string;
+    balance: Array<{ asset: MinswapToken; amount: string }>;
+    amountInDecimal: boolean;
   }> {
     const params = new URLSearchParams({
       address,
       amount_in_decimal: String(amountInDecimal),
     });
-    return this.request(`/wallet?${params}`);
+    const response = await this.request<{
+      wallet: string;
+      ada: string;
+      minimum_lovelace: string;
+      balance: Array<{ asset: Parameters<MinswapClient['mapAsset']>[0]; amount: string }>;
+      amount_in_decimal: boolean;
+    }>(`/wallet?${params}`);
+
+    return {
+      wallet: response.wallet,
+      ada: response.ada,
+      minimumLovelace: response.minimum_lovelace,
+      balance: response.balance.map((entry) => ({
+        asset: this.mapAsset(entry.asset),
+        amount: entry.amount,
+      })),
+      amountInDecimal: response.amount_in_decimal,
+    };
   }
 
   /**
@@ -268,32 +354,35 @@ export class MinswapClient {
   async searchTokens(
     query: string,
     onlyVerified: boolean = true,
-    assets?: string[]
+    assets?: string[],
+    searchAfter?: string[]
   ): Promise<{
     tokens: MinswapToken[];
     searchAfter?: string[];
   }> {
-    return this.request('/tokens', {
+    const response = await this.request<{
+      tokens: Array<Parameters<MinswapClient['mapAsset']>[0]>;
+      search_after?: string[];
+    }>('/tokens', {
       method: 'POST',
       body: JSON.stringify({
         query,
         only_verified: onlyVerified,
         assets,
+        search_after: searchAfter,
       }),
     });
+
+    return {
+      tokens: response.tokens.map((token) => this.mapAsset(token)),
+      searchAfter: response.search_after,
+    };
   }
 
   /**
    * Get swap estimate/quote
    */
-  async estimate(params: {
-    tokenIn: string;
-    tokenOut: string;
-    amount: string;
-    slippage: number;
-    allowMultiHops?: boolean;
-    amountInDecimal?: boolean;
-  }): Promise<SwapEstimate> {
+  async estimate(params: EstimateRequest): Promise<SwapEstimate> {
     const body: Record<string, unknown> = {
       token_in: params.tokenIn,
       token_out: params.tokenOut,
@@ -303,8 +392,16 @@ export class MinswapClient {
       amount_in_decimal: params.amountInDecimal ?? true,
     };
 
-    if (this.partner) {
-      body.partner = this.partner;
+    if (params.includeProtocols) {
+      body.include_protocols = params.includeProtocols;
+    }
+
+    if (params.excludeProtocols) {
+      body.exclude_protocols = params.excludeProtocols;
+    }
+
+    if (params.partner || this.partner) {
+      body.partner = params.partner ?? this.partner;
     }
 
     const response = await this.request<{
@@ -313,46 +410,63 @@ export class MinswapClient {
       amount_in: string;
       amount_out: string;
       min_amount_out: string;
-      price_impact: number;
-      lp_fee: string;
-      dex_fee: string;
+      total_lp_fee: string;
+      total_dex_fee: string;
+      deposits: string;
+      avg_price_impact: number;
+      paths: Array<
+        Array<{
+          pool_id: string;
+          protocol: Protocol;
+          lp_token: string;
+          token_in: string;
+          token_out: string;
+          amount_in: string;
+          amount_out: string;
+          min_amount_out: string;
+          lp_fee: string;
+          dex_fee: string;
+          deposits: string;
+          price_impact: number;
+        }>
+      >;
       aggregator_fee: string;
-      route: Array<{
-        dex: string;
-        pool_id: string;
-        token_in: string;
-        token_out: string;
-        amount_in: string;
-        amount_out: string;
-      }>;
-      effective_price: string;
-      inverse_price: string;
+      aggregator_fee_percent: number;
+      amount_in_decimal: boolean;
     }>('/estimate', {
       method: 'POST',
       body: JSON.stringify(body),
     });
 
-    // Transform snake_case to camelCase
     return {
       tokenIn: response.token_in,
       tokenOut: response.token_out,
       amountIn: response.amount_in,
       amountOut: response.amount_out,
       minAmountOut: response.min_amount_out,
-      priceImpact: response.price_impact,
-      lpFee: response.lp_fee,
-      dexFee: response.dex_fee,
+      totalLpFee: response.total_lp_fee,
+      totalDexFee: response.total_dex_fee,
+      deposits: response.deposits,
+      avgPriceImpact: response.avg_price_impact,
       aggregatorFee: response.aggregator_fee,
-      route: response.route.map((leg) => ({
-        dex: leg.dex,
-        poolId: leg.pool_id,
-        tokenIn: leg.token_in,
-        tokenOut: leg.token_out,
-        amountIn: leg.amount_in,
-        amountOut: leg.amount_out,
-      })),
-      effectivePrice: response.effective_price,
-      inversePrice: response.inverse_price,
+      aggregatorFeePercent: response.aggregator_fee_percent,
+      paths: response.paths.map((path) =>
+        path.map((hop) => ({
+          poolId: hop.pool_id,
+          protocol: hop.protocol,
+          lpToken: hop.lp_token,
+          tokenIn: hop.token_in,
+          tokenOut: hop.token_out,
+          amountIn: hop.amount_in,
+          amountOut: hop.amount_out,
+          minAmountOut: hop.min_amount_out,
+          lpFee: hop.lp_fee,
+          dexFee: hop.dex_fee,
+          deposits: hop.deposits,
+          priceImpact: hop.price_impact,
+        }))
+      ),
+      amountInDecimal: response.amount_in_decimal,
     };
   }
 
@@ -361,39 +475,57 @@ export class MinswapClient {
    */
   async buildTx(params: {
     sender: string;
-    estimate: SwapEstimate;
+    minAmountOut: string;
+    estimate: EstimateRequest;
     inputsToChoose?: string[];
     amountInDecimal?: boolean;
   }): Promise<BuildTxResponse> {
+    const estimateBody: Record<string, unknown> = {
+      amount: params.estimate.amount,
+      token_in: params.estimate.tokenIn,
+      token_out: params.estimate.tokenOut,
+      slippage: params.estimate.slippage,
+    };
+
+    if (params.estimate.includeProtocols) {
+      estimateBody.include_protocols = params.estimate.includeProtocols;
+    }
+
+    if (params.estimate.excludeProtocols) {
+      estimateBody.exclude_protocols = params.estimate.excludeProtocols;
+    }
+
+    if (typeof params.estimate.allowMultiHops === 'boolean') {
+      estimateBody.allow_multi_hops = params.estimate.allowMultiHops;
+    }
+
+    if (params.estimate.partner) {
+      estimateBody.partner = params.estimate.partner;
+    }
+
+    const body: Record<string, unknown> = {
+      sender: params.sender,
+      min_amount_out: params.minAmountOut,
+      estimate: estimateBody,
+    };
+
+    if (params.inputsToChoose) {
+      body.inputs_to_choose = params.inputsToChoose;
+    }
+
+    if (typeof params.amountInDecimal === 'boolean') {
+      body.amount_in_decimal = params.amountInDecimal;
+    }
+
     const response = await this.request<{
       cbor: string;
-      estimated_fee: string;
     }>('/build-tx', {
       method: 'POST',
-      body: JSON.stringify({
-        sender: params.sender,
-        min_amount_out: params.estimate.minAmountOut,
-        // Include estimate data for the API
-        token_in: params.estimate.tokenIn,
-        token_out: params.estimate.tokenOut,
-        amount: params.estimate.amountIn,
-        slippage: 0, // Already calculated in minAmountOut
-        route: params.estimate.route.map((leg) => ({
-          dex: leg.dex,
-          pool_id: leg.poolId,
-          token_in: leg.tokenIn,
-          token_out: leg.tokenOut,
-          amount_in: leg.amountIn,
-          amount_out: leg.amountOut,
-        })),
-        inputs_to_choose: params.inputsToChoose,
-        amount_in_decimal: params.amountInDecimal ?? true,
-      }),
+      body: JSON.stringify(body),
     });
 
     return {
       cbor: response.cbor,
-      estimatedFee: response.estimated_fee,
     };
   }
 
@@ -405,7 +537,7 @@ export class MinswapClient {
     witnessSet: string;
   }): Promise<SubmitTxResponse> {
     const response = await this.request<{
-      tx_hash: string;
+      tx_id: string;
     }>('/finalize-and-submit-tx', {
       method: 'POST',
       body: JSON.stringify({
@@ -415,7 +547,7 @@ export class MinswapClient {
     });
 
     return {
-      txHash: response.tx_hash,
+      txId: response.tx_id,
     };
   }
 
@@ -431,26 +563,33 @@ export class MinswapClient {
       amount_in_decimal: String(amountInDecimal),
     });
 
-    const response = await this.request<Array<{
-      order_id: string;
-      tx_hash: string;
-      dex: string;
-      token_in: string;
-      token_out: string;
-      amount_in: string;
-      min_amount_out: string;
-      status: string;
-    }>>(`/pending-orders?${params}`);
+    const response = await this.request<{
+      orders: Array<{
+        owner_address: string;
+        protocol: Protocol;
+        token_in: Parameters<MinswapClient['mapAsset']>[0];
+        token_out: Parameters<MinswapClient['mapAsset']>[0];
+        amount_in: string;
+        min_amount_out: string;
+        created_at: number;
+        tx_in: string;
+        dex_fee: string;
+        deposit: string;
+      }>;
+      amount_in_decimal: boolean;
+    }>(`/pending-orders?${params}`);
 
-    return response.map((order) => ({
-      orderId: order.order_id,
-      txHash: order.tx_hash,
-      dex: order.dex,
-      tokenIn: order.token_in,
-      tokenOut: order.token_out,
+    return response.orders.map((order) => ({
+      ownerAddress: order.owner_address,
+      protocol: order.protocol,
+      tokenIn: this.mapAsset(order.token_in),
+      tokenOut: this.mapAsset(order.token_out),
       amountIn: order.amount_in,
       minAmountOut: order.min_amount_out,
-      status: order.status,
+      createdAt: order.created_at,
+      txIn: order.tx_in,
+      dexFee: order.dex_fee,
+      deposit: order.deposit,
     }));
   }
 
@@ -459,24 +598,26 @@ export class MinswapClient {
    */
   async buildCancelTx(params: {
     sender: string;
-    orderIds: string[];
+    orders: Array<{ txIn: string; protocol: Protocol }>;
   }): Promise<BuildTxResponse> {
     const response = await this.request<{
       cbor: string;
-      estimated_fee: string;
     }>('/cancel-tx', {
       method: 'POST',
       body: JSON.stringify({
         sender: params.sender,
-        order_ids: params.orderIds,
+        orders: params.orders.map((order) => ({
+          tx_in: order.txIn,
+          protocol: order.protocol,
+        })),
       }),
     });
 
     return {
       cbor: response.cbor,
-      estimatedFee: response.estimated_fee,
     };
   }
+
 
   /**
    * Get network this client is configured for
@@ -501,13 +642,7 @@ export class MockMinswapClient extends MinswapClient {
     super(network);
   }
 
-  async estimate(params: {
-    tokenIn: string;
-    tokenOut: string;
-    amount: string;
-    slippage: number;
-    allowMultiHops?: boolean;
-  }): Promise<SwapEstimate> {
+  async estimate(params: EstimateRequest): Promise<SwapEstimate> {
     // Simulate network delay
     await new Promise((resolve) => setTimeout(resolve, 500));
 
@@ -522,34 +657,43 @@ export class MockMinswapClient extends MinswapClient {
       amountIn: params.amount,
       amountOut,
       minAmountOut,
-      priceImpact: 0.15,
-      lpFee: '0.3',
-      dexFee: '0.1',
+      totalLpFee: '0.3',
+      totalDexFee: '0.1',
+      deposits: '0',
+      avgPriceImpact: 0.15,
       aggregatorFee: '0.05',
-      route: [
-        {
-          dex: 'Minswap',
-          poolId: 'mock_pool_ada_min_v2',
-          tokenIn: params.tokenIn,
-          tokenOut: params.tokenOut,
-          amountIn: params.amount,
-          amountOut,
-        },
+      aggregatorFeePercent: 0.5,
+      paths: [
+        [
+          {
+            poolId: 'mock_pool_ada_min_v2',
+            protocol: 'MinswapV2',
+            lpToken: 'mock_lp_token',
+            tokenIn: params.tokenIn,
+            tokenOut: params.tokenOut,
+            amountIn: params.amount,
+            amountOut,
+            minAmountOut,
+            lpFee: '0.3',
+            dexFee: '0.1',
+            deposits: '0',
+            priceImpact: 0.15,
+          },
+        ],
       ],
-      effectivePrice: mockRate.toString(),
-      inversePrice: (1 / mockRate).toString(),
+      amountInDecimal: params.amountInDecimal ?? true,
     };
   }
 
   async buildTx(params: {
     sender: string;
-    estimate: SwapEstimate;
+    minAmountOut: string;
+    estimate: EstimateRequest;
   }): Promise<BuildTxResponse> {
     await new Promise((resolve) => setTimeout(resolve, 300));
 
     return {
       cbor: 'mock_unsigned_tx_cbor_' + Date.now().toString(16),
-      estimatedFee: '0.2',
     };
   }
 
@@ -557,14 +701,16 @@ export class MockMinswapClient extends MinswapClient {
     await new Promise((resolve) => setTimeout(resolve, 500));
 
     return {
-      txHash: 'mock_tx_hash_' + Date.now().toString(36),
+      txId: 'mock_tx_id_' + Date.now().toString(36),
     };
   }
 
   async searchTokens(
     query: string,
-    onlyVerified: boolean = true
-  ): Promise<{ tokens: MinswapToken[] }> {
+    onlyVerified: boolean = true,
+    assets?: string[],
+    searchAfter?: string[]
+  ): Promise<{ tokens: MinswapToken[]; searchAfter?: string[] }> {
     await new Promise((resolve) => setTimeout(resolve, 200));
 
     const allTokens: MinswapToken[] = [
@@ -617,6 +763,60 @@ export class MockMinswapClient extends MinswapClient {
       filtered = filtered.filter((t) => t.verified);
     }
 
-    return { tokens: filtered };
+    if (assets && assets.length > 0) {
+      const assetSet = new Set(assets.map((asset) => asset.toLowerCase()));
+      filtered = filtered.filter((token) => assetSet.has(token.tokenId.toLowerCase()));
+    }
+
+    return { tokens: filtered, searchAfter };
+  }
+
+  async getPendingOrders(
+    ownerAddress: string,
+    amountInDecimal: boolean = true
+  ): Promise<PendingOrder[]> {
+    await new Promise((resolve) => setTimeout(resolve, 200));
+
+    const adaToken: MinswapToken = {
+      tokenId: 'lovelace',
+      ticker: 'ADA',
+      name: 'Cardano',
+      decimals: 6,
+      verified: true,
+    };
+
+    const minToken: MinswapToken = {
+      tokenId: '29d222ce763455e3d7a09a665ce554f00ac89d2e99a1a83d267170c64d494e',
+      ticker: 'MIN',
+      name: 'Minswap',
+      decimals: 6,
+      verified: true,
+    };
+
+    return [
+      {
+        ownerAddress,
+        protocol: 'MinswapV2',
+        tokenIn: adaToken,
+        tokenOut: minToken,
+        amountIn: amountInDecimal ? '100' : '100000000',
+        minAmountOut: amountInDecimal ? '4.95' : '4950000',
+        createdAt: Date.now(),
+        txIn: 'mock_tx_in_0',
+        dexFee: amountInDecimal ? '0.1' : '100000',
+        deposit: amountInDecimal ? '2' : '2000000',
+      },
+    ];
+  }
+
+  async buildCancelTx(params: {
+    sender: string;
+    orders: Array<{ txIn: string; protocol: Protocol }>;
+  }): Promise<BuildTxResponse> {
+    await new Promise((resolve) => setTimeout(resolve, 200));
+
+    return {
+      cbor: 'mock_cancel_tx_cbor_' + Date.now().toString(16),
+    };
   }
 }
