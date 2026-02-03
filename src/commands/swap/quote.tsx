@@ -52,7 +52,7 @@ export function SwapQuote({
         validateSlippage(slippage);
 
         // Create client (use mock if no real API access)
-        const useMock = process.env.MINSWAP_MOCK === 'true' || !process.env.BLOCKFROST_API_KEY;
+        const useMock = process.env.MINSWAP_MOCK === 'true';
         const client = useMock
           ? new MockMinswapClient(network)
           : createMinswapClient(network);
@@ -127,17 +127,17 @@ export function SwapQuote({
               amount: estimate.amountOut,
               minAmount: estimate.minAmountOut,
             },
-            rate: estimate.effectivePrice,
-            inverseRate: estimate.inversePrice,
-            priceImpact: estimate.priceImpact,
+            rate: quote.rate,
+            inverseRate: quote.inverseRate,
+            priceImpact: estimate.avgPriceImpact,
             slippage,
             fees: {
-              lp: estimate.lpFee,
-              dex: estimate.dexFee,
+              lp: estimate.totalLpFee,
+              dex: estimate.totalDexFee,
               aggregator: estimate.aggregatorFee,
             },
-            route: estimate.route,
-            multiHop: estimate.route.length > 1,
+            paths: estimate.paths,
+            multiHop: (estimate.paths[0] ?? []).length > 1,
           },
           null,
           2
@@ -182,8 +182,8 @@ export function SwapQuote({
     return null;
   }
 
-  const highImpact = isHighPriceImpact(estimate.priceImpact);
-  const criticalImpact = isCriticalPriceImpact(estimate.priceImpact);
+  const highImpact = isHighPriceImpact(estimate.avgPriceImpact);
+  const criticalImpact = isCriticalPriceImpact(estimate.avgPriceImpact);
 
   return (
     <Box flexDirection="column" padding={1}>
@@ -240,10 +240,10 @@ export function SwapQuote({
         {/* Route */}
         <Box marginTop={1}>
           <Text color="gray">Route: </Text>
-          <Text>{formatRoute(estimate.route, fromToken, toToken)}</Text>
+          <Text>{formatRoute(estimate.paths, fromToken, toToken)}</Text>
         </Box>
-        {estimate.route.length > 1 && (
-          <Text color="gray"> ({estimate.route.length} hops)</Text>
+        {(estimate.paths[0] ?? []).length > 1 && (
+          <Text color="gray"> ({(estimate.paths[0] ?? []).length} hops)</Text>
         )}
 
         {/* Fees */}

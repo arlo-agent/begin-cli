@@ -176,10 +176,27 @@ export async function resolveTokenId(
 export function formatTokenAmount(
   amount: string,
   decimals: number,
-  ticker?: string
+  ticker?: string,
+  amountInDecimal: boolean = true
 ): string {
   const num = parseFloat(amount);
-  
+
+  if (isNaN(num)) {
+    return ticker ? `${amount} ${ticker}` : amount;
+  }
+
+  if (amountInDecimal) {
+    if (decimals === 0) {
+      const formatted = Math.floor(num).toLocaleString();
+      return ticker ? `${formatted} ${ticker}` : formatted;
+    }
+
+    const formatted = num.toFixed(decimals);
+    const trimmed = formatted.replace(/\.?0+$/, '');
+
+    return ticker ? `${trimmed} ${ticker}` : trimmed;
+  }
+
   if (decimals === 0) {
     const formatted = Math.floor(num).toLocaleString();
     return ticker ? `${formatted} ${ticker}` : formatted;
@@ -201,12 +218,20 @@ export function formatTokenAmount(
  * @param decimals - Token decimals
  * @returns Amount in smallest unit as string
  */
-export function parseTokenAmount(amount: string, decimals: number): string {
+export function parseTokenAmount(
+  amount: string,
+  decimals: number,
+  amountInDecimal: boolean = false
+): string {
   const num = parseFloat(amount);
   if (isNaN(num) || num < 0) {
     throw new Error(`Invalid amount: ${amount}`);
   }
-  
+
+  if (amountInDecimal) {
+    return amount;
+  }
+
   const multiplier = Math.pow(10, decimals);
   const smallest = Math.floor(num * multiplier);
   
@@ -243,27 +268,49 @@ export function formatSwapQuote(
   fromToken: ResolvedToken,
   toToken: ResolvedToken
 ): FormattedQuote {
-  const fromAmount = formatTokenAmount(estimate.amountIn, fromToken.decimals, fromToken.ticker);
-  const toAmount = formatTokenAmount(estimate.amountOut, toToken.decimals, toToken.ticker);
-  const minReceived = formatTokenAmount(estimate.minAmountOut, toToken.decimals, toToken.ticker);
-  
-  // Format rate
-  const rate = `1 ${fromToken.ticker} = ${estimate.effectivePrice} ${toToken.ticker}`;
-  const inverseRate = `1 ${toToken.ticker} = ${estimate.inversePrice} ${fromToken.ticker}`;
-  
-  // Price impact
-  const priceImpact = `${(estimate.priceImpact * 100).toFixed(2)}%`;
-  
-  // Fees
+  const fromAmount = formatTokenAmount(
+    estimate.amountIn,
+    fromToken.decimals,
+    fromToken.ticker,
+    estimate.amountInDecimal
+  );
+  const toAmount = formatTokenAmount(
+    estimate.amountOut,
+    toToken.decimals,
+    toToken.ticker,
+    estimate.amountInDecimal
+  );
+  const minReceived = formatTokenAmount(
+    estimate.minAmountOut,
+    toToken.decimals,
+    toToken.ticker,
+    estimate.amountInDecimal
+  );
+
+  const amountInNum = parseFloat(estimate.amountIn);
+  const amountOutNum = parseFloat(estimate.amountOut);
+  const rateValue = amountInNum > 0 ? amountOutNum / amountInNum : 0;
+  const inverseRateValue = amountOutNum > 0 ? amountInNum / amountOutNum : 0;
+  const formatRate = (value: number) => {
+    if (!isFinite(value)) {
+      return '0';
+    }
+    return value.toFixed(6).replace(/\.?0+$/, '');
+  };
+
+  const rate = `1 ${fromToken.ticker} = ${formatRate(rateValue)} ${toToken.ticker}`;
+  const inverseRate = `1 ${toToken.ticker} = ${formatRate(inverseRateValue)} ${fromToken.ticker}`;
+
+  const priceImpact = `${(estimate.avgPriceImpact * 100).toFixed(2)}%`;
+
   const totalFees = (
-    parseFloat(estimate.lpFee) +
-    parseFloat(estimate.dexFee) +
+    parseFloat(estimate.totalLpFee) +
+    parseFloat(estimate.totalDexFee) +
     parseFloat(estimate.aggregatorFee)
   ).toFixed(6);
-  
-  // Route description
-  const routeParts = estimate.route.map((leg) => leg.dex);
-  const route = routeParts.join(' → ') || 'Direct';
+
+  const primaryPath = estimate.paths[0] ?? [];
+  const route = primaryPath.map((leg) => leg.protocol).join(' → ') || 'Direct';
   
   return {
     fromAmount,
@@ -276,12 +323,12 @@ export function formatSwapQuote(
     priceImpact,
     totalFees: `${totalFees} ADA`,
     feeBreakdown: {
-      lpFee: `${estimate.lpFee} ADA`,
-      dexFee: `${estimate.dexFee} ADA`,
+      lpFee: `${estimate.totalLpFee} ADA`,
+      dexFee: `${estimate.totalDexFee} ADA`,
       aggregatorFee: `${estimate.aggregatorFee} ADA`,
     },
     route,
-    hops: estimate.route.length,
+    hops: primaryPath.length,
   };
 }
 
@@ -379,15 +426,23 @@ export function isCriticalPriceImpact(priceImpact: number): boolean {
  */
 export function getDexDisplayName(dex: string): string {
   const names: Record<string, string> = {
+    minswapv2: 'Minswap V2',
     minswap: 'Minswap',
-    minswap_v2: 'Minswap V2',
-    sundaeswap: 'SundaeSwap',
-    wingriders: 'WingRiders',
+    minswapstable: 'Minswap Stable',
     muesliswap: 'MuesliSwap',
+    splash: 'Splash',
+    sundaeswapv3: 'SundaeSwap V3',
+    sundaeswap: 'SundaeSwap',
     vyfinance: 'VyFinance',
+    cswapv1: 'Cswap V1',
+    wingridersv2: 'WingRiders V2',
+    wingriders: 'WingRiders',
+    wingridersstablev2: 'WingRiders Stable V2',
     spectrum: 'Spectrum',
+    splashstable: 'Splash Stable',
+    minswap_v2: 'Minswap V2',
   };
-  
+
   return names[dex.toLowerCase()] || dex;
 }
 
@@ -395,24 +450,25 @@ export function getDexDisplayName(dex: string): string {
  * Format route for display
  */
 export function formatRoute(
-  route: SwapEstimate['route'],
+  paths: SwapEstimate['paths'],
   fromToken: ResolvedToken,
   toToken: ResolvedToken
 ): string {
-  if (route.length === 0) {
+  const primaryPath = paths[0] ?? [];
+
+  if (primaryPath.length === 0) {
     return `${fromToken.ticker} → ${toToken.ticker} (Direct)`;
   }
-  
-  if (route.length === 1) {
-    return `${fromToken.ticker} → ${toToken.ticker} via ${getDexDisplayName(route[0].dex)}`;
+
+  if (primaryPath.length === 1) {
+    return `${fromToken.ticker} → ${toToken.ticker} via ${getDexDisplayName(primaryPath[0].protocol)}`;
   }
-  
-  // Multi-hop
+
   const steps = [fromToken.ticker];
-  for (const leg of route) {
-    steps.push(getDexDisplayName(leg.dex));
+  for (const leg of primaryPath) {
+    steps.push(getDexDisplayName(leg.protocol));
   }
   steps.push(toToken.ticker);
-  
+
   return steps.join(' → ');
 }

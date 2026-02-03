@@ -12,7 +12,7 @@ import { StakeWithdraw } from './commands/stake/withdraw.js';
 import { Sign } from './commands/sign.js';
 import { Submit } from './commands/submit.js';
 import { WalletAddress } from './commands/wallet/address.js';
-import { Swap } from './commands/swap/index.js';
+import { Swap, SwapCancel, SwapOrders } from './commands/swap/index.js';
 import { SwapQuote } from './commands/swap/quote.js';
 import { WalletCreate } from './commands/wallet/create.js';
 import { WalletRestore } from './commands/wallet/restore.js';
@@ -39,6 +39,9 @@ export interface AppFlags {
   slippage: number;
   multiHop: boolean;
   yes: boolean;
+  address?: string;
+  id?: string[];
+  protocol?: string;
 }
 
 interface AppProps {
@@ -274,6 +277,45 @@ export function App({ command, subcommand, args, flags, showHelp }: AppProps) {
           slippage={flags.slippage}
           multiHop={flags.multiHop}
           network={flags.network}
+          json={flags.json}
+        />
+      );
+    }
+
+    if (subcommand === 'orders') {
+      return (
+        <SwapOrders
+          network={flags.network}
+          walletName={flags.wallet}
+          password={flags.password}
+          address={flags.address}
+          json={flags.json}
+        />
+      );
+    }
+
+    if (subcommand === 'cancel') {
+      if (!flags.id || flags.id.length === 0) {
+        return (
+          <Box flexDirection="column">
+            <Text color="red">Error: --id is required</Text>
+            <Text color="gray">Usage: begin swap cancel --id {'<tx-in>'}</Text>
+            <Text color="gray">Options:</Text>
+            <Text color="gray">  --id, -i         Pending order tx_in (can repeat)</Text>
+            <Text color="gray">  --protocol       Protocol if not found in pending orders</Text>
+            <Text color="gray">  --yes, -y        Skip confirmation prompt</Text>
+            <Text color="gray">  --json, -j       Output as JSON</Text>
+          </Box>
+        );
+      }
+      return (
+        <SwapCancel
+          network={flags.network}
+          walletName={flags.wallet}
+          password={flags.password}
+          ids={flags.id}
+          protocol={flags.protocol}
+          yes={flags.yes}
           json={flags.json}
         />
       );

@@ -35,6 +35,8 @@ const cli = meow(
 
     swap [options]               Swap tokens via Minswap aggregator
     swap quote [options]         Get a swap quote without executing
+    swap orders [options]        List pending swap orders
+    swap cancel --id <tx-in>     Cancel pending swap order(s)
 
   Options
     --network, -n     Network to use (mainnet, preprod, preview) [default: mainnet]
@@ -60,6 +62,9 @@ const cli = meow(
     --slippage, -s    Slippage tolerance in % [default: 0.5]
     --multi-hop       Allow multi-hop routing [default: true]
     --yes, -y         Skip confirmation prompt
+    --id, -i          Pending order tx_in (repeatable for cancel)
+    --address         Wallet address for swap orders (read-only)
+    --protocol        Protocol override for cancel if not in pending list
 
   Environment
     BEGIN_CLI_MNEMONIC    Mnemonic for CI/agent use (bypasses keystore)
@@ -96,6 +101,9 @@ const cli = meow(
     $ begin swap quote --from ADA --to MIN --amount 100
     $ begin swap --from ADA --to MIN --amount 100 --slippage 0.5
     $ begin swap --from ADA --to MIN --amount 100 --yes --json
+    $ begin swap orders
+    $ begin swap orders --address addr1qy...
+    $ begin swap cancel --id <tx_in> --yes
 
     # Offline signing workflow
     $ begin cardano send addr1qy... 10 --dry-run --output tx.unsigned
@@ -125,6 +133,9 @@ const cli = meow(
       slippage: { type: 'number', shortFlag: 's', default: 0.5 },
       multiHop: { type: 'boolean', default: true },
       yes: { type: 'boolean', shortFlag: 'y', default: false },
+      id: { type: 'string', shortFlag: 'i', isMultiple: true },
+      address: { type: 'string' },
+      protocol: { type: 'string' },
     },
   }
 );
@@ -155,6 +166,9 @@ const rawFlags = cli.flags as {
   slippage: number;
   multiHop: boolean;
   yes: boolean;
+  id?: string[];
+  address?: string;
+  protocol?: string;
 };
 
 const network = rawFlags.network ?? config.network ?? 'mainnet';
@@ -181,6 +195,9 @@ const flags: AppFlags = {
   slippage: rawFlags.slippage,
   multiHop: rawFlags.multiHop,
   yes: rawFlags.yes,
+  id: rawFlags.id,
+  address: rawFlags.address,
+  protocol: rawFlags.protocol,
 };
 
 setOutputContext({ json: flags.json });

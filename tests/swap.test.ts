@@ -85,24 +85,30 @@ describe('Token Resolution', () => {
 
 describe('Token Amount Formatting', () => {
   it('should format ADA amounts with 6 decimals', () => {
-    expect(formatTokenAmount('1000000', 6)).toBe('1');
-    expect(formatTokenAmount('1500000', 6)).toBe('1.5');
-    expect(formatTokenAmount('1234567', 6)).toBe('1.234567');
+    expect(formatTokenAmount('1000000', 6, undefined, false)).toBe('1');
+    expect(formatTokenAmount('1500000', 6, undefined, false)).toBe('1.5');
+    expect(formatTokenAmount('1234567', 6, undefined, false)).toBe('1.234567');
   });
 
   it('should format with ticker suffix', () => {
-    expect(formatTokenAmount('1000000', 6, 'ADA')).toBe('1 ADA');
-    expect(formatTokenAmount('1500000', 6, 'MIN')).toBe('1.5 MIN');
+    expect(formatTokenAmount('1000000', 6, 'ADA', false)).toBe('1 ADA');
+    expect(formatTokenAmount('1500000', 6, 'MIN', false)).toBe('1.5 MIN');
   });
 
   it('should format tokens with 0 decimals', () => {
-    expect(formatTokenAmount('1000', 0)).toBe('1,000');
-    expect(formatTokenAmount('1000', 0, 'HOSKY')).toBe('1,000 HOSKY');
+    expect(formatTokenAmount('1000', 0, undefined, false)).toBe('1,000');
+    expect(formatTokenAmount('1000', 0, 'HOSKY', false)).toBe('1,000 HOSKY');
   });
 
   it('should remove trailing zeros', () => {
-    expect(formatTokenAmount('1000000', 6)).toBe('1');
-    expect(formatTokenAmount('1100000', 6)).toBe('1.1');
+    expect(formatTokenAmount('1000000', 6, undefined, false)).toBe('1');
+    expect(formatTokenAmount('1100000', 6, undefined, false)).toBe('1.1');
+  });
+
+  it('should format decimal-string amounts', () => {
+    expect(formatTokenAmount('1', 6)).toBe('1');
+    expect(formatTokenAmount('1.500000', 6)).toBe('1.5');
+    expect(formatTokenAmount('1.234567', 6, 'ADA')).toBe('1.234567 ADA');
   });
 });
 
@@ -198,19 +204,27 @@ describe('Route Formatting', () => {
   };
 
   it('should format direct route', () => {
-    const route = [
-      {
-        dex: 'minswap',
-        poolId: 'pool1',
-        tokenIn: 'lovelace',
-        tokenOut: toToken.tokenId,
-        amountIn: '100',
-        amountOut: '5',
-      },
+    const paths = [
+      [
+        {
+          protocol: 'MinswapV2',
+          poolId: 'pool1',
+          lpToken: 'lp1',
+          tokenIn: 'lovelace',
+          tokenOut: toToken.tokenId,
+          amountIn: '100',
+          amountOut: '5',
+          minAmountOut: '4.95',
+          lpFee: '0.3',
+          dexFee: '0.1',
+          deposits: '0',
+          priceImpact: 0.01,
+        },
+      ],
     ];
 
-    const result = formatRoute(route, fromToken, toToken);
-    expect(result).toBe('ADA → MIN via Minswap');
+    const result = formatRoute(paths, fromToken, toToken);
+    expect(result).toBe('ADA → MIN via Minswap V2');
   });
 
   it('should format empty route', () => {
@@ -219,26 +233,40 @@ describe('Route Formatting', () => {
   });
 
   it('should format multi-hop route', () => {
-    const route = [
-      {
-        dex: 'minswap',
-        poolId: 'pool1',
-        tokenIn: 'lovelace',
-        tokenOut: 'intermediate',
-        amountIn: '100',
-        amountOut: '50',
-      },
-      {
-        dex: 'sundaeswap',
-        poolId: 'pool2',
-        tokenIn: 'intermediate',
-        tokenOut: toToken.tokenId,
-        amountIn: '50',
-        amountOut: '5',
-      },
+    const paths = [
+      [
+        {
+          protocol: 'MinswapV2',
+          poolId: 'pool1',
+          lpToken: 'lp1',
+          tokenIn: 'lovelace',
+          tokenOut: 'intermediate',
+          amountIn: '100',
+          amountOut: '50',
+          minAmountOut: '49',
+          lpFee: '0.3',
+          dexFee: '0.1',
+          deposits: '0',
+          priceImpact: 0.01,
+        },
+        {
+          protocol: 'SundaeSwap',
+          poolId: 'pool2',
+          lpToken: 'lp2',
+          tokenIn: 'intermediate',
+          tokenOut: toToken.tokenId,
+          amountIn: '50',
+          amountOut: '5',
+          minAmountOut: '4.95',
+          lpFee: '0.1',
+          dexFee: '0.05',
+          deposits: '0',
+          priceImpact: 0.02,
+        },
+      ],
     ];
 
-    const result = formatRoute(route, fromToken, toToken);
+    const result = formatRoute(paths, fromToken, toToken);
     expect(result).toContain('Minswap');
     expect(result).toContain('SundaeSwap');
   });
@@ -267,22 +295,31 @@ describe('Swap Quote Formatting', () => {
     amountIn: '100',
     amountOut: '5',
     minAmountOut: '4.95',
-    priceImpact: 0.01,
-    lpFee: '0.3',
-    dexFee: '0.1',
+    totalLpFee: '0.3',
+    totalDexFee: '0.1',
+    deposits: '0',
+    avgPriceImpact: 0.01,
     aggregatorFee: '0.05',
-    route: [
-      {
-        dex: 'minswap',
-        poolId: 'pool1',
-        tokenIn: 'lovelace',
-        tokenOut: toToken.tokenId,
-        amountIn: '100',
-        amountOut: '5',
-      },
+    aggregatorFeePercent: 0.5,
+    paths: [
+      [
+        {
+          protocol: 'MinswapV2',
+          poolId: 'pool1',
+          lpToken: 'lp1',
+          tokenIn: 'lovelace',
+          tokenOut: toToken.tokenId,
+          amountIn: '100',
+          amountOut: '5',
+          minAmountOut: '4.95',
+          lpFee: '0.3',
+          dexFee: '0.1',
+          deposits: '0',
+          priceImpact: 0.01,
+        },
+      ],
     ],
-    effectivePrice: '0.05',
-    inversePrice: '20',
+    amountInDecimal: true,
   };
 
   it('should format quote correctly', () => {
@@ -324,12 +361,13 @@ describe('MockMinswapClient', () => {
       tokenOut: '29d222ce763455e3d7a09a665ce554f00ac89d2e99a1a83d267170c64d494e',
       amount: '100',
       slippage: 0.5,
+      amountInDecimal: true,
     });
 
     expect(estimate.tokenIn).toBe('lovelace');
     expect(estimate.amountIn).toBe('100');
     expect(parseFloat(estimate.amountOut)).toBeGreaterThan(0);
-    expect(estimate.route.length).toBeGreaterThan(0);
+    expect(estimate.paths.length).toBeGreaterThan(0);
   });
 
   it('should search for tokens', async () => {
@@ -340,20 +378,19 @@ describe('MockMinswapClient', () => {
   });
 
   it('should return build tx response', async () => {
-    const estimate = await client.estimate({
-      tokenIn: 'lovelace',
-      tokenOut: 'someasset',
-      amount: '100',
-      slippage: 0.5,
-    });
-
     const buildResult = await client.buildTx({
       sender: 'addr1test...',
-      estimate,
+      minAmountOut: '4.95',
+      estimate: {
+        tokenIn: 'lovelace',
+        tokenOut: 'someasset',
+        amount: '100',
+        slippage: 0.5,
+        amountInDecimal: true,
+      },
     });
 
     expect(buildResult.cbor).toBeDefined();
-    expect(buildResult.estimatedFee).toBeDefined();
   });
 
   it('should return submit tx response', async () => {
@@ -362,7 +399,24 @@ describe('MockMinswapClient', () => {
       witnessSet: 'test_witness',
     });
 
-    expect(result.txHash).toBeDefined();
-    expect(result.txHash.startsWith('mock_tx_hash_')).toBe(true);
+    expect(result.txId).toBeDefined();
+    expect(result.txId.startsWith('mock_tx_id_')).toBe(true);
+  });
+
+  it('should return pending orders', async () => {
+    const orders = await client.getPendingOrders('addr1test...');
+
+    expect(orders.length).toBeGreaterThan(0);
+    expect(orders[0].txIn).toBeDefined();
+    expect(orders[0].protocol).toBeDefined();
+  });
+
+  it('should return cancel tx response', async () => {
+    const result = await client.buildCancelTx({
+      sender: 'addr1test...',
+      orders: [{ txIn: 'mock_tx_in_0', protocol: 'MinswapV2' }],
+    });
+
+    expect(result.cbor).toBeDefined();
   });
 });
