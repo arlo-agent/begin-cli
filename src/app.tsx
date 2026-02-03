@@ -218,7 +218,15 @@ export function App({ command, subcommand, args, flags, showHelp }: AppProps) {
     }
 
     if (subcommand === 'withdraw') {
-      return <StakeWithdraw network={flags.network} json={flags.json} yes={flags.yes} />;
+      return (
+        <StakeWithdraw
+          network={flags.network}
+          json={flags.json}
+          yes={flags.yes}
+          walletName={flags.wallet}
+          password={flags.password}
+        />
+      );
     }
 
     return (
