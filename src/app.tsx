@@ -172,13 +172,14 @@ export function App({ command, subcommand, args, flags, showHelp }: AppProps) {
         <CardanoSend
           to={to}
           amount={amount}
-          network={flags.network}
+          network={network}
           walletName={flags.wallet}
           password={flags.password}
           assets={flags.asset}
           dryRun={flags.dryRun}
           outputFile={flags.output}
           jsonOutput={flags.json}
+          yes={flags.yes}
         />
       );
     }
@@ -200,7 +201,16 @@ export function App({ command, subcommand, args, flags, showHelp }: AppProps) {
     if (subcommand === 'delegate') {
       const poolId = args[0];
       if (!poolId) return invalidUsage('Pool ID is required', 'begin stake delegate <pool-id>');
-      return <StakeDelegate poolId={poolId} network={flags.network} json={flags.json} />;
+      return (
+        <StakeDelegate
+          poolId={poolId}
+          network={flags.network}
+          json={flags.json}
+          yes={flags.yes}
+          walletName={flags.wallet}
+          password={flags.password}
+        />
+      );
     }
 
     if (subcommand === 'status') {
@@ -208,7 +218,7 @@ export function App({ command, subcommand, args, flags, showHelp }: AppProps) {
     }
 
     if (subcommand === 'withdraw') {
-      return <StakeWithdraw network={flags.network} json={flags.json} />;
+      return <StakeWithdraw network={flags.network} json={flags.json} yes={flags.yes} />;
     }
 
     return (

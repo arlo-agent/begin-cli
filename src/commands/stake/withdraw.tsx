@@ -10,12 +10,13 @@ import {
 interface StakeWithdrawProps {
   network: string;
   json: boolean;
+  yes?: boolean; // Skip confirmation prompt
   stakeAddress?: string; // Optional - in real impl would derive from wallet
 }
 
 type WithdrawState = 'loading' | 'no_rewards' | 'confirm' | 'building' | 'signing' | 'submitting' | 'success' | 'error' | 'cancelled';
 
-export function StakeWithdraw({ network, json, stakeAddress }: StakeWithdrawProps) {
+export function StakeWithdraw({ network, json, yes, stakeAddress }: StakeWithdrawProps) {
   const [state, setState] = useState<WithdrawState>('loading');
   const [status, setStatus] = useState<DelegationStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -37,6 +38,10 @@ export function StakeWithdraw({ network, json, stakeAddress }: StakeWithdrawProp
           
           if (Number(mockStatus.rewardsAvailable) === 0) {
             setState('no_rewards');
+          } else if (yes) {
+            // If --yes flag, skip confirmation
+            setState('building');
+            simulateWithdrawal();
           } else {
             setState('confirm');
           }
@@ -57,7 +62,13 @@ export function StakeWithdraw({ network, json, stakeAddress }: StakeWithdrawProp
           return;
         }
 
-        setState('confirm');
+        // If --yes flag, skip confirmation
+        if (yes) {
+          setState('building');
+          simulateWithdrawal();
+        } else {
+          setState('confirm');
+        }
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load delegation status');
         setState('error');
@@ -65,7 +76,7 @@ export function StakeWithdraw({ network, json, stakeAddress }: StakeWithdrawProp
     };
 
     loadStatus();
-  }, [effectiveStakeAddress, network]);
+  }, [effectiveStakeAddress, network, yes]);
 
   useInput((input, key) => {
     if (state !== 'confirm') return;
