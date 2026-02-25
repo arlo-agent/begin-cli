@@ -130,7 +130,17 @@ Commands available today:
 **Token discovery (Minswap + Jupiter)**
 - Effort: ~1-2 weeks (both integrations exist in other repos)
 - Impact: Agents need to research before trading
-- Sources: Minswap API for Cardano tokens, Jupiter token list + verified tokens for Solana (already in b58-extension `src/core/chains/adapters/solana-token-list.ts`)
+- **Cardano:** Minswap public API (`https://api-mainnet-prod.minswap.org`)
+  - Docs: https://docs.minswap.org/developer/minswap-apis
+  - `GET /v1/assets` — search/list tokens with metadata, verification status
+  - `POST /v1/assets/metrics` — price, volume (1h/24h/7d), liquidity, market cap, supply, sorted by any metric
+  - `GET /v1/assets/:id/metrics` — detailed metrics for a specific token (by policyId+tokenName)
+  - `GET /v1/assets/:id/price/candlestick` — OHLCV candlestick data (1m to 1M intervals)
+  - `GET /v1/assets/:id/price/timeseries` — price history (1d to all)
+  - Pools API for TVL, volume, fee timeseries
+  - Supports 45+ fiat currencies for price display
+  - No API key needed, rate-limited
+- **Solana:** Jupiter token list + verified tokens (already in b58-extension `src/core/chains/adapters/solana-token-list.ts`)
 
 **Jupiter swaps for Solana**
 - Effort: ~2 weeks (swap logic exists in b58-extension)
