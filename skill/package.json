@@ -1,0 +1,26 @@
+{
+  "name": "@beginwallet/claude-skill",
+  "version": "0.1.0",
+  "description": "Claude Skill for Begin CLI - Cardano wallet for AI agents",
+  "keywords": [
+    "claude-skill",
+    "cardano",
+    "wallet",
+    "ai-agent",
+    "blockchain",
+    "begin"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/arlo-agent/begin-cli.git",
+    "directory": "skill"
+  },
+  "license": "MIT",
+  "author": "NeuralSpark",
+  "files": [
+    "SKILL.md"
+  ],
+  "peerDependencies": {
+    "@beginwallet/cli": ">=0.1.0"
+  }
+}
