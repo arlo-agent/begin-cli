@@ -141,11 +141,11 @@ Commands available today:
   - Supports 45+ fiat currencies for price display
   - No API key needed, rate-limited
 - **Solana:** Jupiter token list + verified tokens (already in b58-extension `src/core/chains/adapters/solana-token-list.ts`)
-- **BTC + ADA/USD:** CoinGecko API (free tier, no key needed for basic endpoints)
-  - Minswap doesn't return ADA metrics (ADA is the base pair, not a traded token — `/v1/assets/lovelace/metrics` returns 404)
-  - BTC isn't on any Cardano/Solana DEX — CoinGecko is the only source
-  - `GET https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,cardano,solana&vs_currencies=usd&include_24hr_change=true&include_market_cap=true`
-  - Free tier: 10-30 calls/min (enough for CLI use)
+- **BTC + ADA/USD + charts:** CoinGecko + Binance (both already in b58-extension)
+  - Minswap doesn't return ADA metrics (ADA is the base pair — `/v1/assets/lovelace/metrics` returns 404)
+  - **CoinGecko** (`src/config/production.ts`): `GET /api/v3/simple/price?ids=cardano,bitcoin,solana&include_24hr_change=true` — prices, 24h change. Free tier, no key.
+  - **Binance** (`src/core/chains/adapters/solana-chart.ts`): `data-api.binance.vision/api/v3/klines` — OHLCV candlestick data for price charts. Resolves symbols dynamically. Free, no key.
+  - Both integrations exist and just need porting to CLI.
 
 **Jupiter swaps for Solana**
 - Effort: ~2 weeks (swap logic exists in b58-extension)
