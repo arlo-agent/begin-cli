@@ -32,6 +32,7 @@ export interface AppFlags {
   limit: number;
   page: number;
   asset?: string[];
+  yes?: boolean;
   // Swap-specific flags
   from?: string;
   to?: string;
@@ -214,7 +215,14 @@ export function App({ command, subcommand, args, flags, showHelp }: AppProps) {
     }
 
     if (subcommand === 'status') {
-      return <StakeStatus network={flags.network} json={flags.json} />;
+      return (
+        <StakeStatus
+          network={flags.network}
+          json={flags.json}
+          walletName={flags.wallet}
+          password={flags.password}
+        />
+      );
     }
 
     if (subcommand === 'withdraw') {

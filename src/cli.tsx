@@ -126,6 +126,7 @@ const cli = meow(
       page: { type: 'number', default: 1 },
       wait: { type: 'boolean', default: true },
       asset: { type: 'string', shortFlag: 'a', isMultiple: true },
+      yes: { type: 'boolean', shortFlag: 'y', default: false },
       // Swap-specific flags
       from: { type: 'string' },
       to: { type: 'string' },
@@ -159,6 +160,7 @@ const rawFlags = cli.flags as {
   limit: number;
   page: number;
   asset?: string[];
+  yes: boolean;
   // Swap-specific flags
   from?: string;
   to?: string;
@@ -189,6 +191,7 @@ const flags: AppFlags = {
   limit: rawFlags.limit,
   page: rawFlags.page,
   asset: rawFlags.asset,
+  yes: rawFlags.yes,
   from: rawFlags.from,
   to: rawFlags.to,
   amount: rawFlags.amount,

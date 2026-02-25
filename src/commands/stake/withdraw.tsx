@@ -1,8 +1,18 @@
-import React, { useEffect, useState } from 'react';
-import { Box, Text, useApp, useInput } from 'ink';
+import React, { useState, useEffect } from 'react';
+import { Box, Text, useInput, useApp } from 'ink';
 import TextInput from 'ink-text-input';
-import { getDelegationStatus, getMockDelegationStatus, lovelaceToAda, type DelegationStatus } from '../../lib/staking.js';
-import { checkWalletAvailability, loadWallet, type TransactionConfig } from '../../lib/transaction.js';
+import {
+  getDelegationStatus,
+  getMockDelegationStatus,
+  lovelaceToAda,
+  type DelegationStatus,
+} from '../../lib/staking.js';
+import {
+  loadWallet,
+  checkWalletAvailability,
+  type TransactionConfig,
+} from '../../lib/transaction.js';
+import type { MeshWallet } from '@meshsdk/core';
 
 interface StakeWithdrawProps {
   network: string;
@@ -35,7 +45,7 @@ interface WalletInfo {
 export function StakeWithdraw({
   network,
   json,
-  yes = false,
+  yes,
   walletName,
   password: initialPassword,
 }: StakeWithdrawProps) {
@@ -47,20 +57,73 @@ export function StakeWithdraw({
   const [password, setPassword] = useState(initialPassword || '');
   const [walletInfo, setWalletInfo] = useState<WalletInfo | null>(null);
   const [stakeAddress, setStakeAddress] = useState<string | null>(null);
+  const [wallet, setWallet] = useState<MeshWallet | null>(null);
 
   const config: TransactionConfig = { network };
 
-  const simulateWithdrawal = async () => {
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-    setState('signing');
+  // Check wallet availability on mount
+  useEffect(() => {
+    const availability = checkWalletAvailability(walletName);
 
-    await new Promise((resolve) => setTimeout(resolve, 1500));
-    setState('submitting');
+    if (!availability.available) {
+      setError(availability.error || 'No wallet available');
+      setState('error');
+      setTimeout(() => exit(), 2000);
+      return;
+    }
 
-    await new Promise((resolve) => setTimeout(resolve, 2000));
-    setTxHash('mock_withdraw_tx_' + Date.now().toString(36));
-    setState('success');
-    setTimeout(() => exit(), 2000);
+    setWalletInfo({
+      source: availability.source!,
+      walletName: availability.walletName,
+      needsPassword: availability.needsPassword,
+    });
+
+    // If using env var or password already provided, proceed to loading
+    if (!availability.needsPassword || initialPassword) {
+      initWallet(initialPassword, availability.walletName);
+    } else {
+      setState('password');
+    }
+  }, []);
+
+  // Handle password submission
+  const handlePasswordSubmit = () => {
+    if (password.trim()) {
+      initWallet(password, walletInfo?.walletName);
+    }
+  };
+
+  // Initialize wallet and derive stake address
+  const initWallet = async (pwd?: string, wName?: string) => {
+    try {
+      setState('loading-wallet');
+
+      const loadedWallet = await loadWallet(
+        { walletName: wName, password: pwd },
+        config
+      );
+      setWallet(loadedWallet);
+
+      // Get stake/reward address from wallet
+      const rewardAddresses = await loadedWallet.getRewardAddresses();
+      if (!rewardAddresses || rewardAddresses.length === 0) {
+        throw new Error('Could not derive stake address from wallet');
+      }
+      const derivedStakeAddress = rewardAddresses[0];
+      setStakeAddress(derivedStakeAddress);
+
+      // Continue with status loading
+      await loadStatus(derivedStakeAddress);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to load wallet';
+      if (message.includes('Incorrect password')) {
+        setError('Incorrect password. Please try again.');
+      } else {
+        setError(message);
+      }
+      setState('error');
+      setTimeout(() => exit(), 2000);
+    }
   };
 
   const loadStatus = async (effectiveStakeAddress: string) => {
@@ -69,15 +132,17 @@ export function StakeWithdraw({
       const apiKey = process.env.BLOCKFROST_API_KEY;
 
       if (!apiKey) {
-        const mock = getMockDelegationStatus();
-        const effective = { ...mock, stakeAddress: effectiveStakeAddress };
-        setStatus(effective);
+        // Use mock data
+        console.error('\n⚠ No BLOCKFROST_API_KEY set - using mock data\n');
+        const mockStatus = getMockDelegationStatus();
+        // Override with the actual stake address
+        setStatus({ ...mockStatus, stakeAddress: effectiveStakeAddress });
 
-        if (Number(effective.rewardsAvailable) === 0) {
+        if (Number(mockStatus.rewardsAvailable) === 0) {
           setState('no_rewards');
         } else if (yes) {
           setState('building');
-          void simulateWithdrawal();
+          simulateWithdrawal();
         } else {
           setState('confirm');
         }
@@ -100,7 +165,7 @@ export function StakeWithdraw({
 
       if (yes) {
         setState('building');
-        void simulateWithdrawal();
+        simulateWithdrawal();
       } else {
         setState('confirm');
       }
@@ -173,6 +238,28 @@ export function StakeWithdraw({
       setTimeout(() => exit(), 500);
     }
   });
+
+  const simulateWithdrawal = async () => {
+    // Simulate MeshJS transaction building
+    // In real implementation:
+    // 1. const tx = new Transaction({ initiator: wallet });
+    // 2. tx.withdrawRewards(stakeAddress, rewardsAvailable);
+    // 3. const unsignedTx = await tx.build();
+    // 4. const signedTx = await wallet.signTx(unsignedTx);
+    // 5. const txHash = await wallet.submitTx(signedTx);
+
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+    setState('signing');
+
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+    setState('submitting');
+
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+    setTxHash('mock_withdraw_tx_' + Date.now().toString(36));
+    setState('success');
+
+    setTimeout(() => exit(), 2000);
+  };
 
   // JSON output
   if (json) {
