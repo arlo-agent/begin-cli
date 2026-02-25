@@ -19,6 +19,8 @@ import { WalletRestore } from "./commands/wallet/restore.js";
 import { WalletExport } from "./commands/wallet/export.js";
 import { WalletList } from "./commands/wallet/list.js";
 import { MintCommand } from "./commands/mint/index.js";
+import { TokenSearch } from "./commands/token/search.js";
+import { TokenPrice } from "./commands/token/price.js";
 import { isValidNetwork, type Network } from "./lib/config.js";
 import type { NetworkType } from "./lib/address.js";
 
@@ -35,7 +37,6 @@ export interface AppFlags {
   limit: number;
   page: number;
   asset?: string[];
-  yes: boolean;
   // Mint command flags
   image?: string;
   name?: string;
@@ -51,6 +52,9 @@ export interface AppFlags {
   id?: string[];
   protocol?: string;
   showSeed: boolean;
+  // Token discovery flags
+  trending: boolean;
+  currency: string;
 }
 
 interface AppProps {
@@ -453,6 +457,44 @@ export function App({ command, subcommand, args, flags, showHelp }: AppProps) {
         password={flags.password}
         json={flags.json}
       />
+    );
+  }
+
+  // ---- Token commands ----
+  if (command === 'token') {
+    if (subcommand === 'search') {
+      const query = args[0];
+      // If no query and not --trending, show trending by default
+      return (
+        <TokenSearch
+          query={query}
+          trending={flags.trending || !query}
+          currency={flags.currency}
+          json={flags.json}
+          limit={flags.limit}
+        />
+      );
+    }
+
+    if (subcommand === 'price') {
+      const symbol = args[0];
+      if (!symbol) {
+        return invalidUsage('Token symbol is required', 'begin token price <symbol>');
+      }
+      return (
+        <TokenPrice
+          symbol={symbol}
+          currency={flags.currency}
+          json={flags.json}
+        />
+      );
+    }
+
+    return (
+      <Box flexDirection="column">
+        <Text color="red">Unknown token command: {subcommand || '(none)'}</Text>
+        <Text color="gray">Available commands: search, price</Text>
+      </Box>
     );
   }
 
