@@ -299,12 +299,12 @@ export function CardanoSend({
     }
   };
 
-  // Auto-proceed in JSON mode once ready (no interactive confirmation)
+  // Auto-proceed in JSON mode or with --yes flag (no interactive confirmation)
   useEffect(() => {
-    if (jsonOutput && state === 'confirm') {
+    if ((jsonOutput || yes) && state === 'confirm') {
       handleSend();
     }
-  }, [jsonOutput, state]);
+  }, [jsonOutput, yes, state]);
 
   // Auto-proceed in non-JSON mode when --yes is set
   useEffect(() => {
