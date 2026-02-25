@@ -25,16 +25,16 @@ The recommendation: ship an MCP server and improve the existing Skills files wit
 | Feature | MoonPay CLI | Begin CLI | Gap |
 |---|---|---|---|
 | **Chains** | 9 (SOL, ETH, BTC, Base, Polygon, Arbitrum, Optimism, BNB, Avalanche) | 1 (Cardano) | Large |
-| **Wallet creation** | BIP39, AES-256-GCM, OS keychain | BIP39, password-encrypted keystore | Comparable |
-| **Auth / Agent mode** | Email + OTP (autonomous login possible) | `BEGIN_CLI_MNEMONIC` + `BEGIN_CLI_WALLET_PASSWORD` env vars | Both work for agents |
-| **Fiat on/off ramp** | Virtual bank accounts, Apple Pay, Venmo, PayPal | None | Large |
-| **Token swaps** | Multi-chain via swaps.xyz | Cardano via Minswap aggregator (quote, execute, cancel, orders) | Begin deeper on Cardano |
-| **Cross-chain bridges** | Yes (swaps.xyz) | None | Large |
-| **Staking** | None | Full: delegate, pool search, status, rewards withdrawal | **Begin ahead** |
+| **Wallet creation** | BIP39, AES-256-GCM, OS keychain | BIP39, password-encrypted keystore | **TODO:** Migrate to OS keychain (macOS/Linux/Windows) |
+| **Auth / Agent mode** | Email + OTP (autonomous login possible) | `BEGIN_CLI_MNEMONIC` + `BEGIN_CLI_WALLET_PASSWORD` env vars | **TODO:** Read mnemonic from keychain, make password optional |
+| **Fiat on/off ramp** | Virtual bank accounts, Apple Pay, Venmo, PayPal | Onramper integration exists in b58-extension (feature/solana) | **Port to CLI** — generate URL, send to user |
+| **Token swaps** | Multi-chain via swaps.xyz | Cardano: Minswap (CLI). Solana: Jupiter (b58-extension feature/solana) | Port Jupiter swaps to CLI |
+| **Cross-chain bridges** | Yes (swaps.xyz) | XOSwap integration exists in b58-extension (feature/solana) | Port XOSwap to CLI |
+| **Staking** | None | Delegate, pool search, status, rewards — **currently uses simulated data** | **TODO:** Implement with MeshSDK (real Cardano staking) |
 | **Governance** | None | Cardano governance support | **Begin ahead** |
 | **NFT minting** | None | NMKR integration (mint + send in one command) | **Begin ahead** |
 | **Trading automation** | DCA, limit orders, stop losses (OS cron scripts) | None | Large |
-| **Token discovery** | Trending, market data, risk scores | None | Medium |
+| **Token discovery** | Trending, market data, risk scores | Minswap API (Cardano) + Jupiter token list (Solana, in b58-extension) | Port existing integrations to CLI |
 | **MCP server** | `mp mcp` built-in | None | Critical gap |
 | **Skills system** | 16 SKILL.md files shipped in npm package | 2 SKILL.md files (`skills/` + `skill/`) | Exists but needs expansion |
 | **Offline signing** | None visible | Full air-gapped workflow (dry-run → sign → submit) | **Begin ahead** |
@@ -67,10 +67,10 @@ Commands available today:
 | `receive` | ✅ Production | --qr for QR codes |
 | `sign <tx-file>` | ✅ Production | Offline signing |
 | `submit <signed-tx>` | ✅ Production | --no-wait option |
-| `stake pools [search]` | ✅ Production | Pool search |
-| `stake delegate <pool>` | ✅ Production | --yes flag |
-| `stake status` | ✅ Production | Delegation status + rewards |
-| `stake withdraw` | ✅ Production | --yes flag |
+| `stake pools [search]` | ⚠️ Simulated | Pool search — needs MeshSDK implementation |
+| `stake delegate <pool>` | ⚠️ Simulated | --yes flag — needs MeshSDK implementation |
+| `stake status` | ⚠️ Simulated | Delegation status + rewards — needs MeshSDK |
+| `stake withdraw` | ⚠️ Simulated | --yes flag — needs MeshSDK implementation |
 | `swap` | ✅ Production | Minswap aggregator |
 | `swap quote` | ✅ Production | Quote without executing |
 | `swap orders` | ✅ Production | List pending orders |
@@ -102,26 +102,48 @@ Commands available today:
 - Impact: AI agents discover Begin's capabilities automatically
 - What to do: Consolidate the two existing SKILL.md files into a proper `skills/` directory. Add individual skill files for each command group (wallet, staking, swap, mint, offline-signing). Follow MoonPay's pattern of one skill per workflow. Update `package.json` files list.
 
+**OS Keychain wallet storage**
+- Effort: ~1 week
+- Impact: Better security, password becomes optional, agent-friendly (read mnemonic from keychain)
+- Approach: Use `keytar` or similar for macOS Keychain, Linux libsecret, Windows Credential Manager
+- Mnemonic stored encrypted in OS keychain. Password optional (keychain handles auth).
+
+**Real staking via MeshSDK**
+- Effort: ~1 week
+- Impact: Currently simulated data — needs to be real for production use
+- Approach: Use @meshsdk/core for delegation, pool queries, reward withdrawal on Cardano
+
 **Multi-chain architecture prep**
 - Effort: ~2 weeks (refactor only, no new chains yet)
 - Impact: Unblocks everything else
-- Why now: Begin Wallet mobile already supports Bitcoin and Solana. The chain adapters (IChainAdapter interface) exist in begin-core. Need to extract and wire into CLI.
+- Why now: Jupiter swaps, XOSwap bridges, Onramper fiat, and Jupiter token discovery already exist in b58-extension (feature/solana branch). The code is written — it needs to be extracted and wired into CLI.
 - Key change: Separate Ink rendering from business logic so MCP and CLI share the same core.
 
 ### P1 — Next Quarter
 
-**Fiat onramp integration**
-- Effort: 2-4 weeks depending on provider
+**Fiat onramp (Onramper)**
+- Effort: ~1 week (integration already exists in b58-extension)
 - Impact: High — makes the wallet useful for buying, not just managing
-- See Section 7 for provider comparison.
+- Approach: Port Onramper URL builder from b58-extension. CLI generates checkout URL → prints or opens in browser. For agents, return URL as JSON.
+- Existing: `src/views/exchange/onramper.tsx` in b58-extension — uses `buy.onramper.com` with API key `pk_prod_01HETEQF46GSK6BS5JWKDF31BT`
 
-**Token discovery & market data**
-- Effort: 2-3 weeks
+**Token discovery (Minswap + Jupiter)**
+- Effort: ~1-2 weeks (both integrations exist in other repos)
 - Impact: Agents need to research before trading
-- Sources: CoinGecko API (free tier), DeFi Llama, Blockfrost token info
+- Sources: Minswap API for Cardano tokens, Jupiter token list + verified tokens for Solana (already in b58-extension `src/core/chains/adapters/solana-token-list.ts`)
+
+**Jupiter swaps for Solana**
+- Effort: ~2 weeks (swap logic exists in b58-extension)
+- Impact: Multi-chain swaps. Jupiter aggregator with Metis routing, platform fee support.
+- Existing: `src/core/chains/adapters/solana-swap.ts` — full quote + swap implementation with fee accounts
+
+**XOSwap cross-chain bridges**
+- Effort: ~2 weeks (integration exists in b58-extension)
+- Impact: Cross-chain swaps (BTC↔ETH↔SOL↔ADA etc.)
+- Existing: `src/hooks/useXOSwap.ts` — uses Exodus exchange API (`exchange.exodus.io/v3`)
 
 **Multi-chain: Bitcoin + Solana**
-- Effort: 4-6 weeks (after architecture prep)
+- Effort: 3-4 weeks (after architecture prep, faster since adapters exist)
 - Impact: Parity with mobile app. Three chains, one CLI.
 
 ### P2 — Later
@@ -282,27 +304,33 @@ skills/
 
 ---
 
-## 7. Fiat Onramp Options
+## 7. Fiat Onramp — Onramper (Already Integrated)
 
-| Provider | Cardano support | Integration type | Revenue model | Notes |
-|---|---|---|---|---|
-| **Transak** | Yes (ADA) | Widget URL + API | Revenue share | Good ADA support, recommended for v1 |
-| **MoonPay** | Yes (ADA) | Widget URL + API | Revenue share | Ironic but practical. Broader coverage. |
-| **Ramp Network** | Yes (ADA) | SDK + hosted widget | Revenue share | Strong European coverage |
-| **Banxa** | Yes (ADA) | Widget + API | Revenue share | Good AU/CA coverage |
-| **Build own** | N/A | Full stack | Full revenue | Only if Begin already has MSB licensing |
+Begin already uses **Onramper** in b58-extension (`src/views/exchange/onramper.tsx`). This is a meta-aggregator that routes through multiple providers (MoonPay, Transak, Ramp, etc.) — so we get broad coverage without integrating each provider separately.
 
-### Recommendation
+### Current integration (b58-extension)
+- API key: `pk_prod_01HETEQF46GSK6BS5JWKDF31BT`
+- Supported: BTC, ADA (Cardano) — expandable
+- Default fiat: EUR
+- Customizable theme/branding
 
-Start with **Transak** — they have solid Cardano support and a simple integration (generate URL → open in browser → webhook on completion). Add MoonPay as a second provider when multi-chain ships for broader coverage.
+### CLI implementation plan
 
-CLI integration pattern:
 ```bash
-begin buy --amount 50 --currency USD
-# → Opens checkout URL in browser (or prints for agents)
-# → Polls/webhook for completion
-# → Shows updated balance
+begin buy --amount 50 --currency EUR --token ADA
+# → Generates Onramper checkout URL with wallet address pre-filled
+# → Opens in browser (or prints URL for agents)
+# → JSON mode returns { "url": "https://buy.onramper.com?..." }
 ```
+
+The URL builder is straightforward — construct query params:
+- `apiKey` — existing prod key
+- `onlyCryptos` — token filter (ada_cardano, btc, sol)
+- `defaultFiat` — user's currency
+- `wallets` — pre-fill destination address
+- Theme params for branding
+
+Effort: ~1 week to port and add CLI command. No backend needed — it's a URL.
 
 ---
 
