@@ -47,7 +47,7 @@ export function StakeDelegate({
   poolId,
   network,
   json,
-  yes,
+  yes = false,
   walletName,
   password: initialPassword,
 }: StakeDelegateProps) {
@@ -185,12 +185,12 @@ export function StakeDelegate({
   };
 
   useInput((input, key) => {
+    if (json) return;
     if (state !== 'confirm') return;
 
     if (input === 'y' || input === 'Y') {
-      // Start delegation process
       setState('building');
-      simulateDelegation();
+      void simulateDelegation();
     } else if (input === 'n' || input === 'N' || key.escape) {
       setState('cancelled');
       setTimeout(() => exit(), 500);
@@ -249,12 +249,11 @@ export function StakeDelegate({
       setTimeout(() => exit(), 100);
       return null;
     }
-    // For non-interactive JSON mode, just output pool info
     console.log(
       JSON.stringify(
         {
           status: 'confirm_required',
-          pool: pool,
+          pool,
           stakeAddress,
           needsRegistration,
           message: 'Run without --json to confirm delegation interactively, or use --yes to skip confirmation',
@@ -343,9 +342,7 @@ export function StakeDelegate({
     return (
       <Box flexDirection="column" padding={1}>
         <Text color="cyan">🔨 Building delegation transaction...</Text>
-        {needsRegistration && (
-          <Text color="gray">Including stake key registration certificate</Text>
-        )}
+        {needsRegistration && <Text color="gray">Including stake key registration certificate</Text>}
       </Box>
     );
   }
@@ -394,7 +391,6 @@ export function StakeDelegate({
     );
   }
 
-  // Confirm state
   return (
     <Box flexDirection="column" padding={1}>
       <Box marginBottom={1}>
