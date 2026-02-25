@@ -4,7 +4,7 @@ import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { generateQRCode, isValidCardanoAddress, truncateAddress } from '../lib/qr.js';
 import { deriveAddresses, type NetworkType } from '../lib/address.js';
-import { getMnemonic, walletExists, WALLETS_DIR, MNEMONIC_ENV_VAR } from '../lib/keystore.js';
+import { getMnemonic, walletExists, WALLETS_DIR, MNEMONIC_ENV_VAR, PASSWORD_ENV_VAR, getPasswordFromEnv } from '../lib/keystore.js';
 
 interface ReceiveProps {
   /** Either a wallet name or a raw address */
@@ -60,15 +60,18 @@ async function resolveTargetToAddress(opts: {
     return { isWallet: true, walletName: target, address: saved, source: 'wallet_file' };
   }
 
+  // Password priority: --password flag > BEGIN_CLI_WALLET_PASSWORD env var
+  const effectivePassword = password || getPasswordFromEnv() || undefined;
+
   // Fallback: decrypt mnemonic from keystore and derive address (requires password)
-  if (!password) {
+  if (!effectivePassword) {
     throw new Error(
       `Password required to decrypt wallet "${target}". ` +
-        `Use --password or set ${MNEMONIC_ENV_VAR} to bypass file wallets.`
+        `Use --password, set ${PASSWORD_ENV_VAR}, or set ${MNEMONIC_ENV_VAR} to bypass file wallets.`
     );
   }
 
-  const mnemonic = getMnemonic(password, target);
+  const mnemonic = getMnemonic(effectivePassword, target);
   const derived = await deriveAddresses(mnemonic, network);
   return { isWallet: true, walletName: target, address: derived.baseAddress, source: 'keystore' };
 }
