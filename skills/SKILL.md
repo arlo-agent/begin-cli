@@ -22,7 +22,10 @@ A Cardano CLI wallet designed for AI agents. Manage wallets, send ADA and native
 
 ```bash
 npm install -g @beginwallet/cli
+# or: pnpm add -g @beginwallet/cli
 ```
+
+Run without installing: `npx @beginwallet/cli <command>` or `pnpm dlx @beginwallet/cli <command>`
 
 Verify installation:
 ```bash

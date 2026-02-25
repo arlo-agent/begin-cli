@@ -10,11 +10,13 @@ Begin CLI is a headless, scriptable Cardano wallet designed for autonomous AI ag
 
 ```bash
 npm install -g @beginwallet/cli
+# or: pnpm add -g @beginwallet/cli
 ```
 
 Or use without installing:
 ```bash
 npx @beginwallet/cli <command>
+# or: pnpm dlx @beginwallet/cli <command>
 ```
 
 ## Environment Variables

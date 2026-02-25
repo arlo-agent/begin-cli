@@ -41,6 +41,8 @@ const cli = meow(
     swap orders [options]        List pending swap orders
     swap cancel --id <tx-in>     Cancel pending swap order(s)
 
+    mcp                              Start MCP server for AI agent integration
+
   Options
     --network, -n     Network to use (mainnet, preprod, preview) [default: mainnet]
     --wallet, -w      Wallet name from keystore (uses default if not specified)
@@ -151,12 +153,10 @@ const cli = meow(
       to: { type: 'string', shortFlag: 't' },
       // Swap-specific flags
       from: { type: 'string' },
-      to: { type: 'string' },
       amount: { type: 'string' },
       slippage: { type: 'number', shortFlag: 's', default: 0.5 },
       multiHop: { type: 'boolean', default: true },
-      yes: { type: 'boolean', shortFlag: 'y', default: false },
-      id: { type: 'string', shortFlag: 'i', isMultiple: true },
+      id: { type: 'string', isMultiple: true },
       address: { type: 'string' },
       protocol: { type: 'string' },
     },
@@ -164,6 +164,19 @@ const cli = meow(
 );
 
 const [command, subcommand, ...args] = cli.input;
+
+// Handle MCP command before Ink rendering
+if (command === 'mcp') {
+  const startMcpServer = async () => {
+    const { startMcpServer } = await import('./mcp/server.js');
+    await startMcpServer();
+  };
+  startMcpServer().catch((err) => {
+    console.error('MCP server error:', err);
+    process.exit(1);
+  });
+} else {
+  // Continue with normal CLI flow
 
 // Load config defaults
 const config = loadConfig();
@@ -190,11 +203,9 @@ const rawFlags = cli.flags as {
   to?: string;
   // Swap-specific flags
   from?: string;
-  to?: string;
   amount?: string;
   slippage: number;
   multiHop: boolean;
-  yes: boolean;
   id?: string[];
   address?: string;
   protocol?: string;
@@ -225,11 +236,9 @@ const flags: AppFlags = {
   description: rawFlags.description,
   to: rawFlags.to,
   from: rawFlags.from,
-  to: rawFlags.to,
   amount: rawFlags.amount,
   slippage: rawFlags.slippage,
   multiHop: rawFlags.multiHop,
-  yes: rawFlags.yes,
   id: rawFlags.id,
   address: rawFlags.address,
   protocol: rawFlags.protocol,
@@ -254,3 +263,5 @@ const { waitUntilExit } = render(
 waitUntilExit()
   .then(() => process.exit(0))
   .catch(() => process.exit(1));
+
+} // End of else block for non-MCP commands
