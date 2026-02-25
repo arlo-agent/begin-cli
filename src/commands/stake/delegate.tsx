@@ -1,19 +1,8 @@
-import React, { useState, useEffect } from 'react';
-import { Box, Text, useInput, useApp } from 'ink';
+import React, { useEffect, useState } from 'react';
+import { Box, Text, useApp, useInput } from 'ink';
 import TextInput from 'ink-text-input';
-import {
-  fetchPoolDetails,
-  getDelegationStatus,
-  lovelaceToAda,
-  getMockPools,
-  type StakePool,
-} from '../../lib/staking.js';
-import {
-  loadWallet,
-  checkWalletAvailability,
-  type TransactionConfig,
-} from '../../lib/transaction.js';
-import type { MeshWallet } from '@meshsdk/core';
+import { fetchPoolDetails, getDelegationStatus, getMockPools, lovelaceToAda, type StakePool } from '../../lib/staking.js';
+import { checkWalletAvailability, loadWallet, type TransactionConfig } from '../../lib/transaction.js';
 
 interface StakeDelegateProps {
   poolId: string;
@@ -47,7 +36,7 @@ export function StakeDelegate({
   poolId,
   network,
   json,
-  yes,
+  yes = false,
   walletName,
   password: initialPassword,
 }: StakeDelegateProps) {
@@ -60,14 +49,97 @@ export function StakeDelegate({
   const [password, setPassword] = useState(initialPassword || '');
   const [walletInfo, setWalletInfo] = useState<WalletInfo | null>(null);
   const [stakeAddress, setStakeAddress] = useState<string | null>(null);
-  const [wallet, setWallet] = useState<MeshWallet | null>(null);
 
   const config: TransactionConfig = { network };
 
-  // Check wallet availability on mount
+  const simulateDelegation = async () => {
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+    setState('signing');
+
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+    setState('submitting');
+
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+    setTxHash('mock_delegation_tx_' + Date.now().toString(36));
+    setState('success');
+    setTimeout(() => exit(), 2000);
+  };
+
+  const loadPoolData = async (effectiveStakeAddress: string) => {
+    try {
+      setState('loading');
+
+      const apiKey = process.env.BLOCKFROST_API_KEY;
+      if (!apiKey) {
+        // Use mock data (staking lib throws if no key)
+        const mockPools = getMockPools();
+        const match = mockPools.find(
+          (p) => p.poolId === poolId || p.ticker.toLowerCase() === poolId.toLowerCase()
+        );
+        if (!match) {
+          setError(`Pool not found: ${poolId}`);
+          setState('error');
+          return;
+        }
+        setPool(match);
+        setNeedsRegistration(false);
+
+        if (yes) {
+          setState('building');
+          void simulateDelegation();
+        } else {
+          setState('confirm');
+        }
+        return;
+      }
+
+      const poolDetails = await fetchPoolDetails(poolId, network);
+      if (!poolDetails) {
+        setError(`Pool not found: ${poolId}`);
+        setState('error');
+        return;
+      }
+      setPool(poolDetails);
+
+      const status = await getDelegationStatus(effectiveStakeAddress, network);
+      setNeedsRegistration(!status.isRegistered);
+
+      if (yes) {
+        setState('building');
+        void simulateDelegation();
+      } else {
+        setState('confirm');
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load pool data');
+      setState('error');
+      setTimeout(() => exit(), 2000);
+    }
+  };
+
+  const initWallet = async (pwd?: string, wName?: string) => {
+    try {
+      setState('loading-wallet');
+
+      const loadedWallet = await loadWallet({ walletName: wName, password: pwd }, config);
+      const rewardAddresses = await loadedWallet.getRewardAddresses();
+      if (!rewardAddresses || rewardAddresses.length === 0) {
+        throw new Error('Could not derive stake address from wallet');
+      }
+      const derived = rewardAddresses[0];
+      setStakeAddress(derived);
+
+      await loadPoolData(derived);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to load wallet';
+      setError(message.includes('Incorrect password') ? 'Incorrect password. Please try again.' : message);
+      setState('error');
+      setTimeout(() => exit(), 2000);
+    }
+  };
+
   useEffect(() => {
     const availability = checkWalletAvailability(walletName);
-
     if (!availability.available) {
       setError(availability.error || 'No wallet available');
       setState('error');
@@ -81,144 +153,33 @@ export function StakeDelegate({
       needsPassword: availability.needsPassword,
     });
 
-    // If using env var or password already provided, proceed to loading
     if (!availability.needsPassword || initialPassword) {
-      initWallet(initialPassword, availability.walletName);
-    } else {
-      setState('password');
+      void initWallet(initialPassword, availability.walletName);
+      return;
     }
+
+    setState('password');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Handle password submission
   const handlePasswordSubmit = () => {
     if (password.trim()) {
-      initWallet(password, walletInfo?.walletName);
-    }
-  };
-
-  // Initialize wallet and derive stake address
-  const initWallet = async (pwd?: string, wName?: string) => {
-    try {
-      setState('loading-wallet');
-
-      const loadedWallet = await loadWallet(
-        { walletName: wName, password: pwd },
-        config
-      );
-      setWallet(loadedWallet);
-
-      // Get stake/reward address from wallet
-      const rewardAddresses = await loadedWallet.getRewardAddresses();
-      if (!rewardAddresses || rewardAddresses.length === 0) {
-        throw new Error('Could not derive stake address from wallet');
-      }
-      const derivedStakeAddress = rewardAddresses[0];
-      setStakeAddress(derivedStakeAddress);
-
-      // Continue with pool loading
-      await loadPoolData(derivedStakeAddress);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to load wallet';
-      if (message.includes('Incorrect password')) {
-        setError('Incorrect password. Please try again.');
-      } else {
-        setError(message);
-      }
-      setState('error');
-      setTimeout(() => exit(), 2000);
-    }
-  };
-
-  const loadPoolData = async (effectiveStakeAddress: string) => {
-    try {
-      setState('loading');
-      const apiKey = process.env.BLOCKFROST_API_KEY;
-
-      if (!apiKey) {
-        // Use mock data
-        console.error('\n⚠ No BLOCKFROST_API_KEY set - using mock data\n');
-        const mockPools = getMockPools();
-        const mockPool = mockPools.find(
-          (p) => p.poolId === poolId || p.ticker.toLowerCase() === poolId.toLowerCase()
-        );
-        if (mockPool) {
-          setPool(mockPool);
-          setNeedsRegistration(false); // Mock: assume registered
-        } else {
-          setError(`Pool not found: ${poolId}`);
-          setState('error');
-          return;
-        }
-
-        if (yes) {
-          setState('building');
-          simulateDelegation();
-        } else {
-          setState('confirm');
-        }
-        return;
-      }
-
-      // Fetch pool details
-      const poolDetails = await fetchPoolDetails(poolId, network);
-      if (!poolDetails) {
-        setError(`Pool not found: ${poolId}`);
-        setState('error');
-        return;
-      }
-      setPool(poolDetails);
-
-      // Check if stake key needs registration
-      const status = await getDelegationStatus(effectiveStakeAddress, network);
-      setNeedsRegistration(!status.isRegistered);
-
-      if (yes) {
-        setState('building');
-        simulateDelegation();
-      } else {
-        setState('confirm');
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load pool data');
-      setState('error');
+      void initWallet(password, walletInfo?.walletName);
     }
   };
 
   useInput((input, key) => {
+    if (json) return;
     if (state !== 'confirm') return;
 
     if (input === 'y' || input === 'Y') {
-      // Start delegation process
       setState('building');
-      simulateDelegation();
+      void simulateDelegation();
     } else if (input === 'n' || input === 'N' || key.escape) {
       setState('cancelled');
       setTimeout(() => exit(), 500);
     }
   });
-
-  const simulateDelegation = async () => {
-    // Simulate MeshJS transaction building
-    // In real implementation:
-    // 1. const tx = new Transaction({ initiator: wallet });
-    // 2. if (needsRegistration) tx.registerStake(stakeAddress);
-    // 3. tx.delegateStake(stakeAddress, poolId);
-    // 4. const unsignedTx = await tx.build();
-    // 5. const signedTx = await wallet.signTx(unsignedTx);
-    // 6. const txHash = await wallet.submitTx(signedTx);
-
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-    setState('signing');
-
-    await new Promise((resolve) => setTimeout(resolve, 1500));
-    setState('submitting');
-
-    await new Promise((resolve) => setTimeout(resolve, 2000));
-    setTxHash('mock_delegation_tx_' + Date.now().toString(36));
-    setState('success');
-
-    setTimeout(() => exit(), 2000);
-  };
 
   // JSON output
   if (json) {
@@ -249,12 +210,11 @@ export function StakeDelegate({
       setTimeout(() => exit(), 100);
       return null;
     }
-    // For non-interactive JSON mode, just output pool info
     console.log(
       JSON.stringify(
         {
           status: 'confirm_required',
-          pool: pool,
+          pool,
           stakeAddress,
           needsRegistration,
           message: 'Run without --json to confirm delegation interactively, or use --yes to skip confirmation',
@@ -267,7 +227,6 @@ export function StakeDelegate({
     return null;
   }
 
-  // Render checking state
   if (state === 'checking') {
     return (
       <Box padding={1}>
@@ -276,7 +235,6 @@ export function StakeDelegate({
     );
   }
 
-  // Render password prompt
   if (state === 'password') {
     return (
       <Box flexDirection="column" padding={1}>
@@ -288,33 +246,22 @@ export function StakeDelegate({
         </Box>
         <Box>
           <Text color="gray">Password: </Text>
-          <TextInput
-            value={password}
-            onChange={setPassword}
-            onSubmit={handlePasswordSubmit}
-            mask="*"
-          />
+          <TextInput value={password} onChange={setPassword} onSubmit={handlePasswordSubmit} mask="*" />
         </Box>
       </Box>
     );
   }
 
-  // Render loading wallet state
   if (state === 'loading-wallet') {
     return (
       <Box flexDirection="column" padding={1}>
         <Text color="cyan">⏳ Loading wallet...</Text>
-        {walletInfo?.source === 'wallet' && (
-          <Text color="gray">Decrypting {walletInfo.walletName}...</Text>
-        )}
-        {walletInfo?.source === 'env' && (
-          <Text color="gray">Using environment variable</Text>
-        )}
+        {walletInfo?.source === 'wallet' && <Text color="gray">Decrypting {walletInfo.walletName}...</Text>}
+        {walletInfo?.source === 'env' && <Text color="gray">Using environment variable</Text>}
       </Box>
     );
   }
 
-  // Human-readable output
   if (state === 'loading') {
     return (
       <Box>
@@ -343,9 +290,7 @@ export function StakeDelegate({
     return (
       <Box flexDirection="column" padding={1}>
         <Text color="cyan">🔨 Building delegation transaction...</Text>
-        {needsRegistration && (
-          <Text color="gray">Including stake key registration certificate</Text>
-        )}
+        {needsRegistration && <Text color="gray">Including stake key registration certificate</Text>}
       </Box>
     );
   }
@@ -383,8 +328,7 @@ export function StakeDelegate({
         </Box>
         <Box marginTop={1}>
           <Text color="gray">
-            Note: Delegation becomes active in 2-3 epochs (~10-15 days). Rewards will start
-            accumulating after that.
+            Note: Delegation becomes active in 2-3 epochs (~10-15 days). Rewards will start accumulating after that.
           </Text>
         </Box>
         <Box marginTop={1}>
@@ -394,7 +338,6 @@ export function StakeDelegate({
     );
   }
 
-  // Confirm state
   return (
     <Box flexDirection="column" padding={1}>
       <Box marginBottom={1}>
@@ -402,9 +345,7 @@ export function StakeDelegate({
           Delegate Stake
         </Text>
         <Text color="gray"> ({network})</Text>
-        {walletInfo?.source === 'wallet' && (
-          <Text color="gray"> [{walletInfo.walletName}]</Text>
-        )}
+        {walletInfo?.source === 'wallet' && <Text color="gray"> [{walletInfo.walletName}]</Text>}
       </Box>
 
       {pool && (

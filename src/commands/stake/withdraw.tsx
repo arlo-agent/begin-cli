@@ -1,105 +1,56 @@
-import React, { useState, useEffect } from 'react';
-import { Box, Text, useInput } from 'ink';
-import {
-  getDelegationStatus,
-  getMockDelegationStatus,
-  lovelaceToAda,
-  type DelegationStatus,
-} from '../../lib/staking.js';
+import React, { useEffect, useState } from 'react';
+import { Box, Text, useApp, useInput } from 'ink';
+import TextInput from 'ink-text-input';
+import { getDelegationStatus, getMockDelegationStatus, lovelaceToAda, type DelegationStatus } from '../../lib/staking.js';
+import { checkWalletAvailability, loadWallet, type TransactionConfig } from '../../lib/transaction.js';
 
 interface StakeWithdrawProps {
   network: string;
   json: boolean;
-  yes?: boolean; // Skip confirmation prompt
-  stakeAddress?: string; // Optional - in real impl would derive from wallet
+  yes?: boolean;
+  walletName?: string;
+  password?: string;
 }
 
-type WithdrawState = 'loading' | 'no_rewards' | 'confirm' | 'building' | 'signing' | 'submitting' | 'success' | 'error' | 'cancelled';
+type WithdrawState =
+  | 'checking'
+  | 'password'
+  | 'loading-wallet'
+  | 'loading'
+  | 'no_rewards'
+  | 'confirm'
+  | 'building'
+  | 'signing'
+  | 'submitting'
+  | 'success'
+  | 'error'
+  | 'cancelled';
 
-export function StakeWithdraw({ network, json, yes, stakeAddress }: StakeWithdrawProps) {
-  const [state, setState] = useState<WithdrawState>('loading');
+interface WalletInfo {
+  source: 'env' | 'wallet';
+  walletName?: string;
+  needsPassword: boolean;
+}
+
+export function StakeWithdraw({
+  network,
+  json,
+  yes = false,
+  walletName,
+  password: initialPassword,
+}: StakeWithdrawProps) {
+  const { exit } = useApp();
+  const [state, setState] = useState<WithdrawState>('checking');
   const [status, setStatus] = useState<DelegationStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [txHash, setTxHash] = useState<string | null>(null);
+  const [password, setPassword] = useState(initialPassword || '');
+  const [walletInfo, setWalletInfo] = useState<WalletInfo | null>(null);
+  const [stakeAddress, setStakeAddress] = useState<string | null>(null);
 
-  // Default stake address for demo (in real impl, derive from wallet)
-  const effectiveStakeAddress = stakeAddress || 'stake1uy4s2fc8qjzqchpjxh6yjzgx3ckg4zhfz8rpvj0l0wvtqgsxhfr8c';
-
-  useEffect(() => {
-    const loadStatus = async () => {
-      try {
-        const apiKey = process.env.BLOCKFROST_API_KEY;
-
-        if (!apiKey) {
-          // Use mock data
-          console.error('\n⚠ No BLOCKFROST_API_KEY set - using mock data\n');
-          const mockStatus = getMockDelegationStatus();
-          setStatus(mockStatus);
-          
-          if (Number(mockStatus.rewardsAvailable) === 0) {
-            setState('no_rewards');
-          } else if (yes) {
-            // If --yes flag, skip confirmation
-            setState('building');
-            simulateWithdrawal();
-          } else {
-            setState('confirm');
-          }
-          return;
-        }
-
-        const delegationStatus = await getDelegationStatus(effectiveStakeAddress, network);
-        setStatus(delegationStatus);
-
-        if (!delegationStatus.isRegistered) {
-          setError('Stake key is not registered. You need to delegate first to earn rewards.');
-          setState('error');
-          return;
-        }
-
-        if (Number(delegationStatus.rewardsAvailable) === 0) {
-          setState('no_rewards');
-          return;
-        }
-
-        // If --yes flag, skip confirmation
-        if (yes) {
-          setState('building');
-          simulateWithdrawal();
-        } else {
-          setState('confirm');
-        }
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to load delegation status');
-        setState('error');
-      }
-    };
-
-    loadStatus();
-  }, [effectiveStakeAddress, network, yes]);
-
-  useInput((input, key) => {
-    if (state !== 'confirm') return;
-
-    if (input === 'y' || input === 'Y') {
-      // Start withdrawal process
-      setState('building');
-      simulateWithdrawal();
-    } else if (input === 'n' || input === 'N' || key.escape) {
-      setState('cancelled');
-      setTimeout(() => process.exit(0), 500);
-    }
-  });
+  const config: TransactionConfig = { network };
 
   const simulateWithdrawal = async () => {
-    // Simulate MeshJS transaction building
-    // In real implementation:
-    // 1. const tx = new Transaction({ initiator: wallet });
-    // 2. tx.withdrawRewards(stakeAddress, rewardsAvailable);
-    // 3. const unsignedTx = await tx.build();
-    // 4. const signedTx = await wallet.signTx(unsignedTx);
-    // 5. const txHash = await wallet.submitTx(signedTx);
-
     await new Promise((resolve) => setTimeout(resolve, 1000));
     setState('signing');
 
@@ -109,18 +60,128 @@ export function StakeWithdraw({ network, json, yes, stakeAddress }: StakeWithdra
     await new Promise((resolve) => setTimeout(resolve, 2000));
     setTxHash('mock_withdraw_tx_' + Date.now().toString(36));
     setState('success');
-
-    setTimeout(() => process.exit(0), 2000);
+    setTimeout(() => exit(), 2000);
   };
+
+  const loadStatus = async (effectiveStakeAddress: string) => {
+    try {
+      setState('loading');
+      const apiKey = process.env.BLOCKFROST_API_KEY;
+
+      if (!apiKey) {
+        const mock = getMockDelegationStatus();
+        const effective = { ...mock, stakeAddress: effectiveStakeAddress };
+        setStatus(effective);
+
+        if (Number(effective.rewardsAvailable) === 0) {
+          setState('no_rewards');
+        } else if (yes) {
+          setState('building');
+          void simulateWithdrawal();
+        } else {
+          setState('confirm');
+        }
+        return;
+      }
+
+      const delegationStatus = await getDelegationStatus(effectiveStakeAddress, network);
+      setStatus(delegationStatus);
+
+      if (!delegationStatus.isRegistered) {
+        setError('Stake key is not registered. You need to delegate first to earn rewards.');
+        setState('error');
+        return;
+      }
+
+      if (Number(delegationStatus.rewardsAvailable) === 0) {
+        setState('no_rewards');
+        return;
+      }
+
+      if (yes) {
+        setState('building');
+        void simulateWithdrawal();
+      } else {
+        setState('confirm');
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load delegation status');
+      setState('error');
+      setTimeout(() => exit(), 2000);
+    }
+  };
+
+  const initWallet = async (pwd?: string, wName?: string) => {
+    try {
+      setState('loading-wallet');
+      const loadedWallet = await loadWallet({ walletName: wName, password: pwd }, config);
+      const rewardAddresses = await loadedWallet.getRewardAddresses();
+      if (!rewardAddresses || rewardAddresses.length === 0) {
+        throw new Error('Could not derive stake address from wallet');
+      }
+      const derived = rewardAddresses[0];
+      setStakeAddress(derived);
+      await loadStatus(derived);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to load wallet';
+      setError(message.includes('Incorrect password') ? 'Incorrect password. Please try again.' : message);
+      setState('error');
+      setTimeout(() => exit(), 2000);
+    }
+  };
+
+  useEffect(() => {
+    const availability = checkWalletAvailability(walletName);
+    if (!availability.available) {
+      setError(availability.error || 'No wallet available');
+      setState('error');
+      setTimeout(() => exit(), 2000);
+      return;
+    }
+
+    setWalletInfo({
+      source: availability.source!,
+      walletName: availability.walletName,
+      needsPassword: availability.needsPassword,
+    });
+
+    if (!availability.needsPassword || initialPassword) {
+      void initWallet(initialPassword, availability.walletName);
+      return;
+    }
+
+    setState('password');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const handlePasswordSubmit = () => {
+    if (password.trim()) {
+      void initWallet(password, walletInfo?.walletName);
+    }
+  };
+
+  useInput((input, key) => {
+    if (json) return;
+    if (state !== 'confirm') return;
+
+    if (input === 'y' || input === 'Y') {
+      // Start withdrawal process
+      setState('building');
+      void simulateWithdrawal();
+    } else if (input === 'n' || input === 'N' || key.escape) {
+      setState('cancelled');
+      setTimeout(() => exit(), 500);
+    }
+  });
 
   // JSON output
   if (json) {
-    if (state === 'loading') {
+    if (state === 'checking' || state === 'loading-wallet' || state === 'loading') {
       return <Text>{JSON.stringify({ status: 'loading' })}</Text>;
     }
     if (state === 'error') {
       console.log(JSON.stringify({ error }, null, 2));
-      process.exit(1);
+      setTimeout(() => exit(), 100);
       return null;
     }
     if (state === 'no_rewards') {
@@ -128,7 +189,7 @@ export function StakeWithdraw({ network, json, yes, stakeAddress }: StakeWithdra
         JSON.stringify(
           {
             status: 'no_rewards',
-            stakeAddress: effectiveStakeAddress,
+            stakeAddress,
             rewardsAvailable: '0',
             message: 'No rewards available to withdraw',
           },
@@ -136,7 +197,7 @@ export function StakeWithdraw({ network, json, yes, stakeAddress }: StakeWithdra
           2
         )
       );
-      process.exit(0);
+      setTimeout(() => exit(), 100);
       return null;
     }
     if (state === 'success') {
@@ -145,7 +206,7 @@ export function StakeWithdraw({ network, json, yes, stakeAddress }: StakeWithdra
           {
             status: 'success',
             txHash,
-            stakeAddress: effectiveStakeAddress,
+            stakeAddress,
             withdrawnAmount: status?.rewardsAvailable,
             withdrawnAda: status ? lovelaceToAda(status.rewardsAvailable) : '0',
             network,
@@ -154,7 +215,7 @@ export function StakeWithdraw({ network, json, yes, stakeAddress }: StakeWithdra
           2
         )
       );
-      process.exit(0);
+      setTimeout(() => exit(), 100);
       return null;
     }
     // For non-interactive JSON mode, output status
@@ -162,17 +223,64 @@ export function StakeWithdraw({ network, json, yes, stakeAddress }: StakeWithdra
       JSON.stringify(
         {
           status: 'confirm_required',
-          stakeAddress: effectiveStakeAddress,
+          stakeAddress,
           rewardsAvailable: status?.rewardsAvailable,
           rewardsAda: status ? lovelaceToAda(status.rewardsAvailable) : '0',
-          message: 'Run without --json to confirm withdrawal interactively',
+          message: 'Run without --json to confirm withdrawal interactively, or use --yes to skip confirmation',
         },
         null,
         2
       )
     );
-    process.exit(0);
+    setTimeout(() => exit(), 100);
     return null;
+  }
+
+  // Render checking state
+  if (state === 'checking') {
+    return (
+      <Box padding={1}>
+        <Text color="cyan">⏳ Checking wallet availability...</Text>
+      </Box>
+    );
+  }
+
+  // Render password prompt
+  if (state === 'password') {
+    return (
+      <Box flexDirection="column" padding={1}>
+        <Box marginBottom={1}>
+          <Text color="cyan">🔐 Enter password for wallet </Text>
+          <Text bold color="yellow">
+            {walletInfo?.walletName}
+          </Text>
+        </Box>
+        <Box>
+          <Text color="gray">Password: </Text>
+          <TextInput
+            value={password}
+            onChange={setPassword}
+            onSubmit={handlePasswordSubmit}
+            mask="*"
+          />
+        </Box>
+      </Box>
+    );
+  }
+
+  // Render loading wallet state
+  if (state === 'loading-wallet') {
+    return (
+      <Box flexDirection="column" padding={1}>
+        <Text color="cyan">⏳ Loading wallet...</Text>
+        {walletInfo?.source === 'wallet' && (
+          <Text color="gray">Decrypting {walletInfo.walletName}...</Text>
+        )}
+        {walletInfo?.source === 'env' && (
+          <Text color="gray">Using environment variable</Text>
+        )}
+      </Box>
+    );
   }
 
   // Human-readable output
@@ -195,7 +303,9 @@ export function StakeWithdraw({ network, json, yes, stakeAddress }: StakeWithdra
   if (state === 'no_rewards') {
     return (
       <Box flexDirection="column" padding={1}>
-        <Text bold color="cyan">Withdraw Staking Rewards</Text>
+        <Text bold color="cyan">
+          Withdraw Staking Rewards
+        </Text>
         <Box marginTop={1}>
           <Text color="yellow">No rewards available to withdraw</Text>
         </Box>
@@ -205,9 +315,7 @@ export function StakeWithdraw({ network, json, yes, stakeAddress }: StakeWithdra
           </Text>
         </Box>
         <Box marginTop={1}>
-          <Text color="gray">
-            Use `begin stake status` to check your delegation status.
-          </Text>
+          <Text color="gray">Use `begin stake status` to check your delegation status.</Text>
         </Box>
       </Box>
     );
@@ -233,7 +341,6 @@ export function StakeWithdraw({ network, json, yes, stakeAddress }: StakeWithdra
     return (
       <Box flexDirection="column" padding={1}>
         <Text color="cyan">🔐 Signing transaction...</Text>
-        <Text color="gray">(This is a mock - real signing requires wallet)</Text>
       </Box>
     );
   }
@@ -257,7 +364,9 @@ export function StakeWithdraw({ network, json, yes, stakeAddress }: StakeWithdra
           </Box>
           <Box>
             <Text color="gray">Amount: </Text>
-            <Text bold color="green">{status ? lovelaceToAda(status.rewardsAvailable) : '0'} ADA</Text>
+            <Text bold color="green">
+              {status ? lovelaceToAda(status.rewardsAvailable) : '0'} ADA
+            </Text>
           </Box>
         </Box>
         <Box marginTop={1}>
@@ -276,19 +385,26 @@ export function StakeWithdraw({ network, json, yes, stakeAddress }: StakeWithdra
   return (
     <Box flexDirection="column" padding={1}>
       <Box marginBottom={1}>
-        <Text bold color="cyan">Withdraw Staking Rewards</Text>
+        <Text bold color="cyan">
+          Withdraw Staking Rewards
+        </Text>
         <Text color="gray"> ({network})</Text>
+        {walletInfo?.source === 'wallet' && (
+          <Text color="gray"> [{walletInfo.walletName}]</Text>
+        )}
       </Box>
 
       <Box flexDirection="column" borderStyle="round" borderColor="gray" padding={1}>
         <Box>
           <Text color="gray">Stake Address: </Text>
-          <Text>{effectiveStakeAddress.slice(0, 40)}...</Text>
+          <Text>{stakeAddress?.slice(0, 40)}...</Text>
         </Box>
 
         <Box marginTop={1}>
           <Text color="gray">Available Rewards: </Text>
-          <Text bold color="green">{status ? lovelaceToAda(status.rewardsAvailable) : '0'} ADA</Text>
+          <Text bold color="green">
+            {status ? lovelaceToAda(status.rewardsAvailable) : '0'} ADA
+          </Text>
         </Box>
 
         {status?.delegatedPool && (
@@ -307,7 +423,8 @@ export function StakeWithdraw({ network, json, yes, stakeAddress }: StakeWithdra
 
       <Box marginTop={1}>
         <Text color="gray">
-          Note: Withdrawing rewards does not affect your delegation. You will continue to earn rewards.
+          Note: Withdrawing rewards does not affect your delegation. You will continue to earn
+          rewards.
         </Text>
       </Box>
 
