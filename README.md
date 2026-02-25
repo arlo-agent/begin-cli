@@ -43,11 +43,15 @@
 Get a working wallet in under 5 minutes:
 
 ```bash
-# Option 1: Run directly with npx (no install)
+# Option 1: Run directly (no install)
 npx @beginwallet/cli balance addr1qy...
+# or with pnpm:
+pnpm dlx @beginwallet/cli balance addr1qy...
 
 # Option 2: Install globally
 npm install -g @beginwallet/cli
+# or with pnpm:
+pnpm add -g @beginwallet/cli
 begin balance addr1qy...
 ```
 
@@ -111,6 +115,7 @@ echo "Sent! TX: $TX_HASH"
 
 ```bash
 npm install -g @beginwallet/cli
+# or: pnpm add -g @beginwallet/cli
 ```
 
 Cardano Balance (mainnet)
@@ -499,21 +504,23 @@ For enhanced security, you can build transactions on an online machine and sign 
 git clone https://github.com/arlo-agent/begin-cli.git
 cd begin-cli
 
-# Install dependencies
-npm install
+# Install dependencies (uses pnpm — see packageManager in package.json)
+pnpm install
 
 # 2. Transfer tx.unsigned to OFFLINE machine (USB drive, QR code, etc.)
 
 # Run locally
-node dist/cli.js balance addr1...
+pnpm start
+# or with args: pnpm cli -- balance addr1...
+# or from source: pnpm dev:cli -- balance addr1...
 
-# Watch mode
-npm run dev
+# Watch mode (recompile on change)
+pnpm dev
 
 # 4. Transfer tx.signed back to ONLINE machine
 
 # Link for global testing
-npm link
+pnpm link
 ```
 
 ### Project Structure
