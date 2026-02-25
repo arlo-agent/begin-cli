@@ -39,14 +39,12 @@ export interface AppFlags {
   name?: string;
   displayName?: string;
   description?: string;
+  // Swap-specific flags (to is shared with mint)
   to?: string;
-  // Swap-specific flags
   from?: string;
-  to?: string;
   amount?: string;
   slippage: number;
   multiHop: boolean;
-  yes: boolean;
   address?: string;
   id?: string[];
   protocol?: string;

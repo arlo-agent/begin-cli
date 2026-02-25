@@ -176,55 +176,6 @@ export function StakeWithdraw({
     }
   };
 
-  const initWallet = async (pwd?: string, wName?: string) => {
-    try {
-      setState('loading-wallet');
-      const loadedWallet = await loadWallet({ walletName: wName, password: pwd }, config);
-      const rewardAddresses = await loadedWallet.getRewardAddresses();
-      if (!rewardAddresses || rewardAddresses.length === 0) {
-        throw new Error('Could not derive stake address from wallet');
-      }
-      const derived = rewardAddresses[0];
-      setStakeAddress(derived);
-      await loadStatus(derived);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to load wallet';
-      setError(message.includes('Incorrect password') ? 'Incorrect password. Please try again.' : message);
-      setState('error');
-      setTimeout(() => exit(), 2000);
-    }
-  };
-
-  useEffect(() => {
-    const availability = checkWalletAvailability(walletName);
-    if (!availability.available) {
-      setError(availability.error || 'No wallet available');
-      setState('error');
-      setTimeout(() => exit(), 2000);
-      return;
-    }
-
-    setWalletInfo({
-      source: availability.source!,
-      walletName: availability.walletName,
-      needsPassword: availability.needsPassword,
-    });
-
-    if (!availability.needsPassword || initialPassword) {
-      void initWallet(initialPassword, availability.walletName);
-      return;
-    }
-
-    setState('password');
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const handlePasswordSubmit = () => {
-    if (password.trim()) {
-      void initWallet(password, walletInfo?.walletName);
-    }
-  };
-
   useInput((input, key) => {
     if (json) return;
     if (state !== 'confirm') return;
