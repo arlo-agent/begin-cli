@@ -12,7 +12,7 @@ import {
   checkWalletAvailability,
   type TransactionConfig,
 } from "../../lib/transaction.js";
-import type { MeshWallet } from "@meshsdk/core";
+import { Transaction, type MeshWallet } from "@meshsdk/core";
 
 interface StakeWithdrawProps {
   network: string;
@@ -61,38 +61,6 @@ export function StakeWithdraw({
 
   const config: TransactionConfig = { network };
 
-  // Check wallet availability on mount
-  useEffect(() => {
-    const availability = checkWalletAvailability(walletName);
-
-    if (!availability.available) {
-      setError(availability.error || "No wallet available");
-      setState("error");
-      setTimeout(() => exit(), 2000);
-      return;
-    }
-
-    setWalletInfo({
-      source: availability.source!,
-      walletName: availability.walletName,
-      needsPassword: availability.needsPassword,
-    });
-
-    // If using env var or password already provided, proceed to loading
-    if (!availability.needsPassword || initialPassword) {
-      initWallet(initialPassword, availability.walletName);
-    } else {
-      setState("password");
-    }
-  }, []);
-
-  // Handle password submission
-  const handlePasswordSubmit = () => {
-    if (password.trim()) {
-      initWallet(password, walletInfo?.walletName);
-    }
-  };
-
   // Initialize wallet and derive stake address
   const initWallet = async (pwd?: string, wName?: string) => {
     try {
@@ -139,7 +107,7 @@ export function StakeWithdraw({
           setState("no_rewards");
         } else if (yes) {
           setState("building");
-          simulateWithdrawal();
+          void executeWithdrawal();
         } else {
           setState("confirm");
         }
@@ -162,7 +130,7 @@ export function StakeWithdraw({
 
       if (yes) {
         setState("building");
-        simulateWithdrawal();
+        void executeWithdrawal();
       } else {
         setState("confirm");
       }
@@ -173,6 +141,39 @@ export function StakeWithdraw({
     }
   };
 
+  // Check wallet availability on mount
+  useEffect(() => {
+    const availability = checkWalletAvailability(walletName);
+
+    if (!availability.available) {
+      setError(availability.error || 'No wallet available');
+      setState('error');
+      setTimeout(() => exit(), 2000);
+      return;
+    }
+
+    setWalletInfo({
+      source: availability.source!,
+      walletName: availability.walletName,
+      needsPassword: availability.needsPassword,
+    });
+
+    // If using env var or password already provided, proceed to loading
+    if (!availability.needsPassword || initialPassword) {
+      void initWallet(initialPassword, availability.walletName);
+    } else {
+      setState('password');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Handle password submission
+  const handlePasswordSubmit = () => {
+    if (password.trim()) {
+      void initWallet(password, walletInfo?.walletName);
+    }
+  };
+
   useInput((input, key) => {
     if (json) return;
     if (state !== "confirm") return;
@@ -180,33 +181,47 @@ export function StakeWithdraw({
     if (input === "y" || input === "Y") {
       // Start withdrawal process
       setState("building");
-      void simulateWithdrawal();
+      void executeWithdrawal();
     } else if (input === "n" || input === "N" || key.escape) {
       setState("cancelled");
       setTimeout(() => exit(), 500);
     }
   });
 
-  const simulateWithdrawal = async () => {
-    // Simulate MeshJS transaction building
-    // In real implementation:
-    // 1. const tx = new Transaction({ initiator: wallet });
-    // 2. tx.withdrawRewards(stakeAddress, rewardsAvailable);
-    // 3. const unsignedTx = await tx.build();
-    // 4. const signedTx = await wallet.signTx(unsignedTx);
-    // 5. const txHash = await wallet.submitTx(signedTx);
+  const executeWithdrawal = async () => {
+    try {
+      if (!wallet || !stakeAddress || !status) {
+        throw new Error('Wallet, stake address, or status not available');
+      }
 
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-    setState("signing");
+      // Build the withdrawal transaction
+      const tx = new Transaction({ initiator: wallet });
 
-    await new Promise((resolve) => setTimeout(resolve, 1500));
-    setState("submitting");
+      // Withdraw all available rewards
+      tx.withdrawRewards(stakeAddress, status.rewardsAvailable);
 
-    await new Promise((resolve) => setTimeout(resolve, 2000));
-    setTxHash("mock_withdraw_tx_" + Date.now().toString(36));
-    setState("success");
+      // Build the transaction
+      const unsignedTx = await tx.build();
 
-    setTimeout(() => exit(), 2000);
+      setState('signing');
+
+      // Sign the transaction
+      const signedTx = await wallet.signTx(unsignedTx);
+
+      setState('submitting');
+
+      // Submit the transaction
+      const submittedTxHash = await wallet.submitTx(signedTx);
+      setTxHash(submittedTxHash);
+      setState('success');
+
+      setTimeout(() => exit(), 2000);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Withdrawal failed';
+      setError(message);
+      setState('error');
+      setTimeout(() => exit(), 2000);
+    }
   };
 
   // JSON output
@@ -408,9 +423,6 @@ export function StakeWithdraw({
             Rewards have been sent to your wallet address. Your delegation continues unchanged.
           </Text>
         </Box>
-        <Box marginTop={1}>
-          <Text color="yellow">⚠ This is a MOCK transaction - no actual withdrawal occurred</Text>
-        </Box>
       </Box>
     );
   }
@@ -458,10 +470,6 @@ export function StakeWithdraw({
           Note: Withdrawing rewards does not affect your delegation. You will continue to earn
           rewards.
         </Text>
-      </Box>
-
-      <Box marginTop={1}>
-        <Text color="yellow">⚠ This is a MOCK transaction - no real ADA will be withdrawn</Text>
       </Box>
 
       <Box marginTop={1}>

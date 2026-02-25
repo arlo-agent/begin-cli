@@ -304,17 +304,37 @@ export function lovelaceToAda(lovelace: string): string {
 
 /**
  * Get stake address from payment address
- * Note: This is a simplified version - in production use MeshJS wallet methods
+ * Uses MeshSDK's deserializeAddress to extract stake credential hash
+ * and serializeRewardAddress to build the stake address
  */
-export function deriveStakeAddress(paymentAddress: string, network: string): string {
-  // This would normally be done via MeshJS wallet
-  // For now, return mock stake address for development
-  const prefix = network === "mainnet" ? "stake1" : "stake_test1";
-  return `${prefix}mock_stake_address_derived_from_payment`;
+export function deriveStakeAddress(paymentAddress: string, network: string): string | null {
+  try {
+    const { deserializeAddress, serializeRewardAddress } = require("@meshsdk/core");
+
+    const addrInfo = deserializeAddress(paymentAddress);
+    const stakeCredentialHash = addrInfo.stakeCredentialHash;
+
+    if (!stakeCredentialHash) {
+      // Enterprise address - no stake credential
+      return null;
+    }
+
+    // Build reward/stake address from the stake credential hash
+    const networkId = network === "mainnet" ? 1 : 0;
+    const stakeAddress = serializeRewardAddress(stakeCredentialHash, false, networkId);
+
+    return stakeAddress;
+  } catch (error) {
+    // Address parsing failed - likely invalid address
+    console.error("Failed to derive stake address:", error);
+    return null;
+  }
 }
 
 /**
- * Mock data for development without API key
+ * Mock data for development/demo without API key
+ * @deprecated Use searchPools() or listTopPools() with BLOCKFROST_API_KEY set for real data
+ * This is only used as a fallback when no API key is configured
  */
 export function getMockPools(): StakePool[] {
   return [
@@ -363,6 +383,11 @@ export function getMockPools(): StakePool[] {
   ];
 }
 
+/**
+ * Mock delegation status for development/demo without API key
+ * @deprecated Use getDelegationStatus() with BLOCKFROST_API_KEY set for real data
+ * This is only used as a fallback when no API key is configured
+ */
 export function getMockDelegationStatus(): DelegationStatus {
   return {
     stakeAddress: "stake1uy4s2fc8qjzqchpjxh6yjzgx3ckg4zhfz8rpvj0l0wvtqgsxhfr8c",
