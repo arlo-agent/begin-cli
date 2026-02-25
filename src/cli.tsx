@@ -25,10 +25,10 @@ const cli = meow(
     wallet create <name> [--show-seed]  Create a new wallet (silent by default)
     wallet restore <name>            Restore a wallet from mnemonic (interactive)
 
-    stake pools [search]             List/search stake pools (mock)
-    stake delegate <pool-id>         Delegate stake to a pool (mock) (supports --yes)
-    stake status                     Check delegation status and rewards (mock)
-    stake withdraw                   Withdraw staking rewards (mock) (supports --yes)
+    stake pools [search]             List/search stake pools
+    stake delegate <pool-id>         Delegate stake to a pool (supports --yes)
+    stake status                     Check delegation status and rewards
+    stake withdraw                   Withdraw staking rewards (supports --yes)
 
     mint --image <path> --name <name> --to <addr>
                                      Mint an NFT via NMKR and send to address
