@@ -146,12 +146,12 @@ const cli = meow(
       wait: { type: 'boolean', default: true },
       asset: { type: 'string', shortFlag: 'a', isMultiple: true },
       yes: { type: 'boolean', shortFlag: 'y', default: false },
-      image: { type: 'string', shortFlag: 'i' },
+      image: { type: 'string' },
       name: { type: 'string' },
       displayName: { type: 'string' },
       description: { type: 'string' },
+      // Swap-specific flags (to is also used by mint)
       to: { type: 'string', shortFlag: 't' },
-      // Swap-specific flags
       from: { type: 'string' },
       amount: { type: 'string' },
       slippage: { type: 'number', shortFlag: 's', default: 0.5 },
@@ -200,8 +200,8 @@ const rawFlags = cli.flags as {
   name?: string;
   displayName?: string;
   description?: string;
+  // Swap-specific flags (to is also used by mint)
   to?: string;
-  // Swap-specific flags
   from?: string;
   amount?: string;
   slippage: number;

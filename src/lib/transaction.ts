@@ -1,6 +1,6 @@
 /**
  * Transaction building utilities for Cardano using MeshJS
- * 
+ *
  * Provides functions for:
  * - Building simple ADA transactions
  * - Building multi-asset transactions
@@ -21,12 +21,15 @@ import * as path from 'path';
 import { getBlockfrostKey, isValidNetwork, type Network } from './config.js';
 import { errors } from './errors.js';
 import {
-  getMnemonic,
+  getMnemonicAsync,
   walletExists,
   getDefaultWallet,
   hasEnvMnemonic,
   hasEnvPassword,
   listWallets,
+  isKeychainAvailable,
+  walletUsesKeychain,
+  getWalletVersion,
 } from './keystore.js';
 
 export interface TransactionConfig {
@@ -62,7 +65,10 @@ export interface SubmitResult {
  */
 export function createProvider(config: TransactionConfig): BlockfrostProvider {
   if (!isValidNetwork(config.network)) {
-    throw errors.invalidArgument('network', `must be one of mainnet, preprod, preview (got ${config.network})`);
+    throw errors.invalidArgument(
+      'network',
+      `must be one of mainnet, preprod, preview (got ${config.network})`
+    );
   }
 
   const network = config.network as Network;
@@ -71,8 +77,9 @@ export function createProvider(config: TransactionConfig): BlockfrostProvider {
   const apiKey =
     config.apiKey ||
     (network === 'mainnet'
-      ? (process.env.BLOCKFROST_API_KEY_MAINNET || process.env.BLOCKFROST_API_KEY)
-      : (process.env[`BLOCKFROST_API_KEY_${network.toUpperCase()}`] || process.env.BLOCKFROST_API_KEY)) ||
+      ? process.env.BLOCKFROST_API_KEY_MAINNET || process.env.BLOCKFROST_API_KEY
+      : process.env[`BLOCKFROST_API_KEY_${network.toUpperCase()}`] ||
+        process.env.BLOCKFROST_API_KEY) ||
     getBlockfrostKey(network);
 
   if (!apiKey) {
@@ -93,18 +100,18 @@ export function createProvider(config: TransactionConfig): BlockfrostProvider {
 export interface WalletOptions {
   /** Name of wallet in encrypted keystore */
   walletName?: string;
-  /** Password for decrypting wallet (required for file-based wallets) */
+  /** Password for decrypting wallet (optional if keychain available) */
   password?: string;
 }
 
 /**
  * Loads a wallet from the encrypted keystore or environment variable
- * 
+ *
  * Priority:
- * 1. Specific wallet name if provided (requires password)
- * 2. BEGIN_CLI_MNEMONIC environment variable (for CI/agents)
- * 3. Default wallet from config (requires password)
- * 
+ * 1. BEGIN_CLI_MNEMONIC environment variable (for CI/agents)
+ * 2. Keychain-based wallet (v2 format or migrated v1)
+ * 3. Password-based wallet (v1 format)
+ *
  * @param options - Wallet loading options
  * @param config - Network configuration
  * @returns MeshWallet instance
@@ -114,11 +121,11 @@ export async function loadWallet(
   config: TransactionConfig
 ): Promise<MeshWallet> {
   const provider = createProvider(config);
-  
-  // Get mnemonic from keystore
-  const mnemonicStr = getMnemonic(options.password, options.walletName);
+
+  // Get mnemonic from keystore (async - supports keychain)
+  const mnemonicStr = await getMnemonicAsync(options.password, options.walletName);
   const mnemonic = mnemonicStr.split(/\s+/);
-  
+
   if (mnemonic.length !== 24) {
     throw new Error('Invalid mnemonic: expected 24 words');
   }
@@ -139,32 +146,46 @@ export async function loadWallet(
 /**
  * Check if a wallet source is available
  * Returns info about what's available for error messaging
- * 
- * Password priority:
- * 1. --password flag (passed externally)
- * 2. BEGIN_CLI_WALLET_PASSWORD env var
- * 3. Interactive prompt
- * 
- * needsPassword will be false if BEGIN_CLI_WALLET_PASSWORD is set
+ *
+ * Priority for determining needsPassword:
+ * 1. Environment mnemonic -> no password needed
+ * 2. v2 wallet or migrated v1 -> no password needed (uses keychain)
+ * 3. v1 wallet with env password -> no password needed
+ * 4. v1 wallet without env password -> needs password
  */
 export function checkWalletAvailability(walletName?: string): {
   available: boolean;
-  source?: 'env' | 'wallet';
+  source?: 'env' | 'wallet' | 'keychain';
   walletName?: string;
   needsPassword: boolean;
+  usesKeychain?: boolean;
   error?: string;
 } {
-  // Check if password is available via env var (affects needsPassword)
+  // Check if password is available via env var
   const hasPasswordFromEnv = hasEnvPassword();
 
   // If specific wallet requested, check it exists
   if (walletName) {
     if (walletExists(walletName)) {
+      const version = getWalletVersion(walletName);
+      // v2 wallets use keychain - no password needed
+      if (version === 2) {
+        return {
+          available: true,
+          source: 'keychain',
+          walletName,
+          needsPassword: false,
+          usesKeychain: true,
+        };
+      }
+      // v1 wallets may have keychain key (migrated) - we'll check async later
+      // For sync check, assume password needed unless env var set
       return {
         available: true,
         source: 'wallet',
         walletName,
         needsPassword: !hasPasswordFromEnv,
+        usesKeychain: false, // Will be updated by async check
       };
     }
     return {
@@ -174,7 +195,7 @@ export function checkWalletAvailability(walletName?: string): {
     };
   }
 
-  // Check environment variable for mnemonic
+  // Check environment variable for mnemonic (highest priority)
   if (hasEnvMnemonic()) {
     return {
       available: true,
@@ -186,22 +207,164 @@ export function checkWalletAvailability(walletName?: string): {
   // Check default wallet
   const defaultWallet = getDefaultWallet();
   if (defaultWallet && walletExists(defaultWallet)) {
+    const version = getWalletVersion(defaultWallet);
+    if (version === 2) {
+      return {
+        available: true,
+        source: 'keychain',
+        walletName: defaultWallet,
+        needsPassword: false,
+        usesKeychain: true,
+      };
+    }
     return {
       available: true,
       source: 'wallet',
       walletName: defaultWallet,
       needsPassword: !hasPasswordFromEnv,
+      usesKeychain: false,
     };
   }
 
   // Check for single wallet
   const wallets = listWallets();
   if (wallets.length === 1) {
+    const version = getWalletVersion(wallets[0]);
+    if (version === 2) {
+      return {
+        available: true,
+        source: 'keychain',
+        walletName: wallets[0],
+        needsPassword: false,
+        usesKeychain: true,
+      };
+    }
     return {
       available: true,
       source: 'wallet',
       walletName: wallets[0],
       needsPassword: !hasPasswordFromEnv,
+      usesKeychain: false,
+    };
+  }
+
+  if (wallets.length > 1) {
+    return {
+      available: false,
+      needsPassword: false,
+      error: `Multiple wallets found. Specify one with --wallet or set a default with 'begin wallet default <name>'.`,
+    };
+  }
+
+  return {
+    available: false,
+    needsPassword: false,
+    error: `No wallet available. Set BEGIN_CLI_MNEMONIC environment variable or create a wallet with 'begin wallet create'.`,
+  };
+}
+
+/**
+ * Async version of checkWalletAvailability that properly checks keychain status
+ * Use this when you need accurate keychain detection for v1 migrated wallets
+ */
+export async function checkWalletAvailabilityAsync(walletName?: string): Promise<{
+  available: boolean;
+  source?: 'env' | 'wallet' | 'keychain';
+  walletName?: string;
+  needsPassword: boolean;
+  usesKeychain?: boolean;
+  error?: string;
+}> {
+  // Check if password is available via env var
+  const hasPasswordFromEnv = hasEnvPassword();
+  const keychainAvailable = await isKeychainAvailable();
+
+  // If specific wallet requested, check it exists
+  if (walletName) {
+    if (walletExists(walletName)) {
+      // Check if wallet uses keychain (v2 or migrated v1)
+      if (keychainAvailable) {
+        const usesKeychain = await walletUsesKeychain(walletName);
+        if (usesKeychain) {
+          return {
+            available: true,
+            source: 'keychain',
+            walletName,
+            needsPassword: false,
+            usesKeychain: true,
+          };
+        }
+      }
+      // v1 wallet without keychain
+      return {
+        available: true,
+        source: 'wallet',
+        walletName,
+        needsPassword: !hasPasswordFromEnv,
+        usesKeychain: false,
+      };
+    }
+    return {
+      available: false,
+      needsPassword: false,
+      error: `Wallet "${walletName}" not found. Run 'begin wallet list' to see available wallets.`,
+    };
+  }
+
+  // Check environment variable for mnemonic (highest priority)
+  if (hasEnvMnemonic()) {
+    return {
+      available: true,
+      source: 'env',
+      needsPassword: false,
+    };
+  }
+
+  // Check default wallet
+  const defaultWallet = getDefaultWallet();
+  if (defaultWallet && walletExists(defaultWallet)) {
+    if (keychainAvailable) {
+      const usesKeychain = await walletUsesKeychain(defaultWallet);
+      if (usesKeychain) {
+        return {
+          available: true,
+          source: 'keychain',
+          walletName: defaultWallet,
+          needsPassword: false,
+          usesKeychain: true,
+        };
+      }
+    }
+    return {
+      available: true,
+      source: 'wallet',
+      walletName: defaultWallet,
+      needsPassword: !hasPasswordFromEnv,
+      usesKeychain: false,
+    };
+  }
+
+  // Check for single wallet
+  const wallets = listWallets();
+  if (wallets.length === 1) {
+    if (keychainAvailable) {
+      const usesKeychain = await walletUsesKeychain(wallets[0]);
+      if (usesKeychain) {
+        return {
+          available: true,
+          source: 'keychain',
+          walletName: wallets[0],
+          needsPassword: false,
+          usesKeychain: true,
+        };
+      }
+    }
+    return {
+      available: true,
+      source: 'wallet',
+      walletName: wallets[0],
+      needsPassword: !hasPasswordFromEnv,
+      usesKeychain: false,
     };
   }
 
@@ -243,12 +406,12 @@ export async function buildSendAdaTx(
   amountAda: number
 ): Promise<TransactionResult> {
   const lovelace = adaToLovelace(amountAda);
-  
+
   const tx = new Transaction({ initiator: wallet });
   tx.sendLovelace(to, lovelace);
-  
+
   const unsignedTx = await tx.build();
-  
+
   return {
     unsignedTx,
   };
@@ -264,19 +427,19 @@ export async function buildMultiAssetTx(
   assets: Asset[]
 ): Promise<TransactionResult> {
   const lovelace = adaToLovelace(amountAda);
-  
+
   const tx = new Transaction({ initiator: wallet });
-  
+
   // Send ADA
   tx.sendLovelace(to, lovelace);
-  
+
   // Send each native asset
   if (assets.length > 0) {
     tx.sendAssets(to, assets);
   }
-  
+
   const unsignedTx = await tx.build();
-  
+
   return {
     unsignedTx,
   };
@@ -290,10 +453,10 @@ export async function signTransaction(
   unsignedTx: string
 ): Promise<SignedTransactionResult> {
   const signedTx = await wallet.signTx(unsignedTx);
-  
+
   // Calculate tx hash from the signed transaction
   const txHash = getTxHash(signedTx);
-  
+
   return {
     signedTx,
     txHash,
@@ -319,9 +482,9 @@ export async function submitTransaction(
   signedTx: string
 ): Promise<SubmitResult> {
   const provider = createProvider(config);
-  
+
   const txHash = await provider.submitTx(signedTx);
-  
+
   return {
     txHash,
     confirmed: false, // Will be updated by waitForConfirmation
@@ -349,12 +512,12 @@ export async function waitForConfirmation(
   intervalMs: number = 5000
 ): Promise<SubmitResult> {
   const provider = createProvider(config);
-  
+
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
     try {
       // Check if transaction is on-chain
       const txInfo = await provider.fetchTxInfo(txHash);
-      
+
       if (txInfo) {
         return {
           txHash,
@@ -365,10 +528,10 @@ export async function waitForConfirmation(
     } catch (error) {
       // Transaction not found yet, continue waiting
     }
-    
+
     await sleep(intervalMs);
   }
-  
+
   return {
     txHash,
     confirmed: false,
@@ -412,29 +575,25 @@ export function loadTxFromFile(filePath: string): string {
  */
 export function parseAssetString(assetStr: string): Asset {
   const [unitPart, amountStr] = assetStr.split(':');
-  
+
   if (!unitPart || !amountStr) {
-    throw new Error(
-      `Invalid asset format: ${assetStr}. Expected "policyId.assetName:amount"`
-    );
+    throw new Error(`Invalid asset format: ${assetStr}. Expected "policyId.assetName:amount"`);
   }
-  
+
   const [policyId, assetName] = unitPart.split('.');
-  
+
   if (!policyId || policyId.length !== 56) {
     throw new Error(`Invalid policy ID: ${policyId}. Must be 56 hex characters.`);
   }
-  
+
   const amount = parseInt(amountStr, 10);
   if (isNaN(amount) || amount <= 0) {
     throw new Error(`Invalid amount: ${amountStr}. Must be a positive integer.`);
   }
-  
+
   // Encode asset name to hex if provided
-  const assetNameHex = assetName 
-    ? Buffer.from(assetName, 'utf-8').toString('hex')
-    : '';
-  
+  const assetNameHex = assetName ? Buffer.from(assetName, 'utf-8').toString('hex') : '';
+
   return {
     unit: policyId + assetNameHex,
     quantity: amount.toString(),
@@ -484,7 +643,7 @@ export function calculateBalance(utxos: UTxO[]): {
 } {
   let totalLovelace = BigInt(0);
   const assets = new Map<string, string>();
-  
+
   for (const utxo of utxos) {
     for (const amount of utxo.output.amount) {
       if (amount.unit === 'lovelace') {
@@ -495,7 +654,7 @@ export function calculateBalance(utxos: UTxO[]): {
       }
     }
   }
-  
+
   return {
     lovelace: totalLovelace.toString(),
     assets,

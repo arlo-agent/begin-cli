@@ -35,7 +35,7 @@ export function Sign({
   const [error, setError] = useState<string | null>(null);
   const [password, setPassword] = useState(initialPassword || '');
   const [walletInfo, setWalletInfo] = useState<{
-    source: 'env' | 'wallet';
+    source: 'env' | 'wallet' | 'keychain';
     walletName?: string;
     needsPassword: boolean;
   } | null>(null);

@@ -38,7 +38,7 @@ type DelegateState =
   | 'cancelled';
 
 interface WalletInfo {
-  source: 'env' | 'wallet';
+  source: 'env' | 'wallet' | 'keychain';
   walletName?: string;
   needsPassword: boolean;
 }

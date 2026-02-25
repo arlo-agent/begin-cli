@@ -1,18 +1,30 @@
 /**
  * Wallet Restore Command
  * Interactive command to restore a wallet from mnemonic
+ *
+ * Supports OS keychain storage (no password required) when available,
+ * falls back to password-based encryption otherwise.
  */
 
 import React, { useState, useEffect } from 'react';
 import { Box, Text, useInput, useApp } from 'ink';
 import { restoreWallet, walletExists, validateMnemonic, type WalletInfo } from '../../lib/wallet.js';
+import { isKeychainAvailable } from '../../lib/keystore.js';
 
 interface WalletRestoreProps {
   name: string;
   network: string;
 }
 
-type Step = 'checking' | 'mnemonic' | 'password' | 'confirm-password' | 'restoring' | 'complete' | 'error';
+type Step =
+  | 'checking'
+  | 'mnemonic'
+  | 'checking-keychain'
+  | 'password'
+  | 'confirm-password'
+  | 'restoring'
+  | 'complete'
+  | 'error';
 
 export function WalletRestore({ name, network }: WalletRestoreProps) {
   const { exit } = useApp();
@@ -23,6 +35,7 @@ export function WalletRestore({ name, network }: WalletRestoreProps) {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [walletInfo, setWalletInfo] = useState<WalletInfo | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [keychainAvailable, setKeychainAvailable] = useState(false);
 
   const networkId = network === 'mainnet' ? 1 : 0;
 
@@ -48,6 +61,30 @@ export function WalletRestore({ name, network }: WalletRestoreProps) {
     }
   }, [step, name]);
 
+  // Check keychain availability after mnemonic is entered
+  useEffect(() => {
+    const checkKeychain = async () => {
+      try {
+        const available = await isKeychainAvailable();
+        setKeychainAvailable(available);
+        if (available) {
+          // Skip password prompts - go directly to restoring
+          setStep('restoring');
+        } else {
+          // Need password
+          setStep('password');
+        }
+      } catch {
+        setKeychainAvailable(false);
+        setStep('password');
+      }
+    };
+
+    if (step === 'checking-keychain') {
+      checkKeychain();
+    }
+  }, [step]);
+
   // Handle keyboard input
   useInput((input, key) => {
     if (step === 'mnemonic') {
@@ -57,12 +94,12 @@ export function WalletRestore({ name, network }: WalletRestoreProps) {
           const newWords = [...mnemonicWords, word];
           setMnemonicWords(newWords);
           setCurrentWord('');
-          
+
           if (newWords.length === 24) {
             // Validate complete mnemonic
             if (validateMnemonic(newWords)) {
               setError(null);
-              setStep('password');
+              setStep('checking-keychain');
             } else {
               setError('Invalid mnemonic phrase. Please check your words and try again.');
               setMnemonicWords([]);
@@ -82,11 +119,11 @@ export function WalletRestore({ name, network }: WalletRestoreProps) {
         const newWords = [...mnemonicWords, word];
         setMnemonicWords(newWords);
         setCurrentWord('');
-        
+
         if (newWords.length === 24) {
           if (validateMnemonic(newWords)) {
             setError(null);
-            setStep('password');
+            setStep('checking-keychain');
           } else {
             setError('Invalid mnemonic phrase. Please check your words and try again.');
             setMnemonicWords([]);
@@ -171,10 +208,19 @@ export function WalletRestore({ name, network }: WalletRestoreProps) {
     );
   }
 
+  if (step === 'checking-keychain') {
+    return (
+      <Box flexDirection="column" padding={1}>
+        <Text color="green">✓ Mnemonic validated</Text>
+        <Text>⏳ Checking keychain availability...</Text>
+      </Box>
+    );
+  }
+
   if (step === 'error') {
     return (
       <Box flexDirection="column" padding={1}>
-        <Text color="red">❌ Error: {error}</Text>
+        <Text color="red">✗ Error: {error}</Text>
         <Text color="gray">Press Enter to exit</Text>
       </Box>
     );
@@ -184,17 +230,19 @@ export function WalletRestore({ name, network }: WalletRestoreProps) {
     return (
       <Box flexDirection="column" padding={1}>
         <Box marginBottom={1}>
-          <Text bold color="cyan">Restore Wallet</Text>
+          <Text bold color="cyan">
+            Restore Wallet
+          </Text>
           <Text color="gray"> ({network})</Text>
         </Box>
-        
+
         <Text color="gray">Wallet name: </Text>
         <Text bold>{name}</Text>
-        
+
         <Box marginTop={1} marginBottom={1}>
           <Text>Enter your 24-word recovery phrase</Text>
         </Box>
-        
+
         <Box marginBottom={1}>
           <Text color="gray">Words entered: </Text>
           <Text bold color={mnemonicWords.length === 24 ? 'green' : 'yellow'}>
@@ -225,7 +273,7 @@ export function WalletRestore({ name, network }: WalletRestoreProps) {
         <Box>
           <Text>Word {mnemonicWords.length + 1}: </Text>
           <Text bold>{currentWord}</Text>
-          <Text color="gray">▌</Text>
+          <Text color="gray">|</Text>
         </Box>
 
         {error && (
@@ -247,19 +295,24 @@ export function WalletRestore({ name, network }: WalletRestoreProps) {
     return (
       <Box flexDirection="column" padding={1}>
         <Box marginBottom={1}>
-          <Text bold color="cyan">Restore Wallet</Text>
+          <Text bold color="cyan">
+            Restore Wallet
+          </Text>
         </Box>
-        
+
         <Text color="green">✓ Mnemonic validated</Text>
-        
+        <Box marginTop={1}>
+          <Text color="yellow">OS keychain not available - using password encryption</Text>
+        </Box>
+
         <Box marginTop={1}>
           <Text>Enter password (min 8 chars): </Text>
           <Text>{'•'.repeat(password.length)}</Text>
-          <Text color="gray">▌</Text>
+          <Text color="gray">|</Text>
         </Box>
-        
+
         {error && <Text color="red">{error}</Text>}
-        
+
         <Box marginTop={1}>
           <Text color="gray">Press Enter to continue, Esc to go back</Text>
         </Box>
@@ -271,17 +324,19 @@ export function WalletRestore({ name, network }: WalletRestoreProps) {
     return (
       <Box flexDirection="column" padding={1}>
         <Box marginBottom={1}>
-          <Text bold color="cyan">Restore Wallet</Text>
+          <Text bold color="cyan">
+            Restore Wallet
+          </Text>
         </Box>
-        
+
         <Box marginTop={1}>
           <Text>Confirm password: </Text>
           <Text>{'•'.repeat(confirmPassword.length)}</Text>
-          <Text color="gray">▌</Text>
+          <Text color="gray">|</Text>
         </Box>
-        
+
         {error && <Text color="red">{error}</Text>}
-        
+
         <Box marginTop={1}>
           <Text color="gray">Press Enter to continue, Esc to go back</Text>
         </Box>
@@ -293,16 +348,23 @@ export function WalletRestore({ name, network }: WalletRestoreProps) {
     return (
       <Box flexDirection="column" padding={1}>
         <Text>⏳ Restoring wallet...</Text>
-        <Text color="gray">Deriving keys and encrypting...</Text>
+        <Text color="gray">
+          {keychainAvailable
+            ? 'Deriving keys and storing in OS keychain...'
+            : 'Deriving keys and encrypting...'}
+        </Text>
       </Box>
     );
   }
 
   if (step === 'complete' && walletInfo) {
+    const usesKeychain = walletInfo.usesKeychain ?? keychainAvailable;
     return (
       <Box flexDirection="column" padding={1}>
         <Box marginBottom={1}>
-          <Text bold color="green">✓ Wallet Restored!</Text>
+          <Text bold color="green">
+            ✓ Wallet Restored!
+          </Text>
         </Box>
 
         <Box flexDirection="column">
@@ -313,6 +375,12 @@ export function WalletRestore({ name, network }: WalletRestoreProps) {
           <Box>
             <Text color="gray">Network: </Text>
             <Text>{walletInfo.networkId === 1 ? 'mainnet' : 'testnet'}</Text>
+          </Box>
+          <Box>
+            <Text color="gray">Storage: </Text>
+            <Text color={usesKeychain ? 'green' : 'yellow'}>
+              {usesKeychain ? 'OS Keychain (no password needed)' : 'Password encrypted'}
+            </Text>
           </Box>
           <Box marginTop={1}>
             <Text color="gray">Payment Address:</Text>

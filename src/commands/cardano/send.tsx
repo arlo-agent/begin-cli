@@ -66,7 +66,7 @@ interface TxInfo {
   estimatedFee: string;
   availableAda?: string;
   utxoCount?: number;
-  walletSource?: 'env' | 'wallet';
+  walletSource?: 'env' | 'wallet' | 'keychain';
   unsignedTx?: string;
   unsignedTxPath?: string;
   signedTx?: string;
@@ -74,7 +74,7 @@ interface TxInfo {
 }
 
 interface WalletInfo {
-  source: 'env' | 'wallet';
+  source: 'env' | 'wallet' | 'keychain';
   walletName?: string;
   needsPassword: boolean;
 }

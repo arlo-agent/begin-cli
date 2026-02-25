@@ -1,18 +1,31 @@
 /**
  * Wallet Create Command
  * Interactive command to create a new wallet with mnemonic generation
+ *
+ * Supports OS keychain storage (no password required) when available,
+ * falls back to password-based encryption otherwise.
  */
 
 import React, { useState, useEffect } from 'react';
 import { Box, Text, useInput, useApp } from 'ink';
 import { createWallet, walletExists, type WalletInfo } from '../../lib/wallet.js';
+import { isKeychainAvailable } from '../../lib/keystore.js';
 
 interface WalletCreateProps {
   name: string;
   network: string;
 }
 
-type Step = 'checking' | 'password' | 'confirm-password' | 'creating' | 'show-mnemonic' | 'verify' | 'complete' | 'error';
+type Step =
+  | 'checking'
+  | 'checking-keychain'
+  | 'password'
+  | 'confirm-password'
+  | 'creating'
+  | 'show-mnemonic'
+  | 'verify'
+  | 'complete'
+  | 'error';
 
 export function WalletCreate({ name, network }: WalletCreateProps) {
   const { exit } = useApp();
@@ -26,6 +39,8 @@ export function WalletCreate({ name, network }: WalletCreateProps) {
   const [verifyInput, setVerifyInput] = useState('');
   const [verifyStep, setVerifyStep] = useState(0);
   const [passwordVisible, setPasswordVisible] = useState(false);
+  const [keychainAvailable, setKeychainAvailable] = useState(false);
+  const [usesKeychain, setUsesKeychain] = useState(false);
 
   const networkId = network === 'mainnet' ? 1 : 0;
 
@@ -38,7 +53,7 @@ export function WalletCreate({ name, network }: WalletCreateProps) {
           setError(`Wallet "${name}" already exists`);
           setStep('error');
         } else {
-          setStep('password');
+          setStep('checking-keychain');
         }
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Unknown error');
@@ -50,6 +65,31 @@ export function WalletCreate({ name, network }: WalletCreateProps) {
       checkWallet();
     }
   }, [step, name]);
+
+  // Check keychain availability
+  useEffect(() => {
+    const checkKeychain = async () => {
+      try {
+        const available = await isKeychainAvailable();
+        setKeychainAvailable(available);
+        if (available) {
+          // Skip password prompts - go directly to creating
+          setStep('creating');
+        } else {
+          // Need password
+          setStep('password');
+        }
+      } catch {
+        // Keychain not available, need password
+        setKeychainAvailable(false);
+        setStep('password');
+      }
+    };
+
+    if (step === 'checking-keychain') {
+      checkKeychain();
+    }
+  }, [step]);
 
   // Handle keyboard input
   useInput((input, key) => {
@@ -134,12 +174,10 @@ export function WalletCreate({ name, network }: WalletCreateProps) {
   useEffect(() => {
     const doCreate = async () => {
       try {
-        const result = await createWallet(
-          { name, networkId: networkId as 0 | 1 },
-          password
-        );
+        const result = await createWallet({ name, networkId: networkId as 0 | 1 }, password);
         setMnemonic(result.mnemonic);
         setWalletInfo(result.walletInfo);
+        setUsesKeychain(result.usesKeychain);
         setStep('show-mnemonic');
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to create wallet');
@@ -161,10 +199,18 @@ export function WalletCreate({ name, network }: WalletCreateProps) {
     );
   }
 
+  if (step === 'checking-keychain') {
+    return (
+      <Box>
+        <Text>⏳ Checking keychain availability...</Text>
+      </Box>
+    );
+  }
+
   if (step === 'error') {
     return (
       <Box flexDirection="column" padding={1}>
-        <Text color="red">❌ Error: {error}</Text>
+        <Text color="red">✗ Error: {error}</Text>
         <Text color="gray">Press Enter to exit</Text>
       </Box>
     );
@@ -174,15 +220,20 @@ export function WalletCreate({ name, network }: WalletCreateProps) {
     return (
       <Box flexDirection="column" padding={1}>
         <Box marginBottom={1}>
-          <Text bold color="cyan">Create New Wallet</Text>
+          <Text bold color="cyan">
+            Create New Wallet
+          </Text>
           <Text color="gray"> ({network})</Text>
         </Box>
         <Text color="gray">Wallet name: </Text>
         <Text bold>{name}</Text>
         <Box marginTop={1}>
+          <Text color="yellow">OS keychain not available - using password encryption</Text>
+        </Box>
+        <Box marginTop={1}>
           <Text>Enter password (min 8 chars): </Text>
           <Text>{passwordVisible ? password : '•'.repeat(password.length)}</Text>
-          <Text color="gray">▌</Text>
+          <Text color="gray">|</Text>
         </Box>
         {error && <Text color="red">{error}</Text>}
         <Box marginTop={1}>
@@ -196,12 +247,14 @@ export function WalletCreate({ name, network }: WalletCreateProps) {
     return (
       <Box flexDirection="column" padding={1}>
         <Box marginBottom={1}>
-          <Text bold color="cyan">Create New Wallet</Text>
+          <Text bold color="cyan">
+            Create New Wallet
+          </Text>
         </Box>
         <Box marginTop={1}>
           <Text>Confirm password: </Text>
           <Text>{'•'.repeat(confirmPassword.length)}</Text>
-          <Text color="gray">▌</Text>
+          <Text color="gray">|</Text>
         </Box>
         {error && <Text color="red">{error}</Text>}
         <Box marginTop={1}>
@@ -215,7 +268,11 @@ export function WalletCreate({ name, network }: WalletCreateProps) {
     return (
       <Box flexDirection="column" padding={1}>
         <Text>⏳ Creating wallet...</Text>
-        <Text color="gray">Generating keys and encrypting...</Text>
+        <Text color="gray">
+          {keychainAvailable
+            ? 'Generating keys and storing in OS keychain...'
+            : 'Generating keys and encrypting...'}
+        </Text>
       </Box>
     );
   }
@@ -224,11 +281,16 @@ export function WalletCreate({ name, network }: WalletCreateProps) {
     return (
       <Box flexDirection="column" padding={1}>
         <Box marginBottom={1}>
-          <Text bold color="green">✓ Wallet Created</Text>
+          <Text bold color="green">
+            ✓ Wallet Created
+          </Text>
+          {usesKeychain && <Text color="cyan"> (using OS keychain)</Text>}
         </Box>
-        
+
         <Box marginBottom={1} flexDirection="column">
-          <Text bold color="yellow">⚠️  IMPORTANT: Write down these 24 words!</Text>
+          <Text bold color="yellow">
+            IMPORTANT: Write down these 24 words!
+          </Text>
           <Text color="gray">This is your recovery phrase. Store it safely offline.</Text>
           <Text color="gray">Anyone with these words can access your funds.</Text>
         </Box>
@@ -261,18 +323,20 @@ export function WalletCreate({ name, network }: WalletCreateProps) {
     return (
       <Box flexDirection="column" padding={1}>
         <Box marginBottom={1}>
-          <Text bold color="cyan">Verify Recovery Phrase</Text>
+          <Text bold color="cyan">
+            Verify Recovery Phrase
+          </Text>
           <Text color="gray"> ({verifyStep + 1}/3)</Text>
         </Box>
-        
+
         <Box marginTop={1}>
           <Text>Enter word #{wordNum}: </Text>
           <Text>{verifyInput}</Text>
-          <Text color="gray">▌</Text>
+          <Text color="gray">|</Text>
         </Box>
-        
+
         {error && <Text color="red">{error}</Text>}
-        
+
         <Box marginTop={1}>
           <Text color="gray">Press Enter to verify, Esc to see words again</Text>
         </Box>
@@ -284,7 +348,9 @@ export function WalletCreate({ name, network }: WalletCreateProps) {
     return (
       <Box flexDirection="column" padding={1}>
         <Box marginBottom={1}>
-          <Text bold color="green">✓ Wallet Ready!</Text>
+          <Text bold color="green">
+            ✓ Wallet Ready!
+          </Text>
         </Box>
 
         <Box flexDirection="column">
@@ -295,6 +361,12 @@ export function WalletCreate({ name, network }: WalletCreateProps) {
           <Box>
             <Text color="gray">Network: </Text>
             <Text>{walletInfo.networkId === 1 ? 'mainnet' : 'testnet'}</Text>
+          </Box>
+          <Box>
+            <Text color="gray">Storage: </Text>
+            <Text color={usesKeychain ? 'green' : 'yellow'}>
+              {usesKeychain ? 'OS Keychain (no password needed)' : 'Password encrypted'}
+            </Text>
           </Box>
           <Box marginTop={1}>
             <Text color="gray">Payment Address:</Text>
