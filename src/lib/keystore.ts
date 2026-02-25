@@ -13,7 +13,21 @@ import { createDecipheriv, scryptSync, randomBytes, createCipheriv } from 'crypt
 import { existsSync, mkdirSync, readFileSync, writeFileSync, readdirSync, unlinkSync } from 'fs';
 import { homedir } from 'os';
 import { join } from 'path';
-import keytar from 'keytar';
+// Dynamic import for keytar - graceful fallback when native module unavailable
+let _keytar: typeof import('keytar') | null = null;
+let _keytarLoadAttempted = false;
+
+async function getKeytar(): Promise<typeof import('keytar') | null> {
+  if (_keytarLoadAttempted) return _keytar;
+  _keytarLoadAttempted = true;
+  try {
+    _keytar = await import('keytar');
+    return _keytar;
+  } catch {
+    _keytar = null;
+    return null;
+  }
+}
 
 // Environment variable name for mnemonic
 export const MNEMONIC_ENV_VAR = 'BEGIN_CLI_MNEMONIC';
@@ -98,6 +112,11 @@ export async function isKeychainAvailable(): Promise<boolean> {
   }
 
   try {
+    const keytar = await getKeytar();
+    if (!keytar) {
+      keychainAvailableCache = false;
+      return false;
+    }
     const testAccount = 'begin-cli-availability-test';
     await keytar.setPassword(KEYCHAIN_SERVICE, testAccount, 'test');
     await keytar.deletePassword(KEYCHAIN_SERVICE, testAccount);
@@ -114,6 +133,8 @@ export async function isKeychainAvailable(): Promise<boolean> {
  */
 export function resetKeychainCache(): void {
   keychainAvailableCache = null;
+  _keytarLoadAttempted = false;
+  _keytar = null;
 }
 
 /**
@@ -124,6 +145,8 @@ export function resetKeychainCache(): void {
  */
 export async function getKeychainKey(walletName: string): Promise<string | null> {
   try {
+    const keytar = await getKeytar();
+    if (!keytar) return null;
     const key = await keytar.getPassword(KEYCHAIN_SERVICE, walletName);
     return key;
   } catch {
@@ -138,6 +161,8 @@ export async function getKeychainKey(walletName: string): Promise<string | null>
  * @param key - Hex-encoded AES-256 encryption key
  */
 export async function setKeychainKey(walletName: string, key: string): Promise<void> {
+  const keytar = await getKeytar();
+  if (!keytar) throw new Error('OS keychain is not available');
   await keytar.setPassword(KEYCHAIN_SERVICE, walletName, key);
 }
 
@@ -147,6 +172,8 @@ export async function setKeychainKey(walletName: string, key: string): Promise<v
  * @param walletName - Wallet name
  */
 export async function deleteKeychainKey(walletName: string): Promise<boolean> {
+  const keytar = await getKeytar();
+  if (!keytar) return false;
   return keytar.deletePassword(KEYCHAIN_SERVICE, walletName);
 }
 
