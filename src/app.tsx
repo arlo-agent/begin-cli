@@ -21,6 +21,7 @@ import { WalletList } from "./commands/wallet/list.js";
 import { MintCommand } from "./commands/mint/index.js";
 import { TokenSearch } from "./commands/token/search.js";
 import { TokenPrice } from "./commands/token/price.js";
+import { Buy } from "./commands/buy.js";
 import { isValidNetwork, type Network } from "./lib/config.js";
 import type { NetworkType } from "./lib/address.js";
 
@@ -44,6 +45,10 @@ export interface AppFlags {
   description?: string;
   // Swap-specific flags (to is shared with mint)
   to?: string;
+  // Buy-specific flags
+  currency: string;
+  token: string;
+  // Swap-specific flags
   from?: string;
   amount?: string;
   slippage: number;
@@ -55,7 +60,9 @@ export interface AppFlags {
   yes: boolean;
   // Token discovery flags
   trending: boolean;
+  // Buy-specific flags
   currency: string;
+  token: string;
 }
 
 interface AppProps {
@@ -356,6 +363,24 @@ export function App({ command, subcommand, args, flags, showHelp }: AppProps) {
       />
     );
   }
+
+  // ---- Buy command ----
+  if (command === 'buy') {
+    const amount = flags.amount ? Number(flags.amount) : 50;
+    if (!Number.isFinite(amount) || amount <= 0) {
+      return invalidUsage('Amount must be a positive number', 'begin buy --amount <number> --currency <fiat> --token <crypto>');
+    }
+    return (
+      <Buy
+        amount={amount}
+        currency={flags.currency}
+        token={flags.token}
+        json={flags.json}
+        walletName={flags.wallet}
+      />
+    );
+  }
+
   // Route to swap commands
   if (command === "swap") {
     // Swap quote subcommand: begin swap quote --from ADA --to MIN --amount 100

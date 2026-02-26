@@ -61,7 +61,8 @@
     "node": ">=18"
   },
   "files": [
-    "dist"
+    "dist",
+    "skills"
   ],
   "optionalDependencies": {
     "keytar": "^7.9.0"
