@@ -24,6 +24,7 @@ import { TokenPrice } from "./commands/token/price.js";
 import { Buy } from "./commands/buy.js";
 import { isValidNetwork, type Network } from "./lib/config.js";
 import type { NetworkType } from "./lib/address.js";
+import type { ChainFilter } from "./services/market.js";
 
 export interface AppFlags {
   network: string;
@@ -60,6 +61,7 @@ export interface AppFlags {
   yes: boolean;
   // Token discovery flags
   trending: boolean;
+  chain: string;
 }
 
 interface AppProps {
@@ -488,6 +490,7 @@ export function App({ command, subcommand, args, flags, showHelp }: AppProps) {
     if (subcommand === 'search') {
       const query = args[0];
       // If no query and not --trending, show trending by default
+      const chain = (flags.chain || 'all') as ChainFilter;
       return (
         <TokenSearch
           query={query}
@@ -495,6 +498,7 @@ export function App({ command, subcommand, args, flags, showHelp }: AppProps) {
           currency={flags.currency}
           json={flags.json}
           limit={flags.limit}
+          chain={chain}
         />
       );
     }
