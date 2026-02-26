@@ -37,6 +37,8 @@ const cli = meow(
     mint --image <path> --name <name> --to <addr>
                                      Mint an NFT via NMKR and send to address
 
+    buy [options]                    Buy crypto with fiat via Onramper
+
     sign <tx-file>                   Sign an unsigned transaction file
     submit <signed-tx-file>          Submit a signed transaction file
 
@@ -70,6 +72,11 @@ const cli = meow(
     --show-seed       Show recovery phrase and addresses (wallet create only)
     --help            Show this help message
     --version         Show version
+
+  Buy Options
+    --amount          Fiat amount to spend [default: 50]
+    --currency        Fiat currency (EUR, USD, GBP, etc.) [default: EUR]
+    --token           Crypto to buy (ADA, BTC) [default: ADA]
 
   Swap Options
     --from            Token to swap from (ADA, MIN, policyId.assetName, etc.)
@@ -147,6 +154,11 @@ const cli = meow(
     # Mint NFT via NMKR
     $ begin mint --image ./avatar.png --name "MyNFT" --to addr1qy...
     $ begin mint --image ./art.png --name "Art001" --description "My art" --yes
+
+    # Buy crypto with fiat
+    $ begin buy --amount 50 --currency EUR --token ADA
+    $ begin buy --amount 100 --currency USD --token BTC
+    $ begin buy --token ADA --json
 `,
   {
     importMeta: import.meta,
@@ -180,7 +192,9 @@ const cli = meow(
       showSeed: { type: "boolean", default: false },
       // Token discovery flags
       trending: { type: "boolean", default: false },
-      currency: { type: "string", shortFlag: "c", default: "usd" },
+      currency: { type: "string", shortFlag: "c", default: "EUR" },
+      // Buy-specific flags
+      token: { type: "string", default: "ADA" },
     },
   }
 );
@@ -235,6 +249,8 @@ if (command === "mcp") {
     // Token discovery flags
     trending: boolean;
     currency: string;
+    // Buy-specific flags
+    token: string;
   };
 
   const network = rawFlags.network ?? config.network ?? "mainnet";
@@ -273,6 +289,7 @@ if (command === "mcp") {
     showSeed: rawFlags.showSeed,
     trending: rawFlags.trending,
     currency: rawFlags.currency,
+    token: rawFlags.token,
   };
 
   setOutputContext({ json: flags.json });
