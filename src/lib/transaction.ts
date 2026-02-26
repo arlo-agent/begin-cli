@@ -15,11 +15,11 @@ import {
   resolveTxHash,
   type Asset,
   type UTxO,
-} from '@meshsdk/core';
-import * as fs from 'fs';
-import * as path from 'path';
-import { getBlockfrostKey, isValidNetwork, type Network } from './config.js';
-import { errors } from './errors.js';
+} from "@meshsdk/core";
+import * as fs from "fs";
+import * as path from "path";
+import { getBlockfrostKey, isValidNetwork, type Network } from "./config.js";
+import { errors } from "./errors.js";
 import {
   getMnemonicAsync,
   walletExists,
@@ -30,7 +30,7 @@ import {
   isKeychainAvailable,
   walletUsesKeychain,
   getWalletVersion,
-} from './keystore.js';
+} from "./keystore.js";
 
 export interface TransactionConfig {
   network: string;
@@ -66,7 +66,7 @@ export interface SubmitResult {
 export function createProvider(config: TransactionConfig): BlockfrostProvider {
   if (!isValidNetwork(config.network)) {
     throw errors.invalidArgument(
-      'network',
+      "network",
       `must be one of mainnet, preprod, preview (got ${config.network})`
     );
   }
@@ -76,7 +76,7 @@ export function createProvider(config: TransactionConfig): BlockfrostProvider {
   // Priority: explicit config.apiKey > ENV network-specific > ENV generic > config file
   const apiKey =
     config.apiKey ||
-    (network === 'mainnet'
+    (network === "mainnet"
       ? process.env.BLOCKFROST_API_KEY_MAINNET || process.env.BLOCKFROST_API_KEY
       : process.env[`BLOCKFROST_API_KEY_${network.toUpperCase()}`] ||
         process.env.BLOCKFROST_API_KEY) ||
@@ -127,15 +127,15 @@ export async function loadWallet(
   const mnemonic = mnemonicStr.split(/\s+/);
 
   if (mnemonic.length !== 24) {
-    throw new Error('Invalid mnemonic: expected 24 words');
+    throw new Error("Invalid mnemonic: expected 24 words");
   }
 
   const wallet = new MeshWallet({
-    networkId: config.network === 'mainnet' ? 1 : 0,
+    networkId: config.network === "mainnet" ? 1 : 0,
     fetcher: provider,
     submitter: provider,
     key: {
-      type: 'mnemonic',
+      type: "mnemonic",
       words: mnemonic,
     },
   });
@@ -155,7 +155,7 @@ export async function loadWallet(
  */
 export function checkWalletAvailability(walletName?: string): {
   available: boolean;
-  source?: 'env' | 'wallet' | 'keychain';
+  source?: "env" | "wallet" | "keychain";
   walletName?: string;
   needsPassword: boolean;
   usesKeychain?: boolean;
@@ -172,7 +172,7 @@ export function checkWalletAvailability(walletName?: string): {
       if (version === 2) {
         return {
           available: true,
-          source: 'keychain',
+          source: "keychain",
           walletName,
           needsPassword: false,
           usesKeychain: true,
@@ -182,7 +182,7 @@ export function checkWalletAvailability(walletName?: string): {
       // For sync check, assume password needed unless env var set
       return {
         available: true,
-        source: 'wallet',
+        source: "wallet",
         walletName,
         needsPassword: !hasPasswordFromEnv,
         usesKeychain: false, // Will be updated by async check
@@ -199,7 +199,7 @@ export function checkWalletAvailability(walletName?: string): {
   if (hasEnvMnemonic()) {
     return {
       available: true,
-      source: 'env',
+      source: "env",
       needsPassword: false,
     };
   }
@@ -211,7 +211,7 @@ export function checkWalletAvailability(walletName?: string): {
     if (version === 2) {
       return {
         available: true,
-        source: 'keychain',
+        source: "keychain",
         walletName: defaultWallet,
         needsPassword: false,
         usesKeychain: true,
@@ -219,7 +219,7 @@ export function checkWalletAvailability(walletName?: string): {
     }
     return {
       available: true,
-      source: 'wallet',
+      source: "wallet",
       walletName: defaultWallet,
       needsPassword: !hasPasswordFromEnv,
       usesKeychain: false,
@@ -233,7 +233,7 @@ export function checkWalletAvailability(walletName?: string): {
     if (version === 2) {
       return {
         available: true,
-        source: 'keychain',
+        source: "keychain",
         walletName: wallets[0],
         needsPassword: false,
         usesKeychain: true,
@@ -241,7 +241,7 @@ export function checkWalletAvailability(walletName?: string): {
     }
     return {
       available: true,
-      source: 'wallet',
+      source: "wallet",
       walletName: wallets[0],
       needsPassword: !hasPasswordFromEnv,
       usesKeychain: false,
@@ -269,7 +269,7 @@ export function checkWalletAvailability(walletName?: string): {
  */
 export async function checkWalletAvailabilityAsync(walletName?: string): Promise<{
   available: boolean;
-  source?: 'env' | 'wallet' | 'keychain';
+  source?: "env" | "wallet" | "keychain";
   walletName?: string;
   needsPassword: boolean;
   usesKeychain?: boolean;
@@ -288,7 +288,7 @@ export async function checkWalletAvailabilityAsync(walletName?: string): Promise
         if (usesKeychain) {
           return {
             available: true,
-            source: 'keychain',
+            source: "keychain",
             walletName,
             needsPassword: false,
             usesKeychain: true,
@@ -298,7 +298,7 @@ export async function checkWalletAvailabilityAsync(walletName?: string): Promise
       // v1 wallet without keychain
       return {
         available: true,
-        source: 'wallet',
+        source: "wallet",
         walletName,
         needsPassword: !hasPasswordFromEnv,
         usesKeychain: false,
@@ -315,7 +315,7 @@ export async function checkWalletAvailabilityAsync(walletName?: string): Promise
   if (hasEnvMnemonic()) {
     return {
       available: true,
-      source: 'env',
+      source: "env",
       needsPassword: false,
     };
   }
@@ -328,7 +328,7 @@ export async function checkWalletAvailabilityAsync(walletName?: string): Promise
       if (usesKeychain) {
         return {
           available: true,
-          source: 'keychain',
+          source: "keychain",
           walletName: defaultWallet,
           needsPassword: false,
           usesKeychain: true,
@@ -337,7 +337,7 @@ export async function checkWalletAvailabilityAsync(walletName?: string): Promise
     }
     return {
       available: true,
-      source: 'wallet',
+      source: "wallet",
       walletName: defaultWallet,
       needsPassword: !hasPasswordFromEnv,
       usesKeychain: false,
@@ -352,7 +352,7 @@ export async function checkWalletAvailabilityAsync(walletName?: string): Promise
       if (usesKeychain) {
         return {
           available: true,
-          source: 'keychain',
+          source: "keychain",
           walletName: wallets[0],
           needsPassword: false,
           usesKeychain: true,
@@ -361,7 +361,7 @@ export async function checkWalletAvailabilityAsync(walletName?: string): Promise
     }
     return {
       available: true,
-      source: 'wallet',
+      source: "wallet",
       walletName: wallets[0],
       needsPassword: !hasPasswordFromEnv,
       usesKeychain: false,
@@ -470,7 +470,7 @@ export async function signTransactionFromFile(
   wallet: MeshWallet,
   txFilePath: string
 ): Promise<SignedTransactionResult> {
-  const unsignedTx = fs.readFileSync(txFilePath, 'utf-8').trim();
+  const unsignedTx = fs.readFileSync(txFilePath, "utf-8").trim();
   return signTransaction(wallet, unsignedTx);
 }
 
@@ -498,7 +498,7 @@ export async function submitTransactionFromFile(
   config: TransactionConfig,
   txFilePath: string
 ): Promise<SubmitResult> {
-  const signedTx = fs.readFileSync(txFilePath, 'utf-8').trim();
+  const signedTx = fs.readFileSync(txFilePath, "utf-8").trim();
   return submitTransaction(config, signedTx);
 }
 
@@ -545,7 +545,7 @@ function getTxHash(txCbor: string): string {
   try {
     return resolveTxHash(txCbor);
   } catch {
-    return 'pending';
+    return "pending";
   }
 }
 
@@ -567,20 +567,20 @@ export function loadTxFromFile(filePath: string): string {
   if (!fs.existsSync(filePath)) {
     throw new Error(`Transaction file not found: ${filePath}`);
   }
-  return fs.readFileSync(filePath, 'utf-8').trim();
+  return fs.readFileSync(filePath, "utf-8").trim();
 }
 
 /**
  * Parse asset string in format "policyId.assetName:amount"
  */
 export function parseAssetString(assetStr: string): Asset {
-  const [unitPart, amountStr] = assetStr.split(':');
+  const [unitPart, amountStr] = assetStr.split(":");
 
   if (!unitPart || !amountStr) {
     throw new Error(`Invalid asset format: ${assetStr}. Expected "policyId.assetName:amount"`);
   }
 
-  const [policyId, assetName] = unitPart.split('.');
+  const [policyId, assetName] = unitPart.split(".");
 
   if (!policyId || policyId.length !== 56) {
     throw new Error(`Invalid policy ID: ${policyId}. Must be 56 hex characters.`);
@@ -592,7 +592,7 @@ export function parseAssetString(assetStr: string): Asset {
   }
 
   // Encode asset name to hex if provided
-  const assetNameHex = assetName ? Buffer.from(assetName, 'utf-8').toString('hex') : '';
+  const assetNameHex = assetName ? Buffer.from(assetName, "utf-8").toString("hex") : "";
 
   return {
     unit: policyId + assetNameHex,
@@ -624,7 +624,7 @@ export async function getWalletAddress(wallet: MeshWallet): Promise<string> {
   }
   // Get unused address if no used addresses
   const unusedAddresses = await wallet.getUnusedAddresses();
-  return unusedAddresses[0] || '';
+  return unusedAddresses[0] || "";
 }
 
 /**
@@ -646,10 +646,10 @@ export function calculateBalance(utxos: UTxO[]): {
 
   for (const utxo of utxos) {
     for (const amount of utxo.output.amount) {
-      if (amount.unit === 'lovelace') {
+      if (amount.unit === "lovelace") {
         totalLovelace += BigInt(amount.quantity);
       } else {
-        const current = BigInt(assets.get(amount.unit) || '0');
+        const current = BigInt(assets.get(amount.unit) || "0");
         assets.set(amount.unit, (current + BigInt(amount.quantity)).toString());
       }
     }

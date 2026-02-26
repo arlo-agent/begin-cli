@@ -1,11 +1,11 @@
 #!/usr/bin/env node
-import React from 'react';
-import { render } from 'ink';
-import meow from 'meow';
-import { App, type AppFlags } from './app.js';
-import { loadConfig, isValidNetwork } from './lib/config.js';
-import { setOutputContext, exitWithError } from './lib/output.js';
-import { errors } from './lib/errors.js';
+import React from "react";
+import { render } from "ink";
+import meow from "meow";
+import { App, type AppFlags } from "./app.js";
+import { loadConfig, isValidNetwork } from "./lib/config.js";
+import { setOutputContext, exitWithError } from "./lib/output.js";
+import { errors } from "./lib/errors.js";
 
 const cli = meow(
   `
@@ -22,7 +22,7 @@ const cli = meow(
     cardano send <to> <amount>       Send ADA (and native assets)
 
     wallet address                   Show derived wallet addresses
-    wallet create <name>             Create a new wallet (interactive)
+    wallet create <name> [--show-seed]  Create a new wallet (silent by default)
     wallet restore <name>            Restore a wallet from mnemonic (interactive)
 
     stake pools [search]             List/search stake pools (mock)
@@ -63,6 +63,7 @@ const cli = meow(
     --description     NFT description (mint only)
     --to, -t          Receiver address for minted NFT (mint only)
     -y, --yes         Skip confirmation prompts
+    --show-seed       Show recovery phrase and addresses (wallet create only)
     --help            Show this help message
     --version         Show version
 
@@ -104,8 +105,10 @@ const cli = meow(
 
     # Create/restore wallets
     $ begin wallet create my-wallet
+    $ begin wallet create my-wallet --show-seed
     $ begin wallet restore my-wallet
     $ begin wallet address --full
+    $ begin wallet export [name] --password <pass>
 
     # Send ADA (uses default wallet, prompts for password)
     $ begin cardano send addr1qy... 10
@@ -133,32 +136,33 @@ const cli = meow(
   {
     importMeta: import.meta,
     flags: {
-      network: { type: 'string', shortFlag: 'n' },
-      wallet: { type: 'string', shortFlag: 'w' },
-      password: { type: 'string', shortFlag: 'p' },
-      qr: { type: 'boolean', default: false },
-      dryRun: { type: 'boolean', shortFlag: 'd', default: false },
-      output: { type: 'string', shortFlag: 'o' },
-      json: { type: 'boolean', shortFlag: 'j', default: false },
-      full: { type: 'boolean', default: false },
-      limit: { type: 'number', shortFlag: 'l', default: 10 },
-      page: { type: 'number', default: 1 },
-      wait: { type: 'boolean', default: true },
-      asset: { type: 'string', shortFlag: 'a', isMultiple: true },
-      yes: { type: 'boolean', shortFlag: 'y', default: false },
-      image: { type: 'string' },
-      name: { type: 'string' },
-      displayName: { type: 'string' },
-      description: { type: 'string' },
+      network: { type: "string", shortFlag: "n" },
+      wallet: { type: "string", shortFlag: "w" },
+      password: { type: "string", shortFlag: "p" },
+      qr: { type: "boolean", default: false },
+      dryRun: { type: "boolean", shortFlag: "d", default: false },
+      output: { type: "string", shortFlag: "o" },
+      json: { type: "boolean", shortFlag: "j", default: false },
+      full: { type: "boolean", default: true },
+      limit: { type: "number", shortFlag: "l", default: 10 },
+      page: { type: "number", default: 1 },
+      wait: { type: "boolean", default: true },
+      asset: { type: "string", shortFlag: "a", isMultiple: true },
+      yes: { type: "boolean", shortFlag: "y", default: false },
+      image: { type: "string" },
+      name: { type: "string" },
+      displayName: { type: "string" },
+      description: { type: "string" },
       // Swap-specific flags (to is also used by mint)
-      to: { type: 'string', shortFlag: 't' },
-      from: { type: 'string' },
-      amount: { type: 'string' },
-      slippage: { type: 'number', shortFlag: 's', default: 0.5 },
-      multiHop: { type: 'boolean', default: true },
-      id: { type: 'string', isMultiple: true },
-      address: { type: 'string' },
-      protocol: { type: 'string' },
+      to: { type: "string", shortFlag: "t" },
+      from: { type: "string" },
+      amount: { type: "string" },
+      slippage: { type: "number", shortFlag: "s", default: 0.5 },
+      multiHop: { type: "boolean", default: true },
+      id: { type: "string", isMultiple: true },
+      address: { type: "string" },
+      protocol: { type: "string" },
+      showSeed: { type: "boolean", default: false },
     },
   }
 );
@@ -166,102 +170,105 @@ const cli = meow(
 const [command, subcommand, ...args] = cli.input;
 
 // Handle MCP command before Ink rendering
-if (command === 'mcp') {
+if (command === "mcp") {
   const startMcpServer = async () => {
-    const { startMcpServer } = await import('./mcp/server.js');
+    const { startMcpServer } = await import("./mcp/server.js");
     await startMcpServer();
   };
   startMcpServer().catch((err) => {
-    console.error('MCP server error:', err);
+    console.error("MCP server error:", err);
     process.exit(1);
   });
 } else {
   // Continue with normal CLI flow
 
-// Load config defaults
-const config = loadConfig();
+  // Load config defaults
+  const config = loadConfig();
 
-// Type assertion for raw flags (meow is loosely typed)
-const rawFlags = cli.flags as {
-  network?: string;
-  wallet?: string;
-  password?: string;
-  qr: boolean;
-  dryRun: boolean;
-  output?: string;
-  json: boolean;
-  full: boolean;
-  wait: boolean;
-  limit: number;
-  page: number;
-  asset?: string[];
-  yes: boolean;
-  image?: string;
-  name?: string;
-  displayName?: string;
-  description?: string;
-  // Swap-specific flags (to is also used by mint)
-  to?: string;
-  from?: string;
-  amount?: string;
-  slippage: number;
-  multiHop: boolean;
-  id?: string[];
-  address?: string;
-  protocol?: string;
-};
+  // Type assertion for raw flags (meow is loosely typed)
+  const rawFlags = cli.flags as {
+    network?: string;
+    wallet?: string;
+    password?: string;
+    qr: boolean;
+    dryRun: boolean;
+    output?: string;
+    json: boolean;
+    full: boolean;
+    wait: boolean;
+    limit: number;
+    page: number;
+    asset?: string[];
+    yes: boolean;
+    image?: string;
+    name?: string;
+    displayName?: string;
+    description?: string;
+    // Swap-specific flags (to is also used by mint)
+    to?: string;
+    from?: string;
+    amount?: string;
+    slippage: number;
+    multiHop: boolean;
+    id?: string[];
+    address?: string;
+    protocol?: string;
+    showSeed: boolean;
+  };
 
-const network = rawFlags.network ?? config.network ?? 'mainnet';
-if (!isValidNetwork(network)) {
-  exitWithError(errors.invalidArgument('network', `must be one of mainnet, preprod, preview (got ${network})`));
-}
+  const network = rawFlags.network ?? config.network ?? "mainnet";
+  if (!isValidNetwork(network)) {
+    exitWithError(
+      errors.invalidArgument("network", `must be one of mainnet, preprod, preview (got ${network})`)
+    );
+  }
 
-const flags: AppFlags = {
-  network,
-  wallet: rawFlags.wallet ?? config.defaultWallet,
-  password: rawFlags.password,
-  qr: rawFlags.qr,
-  dryRun: rawFlags.dryRun,
-  output: rawFlags.output,
-  json: rawFlags.json,
-  full: rawFlags.full,
-  wait: rawFlags.wait,
-  limit: rawFlags.limit,
-  page: rawFlags.page,
-  asset: rawFlags.asset,
-  yes: rawFlags.yes,
-  image: rawFlags.image,
-  name: rawFlags.name,
-  displayName: rawFlags.displayName,
-  description: rawFlags.description,
-  to: rawFlags.to,
-  from: rawFlags.from,
-  amount: rawFlags.amount,
-  slippage: rawFlags.slippage,
-  multiHop: rawFlags.multiHop,
-  id: rawFlags.id,
-  address: rawFlags.address,
-  protocol: rawFlags.protocol,
-};
+  const flags: AppFlags = {
+    network,
+    wallet: rawFlags.wallet ?? config.defaultWallet,
+    password: rawFlags.password,
+    qr: rawFlags.qr,
+    dryRun: rawFlags.dryRun,
+    output: rawFlags.output,
+    json: rawFlags.json,
+    full: rawFlags.full,
+    wait: rawFlags.wait,
+    limit: rawFlags.limit,
+    page: rawFlags.page,
+    asset: rawFlags.asset,
+    yes: rawFlags.yes,
+    image: rawFlags.image,
+    name: rawFlags.name,
+    displayName: rawFlags.displayName,
+    description: rawFlags.description,
+    to: rawFlags.to,
+    from: rawFlags.from,
+    amount: rawFlags.amount,
+    slippage: rawFlags.slippage,
+    multiHop: rawFlags.multiHop,
+    id: rawFlags.id,
+    address: rawFlags.address,
+    protocol: rawFlags.protocol,
+    showSeed: rawFlags.showSeed,
+  };
 
-setOutputContext({ json: flags.json });
+  setOutputContext({ json: flags.json });
 
-if (flags.json && !command) {
-  exitWithError(errors.missingArgument('command'));
-}
+  if (flags.json && !command) {
+    exitWithError(errors.missingArgument("command"));
+  }
 
-const { waitUntilExit } = render(
-  <App
-    command={command}
-    subcommand={subcommand}
-    args={args}
-    flags={flags}
-    showHelp={cli.showHelp}
-  />
-);
+  const { waitUntilExit } = render(
+    <App
+      command={command}
+      subcommand={subcommand}
+      args={args}
+      flags={flags}
+      showHelp={cli.showHelp}
+    />
+  );
 
-waitUntilExit()
-  .then(() => process.exit(0))
-  .catch(() => process.exit(1));
-
+  waitUntilExit()
+    .then(() => process.exit(0))
+    .catch(() => process.exit(1));
 } // End of else block for non-MCP commands

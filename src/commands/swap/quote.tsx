@@ -1,10 +1,10 @@
-import React, { useState, useEffect } from 'react';
-import { Box, Text, useApp } from 'ink';
+import React, { useState, useEffect } from "react";
+import { Box, Text, useApp } from "ink";
 import {
   createMinswapClient,
   MockMinswapClient,
   type SwapEstimate,
-} from '../../services/minswap.js';
+} from "../../services/minswap.js";
 import {
   resolveTokenId,
   formatSwapQuote,
@@ -14,7 +14,7 @@ import {
   formatRoute,
   type ResolvedToken,
   type FormattedQuote,
-} from '../../lib/swap.js';
+} from "../../lib/swap.js";
 
 interface SwapQuoteProps {
   from: string;
@@ -26,19 +26,11 @@ interface SwapQuoteProps {
   json: boolean;
 }
 
-type QuoteState = 'resolving' | 'loading' | 'success' | 'error';
+type QuoteState = "resolving" | "loading" | "success" | "error";
 
-export function SwapQuote({
-  from,
-  to,
-  amount,
-  slippage,
-  multiHop,
-  network,
-  json,
-}: SwapQuoteProps) {
+export function SwapQuote({ from, to, amount, slippage, multiHop, network, json }: SwapQuoteProps) {
   const { exit } = useApp();
-  const [state, setState] = useState<QuoteState>('resolving');
+  const [state, setState] = useState<QuoteState>("resolving");
   const [error, setError] = useState<string | null>(null);
   const [fromToken, setFromToken] = useState<ResolvedToken | null>(null);
   const [toToken, setToToken] = useState<ResolvedToken | null>(null);
@@ -52,27 +44,25 @@ export function SwapQuote({
         validateSlippage(slippage);
 
         // Create client (use mock if no real API access)
-        const useMock = process.env.MINSWAP_MOCK === 'true';
-        const client = useMock
-          ? new MockMinswapClient(network)
-          : createMinswapClient(network);
+        const useMock = process.env.MINSWAP_MOCK === "true";
+        const client = useMock ? new MockMinswapClient(network) : createMinswapClient(network);
 
         // Resolve token IDs
-        setState('resolving');
+        setState("resolving");
         const [resolvedFrom, resolvedTo] = await Promise.all([
           resolveTokenId(from, client),
           resolveTokenId(to, client),
         ]);
 
         if (resolvedFrom.tokenId === resolvedTo.tokenId) {
-          throw new Error('Cannot swap a token for itself');
+          throw new Error("Cannot swap a token for itself");
         }
 
         setFromToken(resolvedFrom);
         setToToken(resolvedTo);
 
         // Get estimate
-        setState('loading');
+        setState("loading");
         const swapEstimate = await client.estimate({
           tokenIn: resolvedFrom.tokenId,
           tokenOut: resolvedTo.tokenId,
@@ -88,10 +78,10 @@ export function SwapQuote({
         const formatted = formatSwapQuote(swapEstimate, resolvedFrom, resolvedTo);
         setQuote(formatted);
 
-        setState('success');
+        setState("success");
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to get quote');
-        setState('error');
+        setError(err instanceof Error ? err.message : "Failed to get quote");
+        setState("error");
       }
     };
 
@@ -100,21 +90,21 @@ export function SwapQuote({
 
   // JSON output
   if (json) {
-    if (state === 'resolving' || state === 'loading') {
+    if (state === "resolving" || state === "loading") {
       return <Text>{JSON.stringify({ status: state })}</Text>;
     }
 
-    if (state === 'error') {
+    if (state === "error") {
       console.log(JSON.stringify({ error, from, to, amount }, null, 2));
       exit();
       return null;
     }
 
-    if (state === 'success' && estimate && quote) {
+    if (state === "success" && estimate && quote) {
       console.log(
         JSON.stringify(
           {
-            status: 'success',
+            status: "success",
             network,
             from: {
               token: fromToken?.ticker,
@@ -151,7 +141,7 @@ export function SwapQuote({
   }
 
   // Human-readable output
-  if (state === 'resolving') {
+  if (state === "resolving") {
     return (
       <Box padding={1}>
         <Text color="cyan">⏳ Resolving tokens...</Text>
@@ -159,7 +149,7 @@ export function SwapQuote({
     );
   }
 
-  if (state === 'loading') {
+  if (state === "loading") {
     return (
       <Box flexDirection="column" padding={1}>
         <Text color="cyan">⏳ Fetching swap quote...</Text>
@@ -170,7 +160,7 @@ export function SwapQuote({
     );
   }
 
-  if (state === 'error') {
+  if (state === "error") {
     return (
       <Box flexDirection="column" padding={1}>
         <Text color="red">✗ Error: {error}</Text>
@@ -194,15 +184,10 @@ export function SwapQuote({
         <Text color="gray"> ({network})</Text>
       </Box>
 
-      <Box
-        flexDirection="column"
-        borderStyle="round"
-        borderColor="gray"
-        padding={1}
-      >
+      <Box flexDirection="column" borderStyle="round" borderColor="gray" padding={1}>
         {/* Amount info */}
         <Box>
-          <Text color="gray">You pay:    </Text>
+          <Text color="gray">You pay: </Text>
           <Text bold color="white">
             {quote.fromAmount}
           </Text>
@@ -228,13 +213,11 @@ export function SwapQuote({
         {/* Price impact */}
         <Box>
           <Text color="gray">Price impact: </Text>
-          <Text color={criticalImpact ? 'red' : highImpact ? 'yellow' : 'green'}>
+          <Text color={criticalImpact ? "red" : highImpact ? "yellow" : "green"}>
             {quote.priceImpact}
           </Text>
           {criticalImpact && <Text color="red"> ⚠ HIGH</Text>}
-          {highImpact && !criticalImpact && (
-            <Text color="yellow"> ⚠ Moderate</Text>
-          )}
+          {highImpact && !criticalImpact && <Text color="yellow"> ⚠ Moderate</Text>}
         </Box>
 
         {/* Route */}
@@ -254,8 +237,8 @@ export function SwapQuote({
           </Box>
           <Box paddingLeft={2}>
             <Text color="gray">
-              LP: {quote.feeBreakdown.lpFee} | DEX: {quote.feeBreakdown.dexFee} |
-              Aggregator: {quote.feeBreakdown.aggregatorFee}
+              LP: {quote.feeBreakdown.lpFee} | DEX: {quote.feeBreakdown.dexFee} | Aggregator:{" "}
+              {quote.feeBreakdown.aggregatorFee}
             </Text>
           </Box>
         </Box>
@@ -269,18 +252,15 @@ export function SwapQuote({
         </Box>
       )}
 
-      {process.env.MINSWAP_MOCK === 'true' && (
+      {process.env.MINSWAP_MOCK === "true" && (
         <Box marginTop={1}>
-          <Text color="yellow">
-            ⚠ Using mock data - set up Minswap API for real quotes
-          </Text>
+          <Text color="yellow">⚠ Using mock data - set up Minswap API for real quotes</Text>
         </Box>
       )}
 
       <Box marginTop={1}>
         <Text color="gray">
-          To execute this swap, run: begin swap --from {from} --to {to} --amount{' '}
-          {amount}
+          To execute this swap, run: begin swap --from {from} --to {to} --amount {amount}
         </Text>
       </Box>
     </Box>

@@ -4,9 +4,9 @@
  * Pure functions for fetching transaction history.
  */
 
-import { hasApiKey } from '../lib/provider.js';
-import { getBlockfrostKey, type Network } from '../lib/config.js';
-import { errors } from '../lib/errors.js';
+import { hasApiKey } from "../lib/provider.js";
+import { getBlockfrostKey, type Network } from "../lib/config.js";
+import { errors } from "../lib/errors.js";
 
 export interface TransactionInfo {
   txHash: string;
@@ -47,13 +47,13 @@ interface BlockfrostTxDetails {
 }
 
 const BLOCKFROST_URLS: Record<Network, string> = {
-  mainnet: 'https://cardano-mainnet.blockfrost.io/api/v0',
-  preprod: 'https://cardano-preprod.blockfrost.io/api/v0',
-  preview: 'https://cardano-preview.blockfrost.io/api/v0',
+  mainnet: "https://cardano-mainnet.blockfrost.io/api/v0",
+  preprod: "https://cardano-preprod.blockfrost.io/api/v0",
+  preview: "https://cardano-preview.blockfrost.io/api/v0",
 };
 
 function getApiKey(network: Network): string | undefined {
-  const envSuffix = network === 'mainnet' ? '' : `_${network.toUpperCase()}`;
+  const envSuffix = network === "mainnet" ? "" : `_${network.toUpperCase()}`;
   const networkSpecificKey = process.env[`BLOCKFROST_API_KEY${envSuffix}`];
   if (networkSpecificKey) return networkSpecificKey;
   const genericKey = process.env.BLOCKFROST_API_KEY;
@@ -71,37 +71,37 @@ function getMockHistory(address: string, network: Network): HistoryResult {
     hasMore: true,
     transactions: [
       {
-        txHash: 'abc123def456789abc123def456789abc123def456789abc123def456789abcd',
+        txHash: "abc123def456789abc123def456789abc123def456789abc123def456789abcd",
         blockHeight: 9876543,
         blockTime: now - 3600,
-        fees: '180000',
-        feesAda: '0.180000',
+        fees: "180000",
+        feesAda: "0.180000",
         inputCount: 2,
         outputCount: 2,
-        totalOutput: '50000000',
-        totalOutputAda: '50.000000',
+        totalOutput: "50000000",
+        totalOutputAda: "50.000000",
       },
       {
-        txHash: 'def456789abc123def456789abc123def456789abc123def456789abc123defa',
+        txHash: "def456789abc123def456789abc123def456789abc123def456789abc123defa",
         blockHeight: 9876500,
         blockTime: now - 7200,
-        fees: '170000',
-        feesAda: '0.170000',
+        fees: "170000",
+        feesAda: "0.170000",
         inputCount: 1,
         outputCount: 3,
-        totalOutput: '125000000',
-        totalOutputAda: '125.000000',
+        totalOutput: "125000000",
+        totalOutputAda: "125.000000",
       },
       {
-        txHash: '789abc123def456789abc123def456789abc123def456789abc123def456789a',
+        txHash: "789abc123def456789abc123def456789abc123def456789abc123def456789a",
         blockHeight: 9876400,
         blockTime: now - 86400,
-        fees: '200000',
-        feesAda: '0.200000',
+        fees: "200000",
+        feesAda: "0.200000",
         inputCount: 3,
         outputCount: 2,
-        totalOutput: '10000000',
-        totalOutputAda: '10.000000',
+        totalOutput: "10000000",
+        totalOutputAda: "10.000000",
       },
     ],
     mock: true,
@@ -124,7 +124,7 @@ export async function getHistory(
   const apiKey = getApiKey(network);
   const baseUrl = BLOCKFROST_URLS[network];
   if (!apiKey) {
-    throw errors.providerError('BLOCKFROST_API_KEY is required');
+    throw errors.providerError("BLOCKFROST_API_KEY is required");
   }
 
   const txListResponse = await fetch(
@@ -161,18 +161,18 @@ export async function getHistory(
           txHash: tx.tx_hash,
           blockHeight: tx.block_height,
           blockTime: tx.block_time,
-          fees: '0',
-          feesAda: '0.000000',
+          fees: "0",
+          feesAda: "0.000000",
           inputCount: 0,
           outputCount: 0,
-          totalOutput: '0',
-          totalOutputAda: '0.000000',
+          totalOutput: "0",
+          totalOutputAda: "0.000000",
         };
       }
 
       const txDetails = (await txResponse.json()) as BlockfrostTxDetails;
-      const lovelaceOutput = txDetails.output_amount.find((a) => a.unit === 'lovelace');
-      const totalOutput = lovelaceOutput?.quantity || '0';
+      const lovelaceOutput = txDetails.output_amount.find((a) => a.unit === "lovelace");
+      const totalOutput = lovelaceOutput?.quantity || "0";
       const totalOutputAda = (Number(totalOutput) / 1_000_000).toFixed(6);
       const feesAda = (Number(txDetails.fees) / 1_000_000).toFixed(6);
 

@@ -6,10 +6,15 @@
  * falls back to password-based encryption otherwise.
  */
 
-import React, { useState, useEffect } from 'react';
-import { Box, Text, useInput, useApp } from 'ink';
-import { restoreWallet, walletExists, validateMnemonic, type WalletInfo } from '../../lib/wallet.js';
-import { isKeychainAvailable } from '../../lib/keystore.js';
+import React, { useState, useEffect } from "react";
+import { Box, Text, useInput, useApp } from "ink";
+import {
+  restoreWallet,
+  walletExists,
+  validateMnemonic,
+  type WalletInfo,
+} from "../../lib/wallet.js";
+import { isKeychainAvailable } from "../../lib/keystore.js";
 
 interface WalletRestoreProps {
   name: string;
@@ -17,27 +22,27 @@ interface WalletRestoreProps {
 }
 
 type Step =
-  | 'checking'
-  | 'mnemonic'
-  | 'checking-keychain'
-  | 'password'
-  | 'confirm-password'
-  | 'restoring'
-  | 'complete'
-  | 'error';
+  | "checking"
+  | "mnemonic"
+  | "checking-keychain"
+  | "password"
+  | "confirm-password"
+  | "restoring"
+  | "complete"
+  | "error";
 
 export function WalletRestore({ name, network }: WalletRestoreProps) {
   const { exit } = useApp();
-  const [step, setStep] = useState<Step>('checking');
+  const [step, setStep] = useState<Step>("checking");
   const [mnemonicWords, setMnemonicWords] = useState<string[]>([]);
-  const [currentWord, setCurrentWord] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
+  const [currentWord, setCurrentWord] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [walletInfo, setWalletInfo] = useState<WalletInfo | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [keychainAvailable, setKeychainAvailable] = useState(false);
 
-  const networkId = network === 'mainnet' ? 1 : 0;
+  const networkId = network === "mainnet" ? 1 : 0;
 
   // Check if wallet exists
   useEffect(() => {
@@ -46,17 +51,17 @@ export function WalletRestore({ name, network }: WalletRestoreProps) {
         const exists = await walletExists(name);
         if (exists) {
           setError(`Wallet "${name}" already exists`);
-          setStep('error');
+          setStep("error");
         } else {
-          setStep('mnemonic');
+          setStep("mnemonic");
         }
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Unknown error');
-        setStep('error');
+        setError(err instanceof Error ? err.message : "Unknown error");
+        setStep("error");
       }
     };
 
-    if (step === 'checking') {
+    if (step === "checking") {
       checkWallet();
     }
   }, [step, name]);
@@ -69,39 +74,39 @@ export function WalletRestore({ name, network }: WalletRestoreProps) {
         setKeychainAvailable(available);
         if (available) {
           // Skip password prompts - go directly to restoring
-          setStep('restoring');
+          setStep("restoring");
         } else {
           // Need password
-          setStep('password');
+          setStep("password");
         }
       } catch {
         setKeychainAvailable(false);
-        setStep('password');
+        setStep("password");
       }
     };
 
-    if (step === 'checking-keychain') {
+    if (step === "checking-keychain") {
       checkKeychain();
     }
   }, [step]);
 
   // Handle keyboard input
   useInput((input, key) => {
-    if (step === 'mnemonic') {
+    if (step === "mnemonic") {
       if (key.return) {
         if (currentWord.trim()) {
           const word = currentWord.trim().toLowerCase();
           const newWords = [...mnemonicWords, word];
           setMnemonicWords(newWords);
-          setCurrentWord('');
+          setCurrentWord("");
 
           if (newWords.length === 24) {
             // Validate complete mnemonic
             if (validateMnemonic(newWords)) {
               setError(null);
-              setStep('checking-keychain');
+              setStep("checking-keychain");
             } else {
-              setError('Invalid mnemonic phrase. Please check your words and try again.');
+              setError("Invalid mnemonic phrase. Please check your words and try again.");
               setMnemonicWords([]);
             }
           }
@@ -113,64 +118,64 @@ export function WalletRestore({ name, network }: WalletRestoreProps) {
           // Remove last word
           setMnemonicWords((words) => words.slice(0, -1));
         }
-      } else if (input === ' ' && currentWord.trim()) {
+      } else if (input === " " && currentWord.trim()) {
         // Space also adds word
         const word = currentWord.trim().toLowerCase();
         const newWords = [...mnemonicWords, word];
         setMnemonicWords(newWords);
-        setCurrentWord('');
+        setCurrentWord("");
 
         if (newWords.length === 24) {
           if (validateMnemonic(newWords)) {
             setError(null);
-            setStep('checking-keychain');
+            setStep("checking-keychain");
           } else {
-            setError('Invalid mnemonic phrase. Please check your words and try again.');
+            setError("Invalid mnemonic phrase. Please check your words and try again.");
             setMnemonicWords([]);
           }
         }
       } else if (key.escape) {
         // Clear all
         setMnemonicWords([]);
-        setCurrentWord('');
+        setCurrentWord("");
         setError(null);
-      } else if (input && !key.ctrl && !key.meta && input !== ' ') {
+      } else if (input && !key.ctrl && !key.meta && input !== " ") {
         setCurrentWord((w) => w + input.toLowerCase());
       }
-    } else if (step === 'password') {
+    } else if (step === "password") {
       if (key.return) {
         if (password.length < 8) {
-          setError('Password must be at least 8 characters');
+          setError("Password must be at least 8 characters");
           return;
         }
         setError(null);
-        setStep('confirm-password');
+        setStep("confirm-password");
       } else if (key.backspace || key.delete) {
         setPassword((p) => p.slice(0, -1));
       } else if (key.escape) {
-        setPassword('');
-        setStep('mnemonic');
+        setPassword("");
+        setStep("mnemonic");
       } else if (input && !key.ctrl && !key.meta) {
         setPassword((p) => p + input);
       }
-    } else if (step === 'confirm-password') {
+    } else if (step === "confirm-password") {
       if (key.return) {
         if (confirmPassword !== password) {
-          setError('Passwords do not match');
-          setConfirmPassword('');
+          setError("Passwords do not match");
+          setConfirmPassword("");
           return;
         }
         setError(null);
-        setStep('restoring');
+        setStep("restoring");
       } else if (key.backspace || key.delete) {
         setConfirmPassword((p) => p.slice(0, -1));
       } else if (key.escape) {
-        setConfirmPassword('');
-        setStep('password');
+        setConfirmPassword("");
+        setStep("password");
       } else if (input && !key.ctrl && !key.meta) {
         setConfirmPassword((p) => p + input);
       }
-    } else if (step === 'complete' || step === 'error') {
+    } else if (step === "complete" || step === "error") {
       if (key.return || key.escape) {
         exit();
       }
@@ -187,20 +192,20 @@ export function WalletRestore({ name, network }: WalletRestoreProps) {
           password
         );
         setWalletInfo(info);
-        setStep('complete');
+        setStep("complete");
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to restore wallet');
-        setStep('error');
+        setError(err instanceof Error ? err.message : "Failed to restore wallet");
+        setStep("error");
       }
     };
 
-    if (step === 'restoring') {
+    if (step === "restoring") {
       doRestore();
     }
   }, [step, name, networkId, mnemonicWords, password]);
 
   // Render based on step
-  if (step === 'checking') {
+  if (step === "checking") {
     return (
       <Box>
         <Text>⏳ Checking wallet...</Text>
@@ -208,7 +213,7 @@ export function WalletRestore({ name, network }: WalletRestoreProps) {
     );
   }
 
-  if (step === 'checking-keychain') {
+  if (step === "checking-keychain") {
     return (
       <Box flexDirection="column" padding={1}>
         <Text color="green">✓ Mnemonic validated</Text>
@@ -217,7 +222,7 @@ export function WalletRestore({ name, network }: WalletRestoreProps) {
     );
   }
 
-  if (step === 'error') {
+  if (step === "error") {
     return (
       <Box flexDirection="column" padding={1}>
         <Text color="red">✗ Error: {error}</Text>
@@ -226,7 +231,7 @@ export function WalletRestore({ name, network }: WalletRestoreProps) {
     );
   }
 
-  if (step === 'mnemonic') {
+  if (step === "mnemonic") {
     return (
       <Box flexDirection="column" padding={1}>
         <Box marginBottom={1}>
@@ -245,7 +250,7 @@ export function WalletRestore({ name, network }: WalletRestoreProps) {
 
         <Box marginBottom={1}>
           <Text color="gray">Words entered: </Text>
-          <Text bold color={mnemonicWords.length === 24 ? 'green' : 'yellow'}>
+          <Text bold color={mnemonicWords.length === 24 ? "green" : "yellow"}>
             {mnemonicWords.length}/24
           </Text>
         </Box>
@@ -260,7 +265,7 @@ export function WalletRestore({ name, network }: WalletRestoreProps) {
                   if (idx >= mnemonicWords.length) return null;
                   return (
                     <Box key={idx} width={18}>
-                      <Text color="gray">{String(idx + 1).padStart(2, ' ')}. </Text>
+                      <Text color="gray">{String(idx + 1).padStart(2, " ")}. </Text>
                       <Text color="green">{mnemonicWords[idx]}</Text>
                     </Box>
                   );
@@ -291,7 +296,7 @@ export function WalletRestore({ name, network }: WalletRestoreProps) {
     );
   }
 
-  if (step === 'password') {
+  if (step === "password") {
     return (
       <Box flexDirection="column" padding={1}>
         <Box marginBottom={1}>
@@ -302,12 +307,12 @@ export function WalletRestore({ name, network }: WalletRestoreProps) {
 
         <Text color="green">✓ Mnemonic validated</Text>
         <Box marginTop={1}>
-          <Text color="yellow">OS keychain not available - using password encryption</Text>
+          <Text color="yellow">OS keychain not available - using password encryption. Run with DEBUG=begin-cli:keychain to see why.</Text>
         </Box>
 
         <Box marginTop={1}>
           <Text>Enter password (min 8 chars): </Text>
-          <Text>{'•'.repeat(password.length)}</Text>
+          <Text>{"•".repeat(password.length)}</Text>
           <Text color="gray">|</Text>
         </Box>
 
@@ -320,7 +325,7 @@ export function WalletRestore({ name, network }: WalletRestoreProps) {
     );
   }
 
-  if (step === 'confirm-password') {
+  if (step === "confirm-password") {
     return (
       <Box flexDirection="column" padding={1}>
         <Box marginBottom={1}>
@@ -331,7 +336,7 @@ export function WalletRestore({ name, network }: WalletRestoreProps) {
 
         <Box marginTop={1}>
           <Text>Confirm password: </Text>
-          <Text>{'•'.repeat(confirmPassword.length)}</Text>
+          <Text>{"•".repeat(confirmPassword.length)}</Text>
           <Text color="gray">|</Text>
         </Box>
 
@@ -344,20 +349,20 @@ export function WalletRestore({ name, network }: WalletRestoreProps) {
     );
   }
 
-  if (step === 'restoring') {
+  if (step === "restoring") {
     return (
       <Box flexDirection="column" padding={1}>
         <Text>⏳ Restoring wallet...</Text>
         <Text color="gray">
           {keychainAvailable
-            ? 'Deriving keys and storing in OS keychain...'
-            : 'Deriving keys and encrypting...'}
+            ? "Deriving keys and storing in OS keychain..."
+            : "Deriving keys and encrypting..."}
         </Text>
       </Box>
     );
   }
 
-  if (step === 'complete' && walletInfo) {
+  if (step === "complete" && walletInfo) {
     const usesKeychain = walletInfo.usesKeychain ?? keychainAvailable;
     return (
       <Box flexDirection="column" padding={1}>
@@ -374,12 +379,12 @@ export function WalletRestore({ name, network }: WalletRestoreProps) {
           </Box>
           <Box>
             <Text color="gray">Network: </Text>
-            <Text>{walletInfo.networkId === 1 ? 'mainnet' : 'testnet'}</Text>
+            <Text>{walletInfo.networkId === 1 ? "mainnet" : "testnet"}</Text>
           </Box>
           <Box>
             <Text color="gray">Storage: </Text>
-            <Text color={usesKeychain ? 'green' : 'yellow'}>
-              {usesKeychain ? 'OS Keychain (no password needed)' : 'Password encrypted'}
+            <Text color={usesKeychain ? "green" : "yellow"}>
+              {usesKeychain ? "OS Keychain (no password needed)" : "Password encrypted"}
             </Text>
           </Box>
           <Box marginTop={1}>

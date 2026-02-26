@@ -15,20 +15,20 @@ export enum ExitCode {
 
 export enum ErrorCode {
   // General errors (exit code 1)
-  UNKNOWN_ERROR = 'UNKNOWN_ERROR',
-  NETWORK_ERROR = 'NETWORK_ERROR',
-  CONFIG_ERROR = 'CONFIG_ERROR',
-  PROVIDER_ERROR = 'PROVIDER_ERROR',
-  WALLET_ERROR = 'WALLET_ERROR',
+  UNKNOWN_ERROR = "UNKNOWN_ERROR",
+  NETWORK_ERROR = "NETWORK_ERROR",
+  CONFIG_ERROR = "CONFIG_ERROR",
+  PROVIDER_ERROR = "PROVIDER_ERROR",
+  WALLET_ERROR = "WALLET_ERROR",
 
   // User errors (exit code 2)
-  INVALID_ARGUMENT = 'INVALID_ARGUMENT',
-  MISSING_ARGUMENT = 'MISSING_ARGUMENT',
-  INVALID_ADDRESS = 'INVALID_ADDRESS',
-  INVALID_AMOUNT = 'INVALID_AMOUNT',
-  WALLET_NOT_FOUND = 'WALLET_NOT_FOUND',
-  INSUFFICIENT_FUNDS = 'INSUFFICIENT_FUNDS',
-  UNKNOWN_COMMAND = 'UNKNOWN_COMMAND',
+  INVALID_ARGUMENT = "INVALID_ARGUMENT",
+  MISSING_ARGUMENT = "MISSING_ARGUMENT",
+  INVALID_ADDRESS = "INVALID_ADDRESS",
+  INVALID_AMOUNT = "INVALID_AMOUNT",
+  WALLET_NOT_FOUND = "WALLET_NOT_FOUND",
+  INSUFFICIENT_FUNDS = "INSUFFICIENT_FUNDS",
+  UNKNOWN_COMMAND = "UNKNOWN_COMMAND",
 }
 
 const userErrorCodes = new Set<ErrorCode>([
@@ -46,9 +46,13 @@ export class BeginError extends Error {
   public readonly exitCode: ExitCode;
   public readonly details?: Record<string, unknown>;
 
-  constructor(message: string, code: ErrorCode = ErrorCode.UNKNOWN_ERROR, details?: Record<string, unknown>) {
+  constructor(
+    message: string,
+    code: ErrorCode = ErrorCode.UNKNOWN_ERROR,
+    details?: Record<string, unknown>
+  ) {
     super(message);
-    this.name = 'BeginError';
+    this.name = "BeginError";
     this.code = code;
     this.exitCode = userErrorCodes.has(code) ? ExitCode.USER_ERROR : ExitCode.ERROR;
     this.details = details;
@@ -67,7 +71,9 @@ export class BeginError extends Error {
 // Convenience error factories
 export const errors = {
   missingArgument: (arg: string) =>
-    new BeginError(`Missing required argument: ${arg}`, ErrorCode.MISSING_ARGUMENT, { argument: arg }),
+    new BeginError(`Missing required argument: ${arg}`, ErrorCode.MISSING_ARGUMENT, {
+      argument: arg,
+    }),
 
   invalidArgument: (arg: string, reason?: string) =>
     new BeginError(
@@ -77,11 +83,15 @@ export const errors = {
     ),
 
   invalidAddress: (address?: string) =>
-    new BeginError('Invalid Cardano address', ErrorCode.INVALID_ADDRESS, address ? { address } : undefined),
+    new BeginError(
+      "Invalid Cardano address",
+      ErrorCode.INVALID_ADDRESS,
+      address ? { address } : undefined
+    ),
 
   invalidAmount: (amount?: string) =>
     new BeginError(
-      'Invalid amount: must be a positive number',
+      "Invalid amount: must be a positive number",
       ErrorCode.INVALID_AMOUNT,
       amount ? { amount } : undefined
     ),

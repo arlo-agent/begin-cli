@@ -4,8 +4,8 @@
  * Pure functions for fetching wallet/address balances.
  */
 
-import { createProvider, hasApiKey, type Asset } from '../lib/provider.js';
-import type { Network } from '../lib/config.js';
+import { createProvider, hasApiKey, type Asset } from "../lib/provider.js";
+import type { Network } from "../lib/config.js";
 
 export interface TokenInfo {
   policyId: string;
@@ -48,16 +48,20 @@ export interface UtxosResult {
 function lovelaceToAda(lovelace: bigint): string {
   const whole = lovelace / 1_000_000n;
   const frac = lovelace % 1_000_000n;
-  return `${whole.toString()}.${frac.toString().padStart(6, '0')}`;
+  return `${whole.toString()}.${frac.toString().padStart(6, "0")}`;
 }
 
-function parseAssetUnit(unit: string): { policyId: string; assetName: string; assetNameHex: string } {
+function parseAssetUnit(unit: string): {
+  policyId: string;
+  assetName: string;
+  assetNameHex: string;
+} {
   const policyId = unit.slice(0, 56);
   const assetNameHex = unit.slice(56);
-  let assetName = '';
+  let assetName = "";
   if (assetNameHex) {
     try {
-      assetName = Buffer.from(assetNameHex, 'hex').toString('utf8');
+      assetName = Buffer.from(assetNameHex, "hex").toString("utf8");
     } catch {
       assetName = assetNameHex;
     }
@@ -69,23 +73,23 @@ function getMockBalance(address: string, network: Network): BalanceResult {
   return {
     address,
     network,
-    lovelace: '125430000',
-    ada: '125.430000',
+    lovelace: "125430000",
+    ada: "125.430000",
     tokenCount: 2,
     tokens: [
       {
-        policyId: 'a0028f350aaabe0545fdcb56b039bfb08e4bb4d8c4d7c3c7d481c235',
-        assetName: 'HOSKY',
-        assetNameHex: '484f534b59',
-        quantity: '1000000',
-        unit: 'a0028f350aaabe0545fdcb56b039bfb08e4bb4d8c4d7c3c7d481c235484f534b59',
+        policyId: "a0028f350aaabe0545fdcb56b039bfb08e4bb4d8c4d7c3c7d481c235",
+        assetName: "HOSKY",
+        assetNameHex: "484f534b59",
+        quantity: "1000000",
+        unit: "a0028f350aaabe0545fdcb56b039bfb08e4bb4d8c4d7c3c7d481c235484f534b59",
       },
       {
-        policyId: 'b0028f350aaabe0545fdcb56b039bfb08e4bb4d8c4d7c3c7d481c235',
-        assetName: 'SNEK',
-        assetNameHex: '534e454b',
-        quantity: '500',
-        unit: 'b0028f350aaabe0545fdcb56b039bfb08e4bb4d8c4d7c3c7d481c235534e454b',
+        policyId: "b0028f350aaabe0545fdcb56b039bfb08e4bb4d8c4d7c3c7d481c235",
+        assetName: "SNEK",
+        assetNameHex: "534e454b",
+        quantity: "500",
+        unit: "b0028f350aaabe0545fdcb56b039bfb08e4bb4d8c4d7c3c7d481c235534e454b",
       },
     ],
     mock: true,
@@ -95,23 +99,25 @@ function getMockBalance(address: string, network: Network): BalanceResult {
 function getMockUtxos(address: string, network: Network): UtxosResult {
   const utxos: UtxoInfo[] = [
     {
-      txHash: 'abc123def456789abc123def456789abc123def456789abc123def456789abcd',
+      txHash: "abc123def456789abc123def456789abc123def456789abc123def456789abcd",
       outputIndex: 0,
-      lovelace: '50000000',
-      ada: '50.000000',
-      tokens: [{
-        policyId: 'a0028f350aaabe0545fdcb56b039bfb08e4bb4d8c4d7c3c7d481c235',
-        assetName: 'HOSKY',
-        assetNameHex: '484f534b59',
-        quantity: '1000000',
-        unit: 'a0028f350aaabe0545fdcb56b039bfb08e4bb4d8c4d7c3c7d481c235484f534b59',
-      }],
+      lovelace: "50000000",
+      ada: "50.000000",
+      tokens: [
+        {
+          policyId: "a0028f350aaabe0545fdcb56b039bfb08e4bb4d8c4d7c3c7d481c235",
+          assetName: "HOSKY",
+          assetNameHex: "484f534b59",
+          quantity: "1000000",
+          unit: "a0028f350aaabe0545fdcb56b039bfb08e4bb4d8c4d7c3c7d481c235484f534b59",
+        },
+      ],
     },
     {
-      txHash: 'def456789abc123def456789abc123def456789abc123def456789abc123defa',
+      txHash: "def456789abc123def456789abc123def456789abc123def456789abc123defa",
       outputIndex: 1,
-      lovelace: '75430000',
-      ada: '75.430000',
+      lovelace: "75430000",
+      ada: "75.430000",
       tokens: [],
     },
   ];
@@ -143,7 +149,7 @@ export async function getBalance(address: string, network: Network): Promise<Bal
 
   for (const utxo of utxos) {
     for (const asset of utxo.output.amount as Asset[]) {
-      if (asset.unit === 'lovelace') {
+      if (asset.unit === "lovelace") {
         totalLovelace += BigInt(asset.quantity);
       } else {
         const current = tokenMap.get(asset.unit) || 0n;
@@ -185,10 +191,10 @@ export async function getUtxos(address: string, network: Network): Promise<Utxos
   const rawUtxos = await provider.fetchAddressUTxOs(address);
 
   const utxos: UtxoInfo[] = rawUtxos.map((utxo) => {
-    const lovelace = utxo.output.amount.find((a: Asset) => a.unit === 'lovelace');
-    const lovelaceStr = lovelace?.quantity || '0';
+    const lovelace = utxo.output.amount.find((a: Asset) => a.unit === "lovelace");
+    const lovelaceStr = lovelace?.quantity || "0";
     const tokens = utxo.output.amount
-      .filter((a: Asset) => a.unit !== 'lovelace')
+      .filter((a: Asset) => a.unit !== "lovelace")
       .map((a: Asset) => ({
         ...parseAssetUnit(a.unit),
         quantity: a.quantity,

@@ -6,43 +6,40 @@
  * falls back to password-based encryption otherwise.
  */
 
-import React, { useState, useEffect } from 'react';
-import { Box, Text, useInput, useApp } from 'ink';
-import { createWallet, walletExists, type WalletInfo } from '../../lib/wallet.js';
-import { isKeychainAvailable } from '../../lib/keystore.js';
+import React, { useState, useEffect } from "react";
+import { Box, Text, useInput, useApp } from "ink";
+import { createWallet, walletExists, type WalletInfo } from "../../lib/wallet.js";
+import { isKeychainAvailable } from "../../lib/keystore.js";
 
 interface WalletCreateProps {
   name: string;
   network: string;
+  showSeed?: boolean;
 }
 
 type Step =
-  | 'checking'
-  | 'checking-keychain'
-  | 'password'
-  | 'confirm-password'
-  | 'creating'
-  | 'show-mnemonic'
-  | 'verify'
-  | 'complete'
-  | 'error';
+  | "checking"
+  | "checking-keychain"
+  | "password"
+  | "confirm-password"
+  | "creating"
+  | "show-mnemonic"
+  | "complete"
+  | "error";
 
-export function WalletCreate({ name, network }: WalletCreateProps) {
+export function WalletCreate({ name, network, showSeed = false }: WalletCreateProps) {
   const { exit } = useApp();
-  const [step, setStep] = useState<Step>('checking');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
+  const [step, setStep] = useState<Step>("checking");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [mnemonic, setMnemonic] = useState<string[]>([]);
   const [walletInfo, setWalletInfo] = useState<WalletInfo | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [verifyIndices, setVerifyIndices] = useState<number[]>([]);
-  const [verifyInput, setVerifyInput] = useState('');
-  const [verifyStep, setVerifyStep] = useState(0);
   const [passwordVisible, setPasswordVisible] = useState(false);
   const [keychainAvailable, setKeychainAvailable] = useState(false);
   const [usesKeychain, setUsesKeychain] = useState(false);
 
-  const networkId = network === 'mainnet' ? 1 : 0;
+  const networkId = network === "mainnet" ? 1 : 0;
 
   // Check if wallet exists
   useEffect(() => {
@@ -51,17 +48,17 @@ export function WalletCreate({ name, network }: WalletCreateProps) {
         const exists = await walletExists(name);
         if (exists) {
           setError(`Wallet "${name}" already exists`);
-          setStep('error');
+          setStep("error");
         } else {
-          setStep('checking-keychain');
+          setStep("checking-keychain");
         }
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Unknown error');
-        setStep('error');
+        setError(err instanceof Error ? err.message : "Unknown error");
+        setStep("error");
       }
     };
 
-    if (step === 'checking') {
+    if (step === "checking") {
       checkWallet();
     }
   }, [step, name]);
@@ -74,96 +71,61 @@ export function WalletCreate({ name, network }: WalletCreateProps) {
         setKeychainAvailable(available);
         if (available) {
           // Skip password prompts - go directly to creating
-          setStep('creating');
+          setStep("creating");
         } else {
           // Need password
-          setStep('password');
+          setStep("password");
         }
       } catch {
         // Keychain not available, need password
         setKeychainAvailable(false);
-        setStep('password');
+        setStep("password");
       }
     };
 
-    if (step === 'checking-keychain') {
+    if (step === "checking-keychain") {
       checkKeychain();
     }
   }, [step]);
 
   // Handle keyboard input
   useInput((input, key) => {
-    if (step === 'password') {
+    if (step === "password") {
       if (key.return) {
         if (password.length < 8) {
-          setError('Password must be at least 8 characters');
+          setError("Password must be at least 8 characters");
           return;
         }
         setError(null);
-        setStep('confirm-password');
+        setStep("confirm-password");
       } else if (key.backspace || key.delete) {
         setPassword((p) => p.slice(0, -1));
       } else if (input && !key.ctrl && !key.meta) {
         setPassword((p) => p + input);
       }
-    } else if (step === 'confirm-password') {
+    } else if (step === "confirm-password") {
       if (key.return) {
         if (confirmPassword !== password) {
-          setError('Passwords do not match');
-          setConfirmPassword('');
+          setError("Passwords do not match");
+          setConfirmPassword("");
           return;
         }
         setError(null);
-        setStep('creating');
+        setStep("creating");
       } else if (key.backspace || key.delete) {
         setConfirmPassword((p) => p.slice(0, -1));
       } else if (key.escape) {
-        setPassword('');
-        setConfirmPassword('');
-        setStep('password');
+        setPassword("");
+        setConfirmPassword("");
+        setStep("password");
       } else if (input && !key.ctrl && !key.meta) {
         setConfirmPassword((p) => p + input);
       }
-    } else if (step === 'show-mnemonic') {
+    } else if (step === "show-mnemonic") {
       if (key.return) {
-        // Select 3 random words to verify
-        const indices: number[] = [];
-        while (indices.length < 3) {
-          const idx = Math.floor(Math.random() * 24);
-          if (!indices.includes(idx)) {
-            indices.push(idx);
-          }
-        }
-        indices.sort((a, b) => a - b);
-        setVerifyIndices(indices);
-        setStep('verify');
+        setStep("complete");
       }
-    } else if (step === 'verify') {
-      if (key.return) {
-        const expectedWord = mnemonic[verifyIndices[verifyStep]];
-        if (verifyInput.toLowerCase().trim() === expectedWord.toLowerCase()) {
-          if (verifyStep < 2) {
-            setVerifyStep((v) => v + 1);
-            setVerifyInput('');
-            setError(null);
-          } else {
-            setStep('complete');
-          }
-        } else {
-          setError(`Incorrect word. Please try again.`);
-          setVerifyInput('');
-        }
-      } else if (key.backspace || key.delete) {
-        setVerifyInput((v) => v.slice(0, -1));
-      } else if (key.escape) {
-        setStep('show-mnemonic');
-        setVerifyStep(0);
-        setVerifyInput('');
-        setError(null);
-      } else if (input && !key.ctrl && !key.meta) {
-        setVerifyInput((v) => v + input);
-      }
-    } else if (step === 'complete' || step === 'error') {
+    } else if (step === "complete" || step === "error") {
       if (key.return || key.escape) {
         exit();
       }
@@ -178,20 +140,27 @@ export function WalletCreate({ name, network }: WalletCreateProps) {
         setMnemonic(result.mnemonic);
         setWalletInfo(result.walletInfo);
         setUsesKeychain(result.usesKeychain);
-        setStep('show-mnemonic');
+        setStep(showSeed ? "show-mnemonic" : "complete");
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to create wallet');
-        setStep('error');
+        setError(err instanceof Error ? err.message : "Failed to create wallet");
+        setStep("error");
       }
     };
 
-    if (step === 'creating') {
+    if (step === "creating") {
       doCreate();
     }
-  }, [step, name, networkId, password]);
+  }, [step, name, networkId, password, showSeed]);
+
+  // Silent mode: auto exit when creation completes (no Press Enter)
+  useEffect(() => {
+    if (step === "complete" && !showSeed) {
+      exit();
+    }
+  }, [step, showSeed, exit]);
 
   // Render based on step
-  if (step === 'checking') {
+  if (step === "checking") {
     return (
       <Box>
         <Text>⏳ Checking wallet...</Text>
@@ -199,7 +168,7 @@ export function WalletCreate({ name, network }: WalletCreateProps) {
     );
   }
 
-  if (step === 'checking-keychain') {
+  if (step === "checking-keychain") {
     return (
       <Box>
         <Text>⏳ Checking keychain availability...</Text>
@@ -207,7 +176,7 @@ export function WalletCreate({ name, network }: WalletCreateProps) {
     );
   }
 
-  if (step === 'error') {
+  if (step === "error") {
     return (
       <Box flexDirection="column" padding={1}>
         <Text color="red">✗ Error: {error}</Text>
@@ -216,7 +185,7 @@ export function WalletCreate({ name, network }: WalletCreateProps) {
     );
   }
 
-  if (step === 'password') {
+  if (step === "password") {
     return (
       <Box flexDirection="column" padding={1}>
         <Box marginBottom={1}>
@@ -228,11 +197,11 @@ export function WalletCreate({ name, network }: WalletCreateProps) {
         <Text color="gray">Wallet name: </Text>
         <Text bold>{name}</Text>
         <Box marginTop={1}>
-          <Text color="yellow">OS keychain not available - using password encryption</Text>
+          <Text color="yellow">OS keychain not available - using password encryption. Run with DEBUG=begin-cli:keychain to see why.</Text>
         </Box>
         <Box marginTop={1}>
           <Text>Enter password (min 8 chars): </Text>
-          <Text>{passwordVisible ? password : '•'.repeat(password.length)}</Text>
+          <Text>{passwordVisible ? password : "•".repeat(password.length)}</Text>
           <Text color="gray">|</Text>
         </Box>
         {error && <Text color="red">{error}</Text>}
@@ -243,7 +212,7 @@ export function WalletCreate({ name, network }: WalletCreateProps) {
     );
   }
 
-  if (step === 'confirm-password') {
+  if (step === "confirm-password") {
     return (
       <Box flexDirection="column" padding={1}>
         <Box marginBottom={1}>
@@ -253,7 +222,7 @@ export function WalletCreate({ name, network }: WalletCreateProps) {
         </Box>
         <Box marginTop={1}>
           <Text>Confirm password: </Text>
-          <Text>{'•'.repeat(confirmPassword.length)}</Text>
+          <Text>{"•".repeat(confirmPassword.length)}</Text>
           <Text color="gray">|</Text>
         </Box>
         {error && <Text color="red">{error}</Text>}
@@ -264,20 +233,20 @@ export function WalletCreate({ name, network }: WalletCreateProps) {
     );
   }
 
-  if (step === 'creating') {
+  if (step === "creating") {
     return (
       <Box flexDirection="column" padding={1}>
         <Text>⏳ Creating wallet...</Text>
         <Text color="gray">
           {keychainAvailable
-            ? 'Generating keys and storing in OS keychain...'
-            : 'Generating keys and encrypting...'}
+            ? "Generating keys and storing in OS keychain..."
+            : "Generating keys and encrypting..."}
         </Text>
       </Box>
     );
   }
 
-  if (step === 'show-mnemonic') {
+  if (step === "show-mnemonic") {
     return (
       <Box flexDirection="column" padding={1}>
         <Box marginBottom={1}>
@@ -302,7 +271,7 @@ export function WalletCreate({ name, network }: WalletCreateProps) {
                 const idx = row * 4 + col;
                 return (
                   <Box key={idx} width={20}>
-                    <Text color="gray">{String(idx + 1).padStart(2, ' ')}. </Text>
+                    <Text color="gray">{String(idx + 1).padStart(2, " ")}. </Text>
                     <Text bold>{mnemonic[idx]}</Text>
                   </Box>
                 );
@@ -318,79 +287,66 @@ export function WalletCreate({ name, network }: WalletCreateProps) {
     );
   }
 
-  if (step === 'verify') {
-    const wordNum = verifyIndices[verifyStep] + 1;
-    return (
-      <Box flexDirection="column" padding={1}>
-        <Box marginBottom={1}>
-          <Text bold color="cyan">
-            Verify Recovery Phrase
-          </Text>
-          <Text color="gray"> ({verifyStep + 1}/3)</Text>
-        </Box>
-
-        <Box marginTop={1}>
-          <Text>Enter word #{wordNum}: </Text>
-          <Text>{verifyInput}</Text>
-          <Text color="gray">|</Text>
-        </Box>
-
-        {error && <Text color="red">{error}</Text>}
-
-        <Box marginTop={1}>
-          <Text color="gray">Press Enter to verify, Esc to see words again</Text>
-        </Box>
-      </Box>
-    );
-  }
-
-  if (step === 'complete' && walletInfo) {
-    return (
-      <Box flexDirection="column" padding={1}>
-        <Box marginBottom={1}>
+  if (step === "complete") {
+    // Silent mode: minimal message only (auto exit, no Press Enter)
+    if (!showSeed) {
+      return (
+        <Box flexDirection="column" padding={1}>
           <Text bold color="green">
-            ✓ Wallet Ready!
+            Secure wallet created
           </Text>
         </Box>
-
-        <Box flexDirection="column">
-          <Box>
-            <Text color="gray">Name: </Text>
-            <Text bold>{walletInfo.name}</Text>
-          </Box>
-          <Box>
-            <Text color="gray">Network: </Text>
-            <Text>{walletInfo.networkId === 1 ? 'mainnet' : 'testnet'}</Text>
-          </Box>
-          <Box>
-            <Text color="gray">Storage: </Text>
-            <Text color={usesKeychain ? 'green' : 'yellow'}>
-              {usesKeychain ? 'OS Keychain (no password needed)' : 'Password encrypted'}
+      );
+    }
+    // Show-seed mode: full summary (walletInfo required)
+    if (walletInfo) {
+      return (
+        <Box flexDirection="column" padding={1}>
+          <Box marginBottom={1}>
+            <Text bold color="green">
+              ✓ Wallet Ready!
             </Text>
           </Box>
-          <Box marginTop={1}>
-            <Text color="gray">Payment Address:</Text>
-          </Box>
-          <Box paddingLeft={2}>
-            <Text>{walletInfo.paymentAddress}</Text>
-          </Box>
-          {walletInfo.stakeAddress && (
-            <>
-              <Box marginTop={1}>
-                <Text color="gray">Stake Address:</Text>
-              </Box>
-              <Box paddingLeft={2}>
-                <Text>{walletInfo.stakeAddress}</Text>
-              </Box>
-            </>
-          )}
-        </Box>
 
-        <Box marginTop={1}>
-          <Text color="gray">Press Enter to exit</Text>
+          <Box flexDirection="column">
+            <Box>
+              <Text color="gray">Name: </Text>
+              <Text bold>{walletInfo.name}</Text>
+            </Box>
+            <Box>
+              <Text color="gray">Network: </Text>
+              <Text>{walletInfo.networkId === 1 ? "mainnet" : "testnet"}</Text>
+            </Box>
+            <Box>
+              <Text color="gray">Storage: </Text>
+              <Text color={usesKeychain ? "green" : "yellow"}>
+                {usesKeychain ? "OS Keychain (no password needed)" : "Password encrypted"}
+              </Text>
+            </Box>
+            <Box marginTop={1}>
+              <Text color="gray">Payment Address:</Text>
+            </Box>
+            <Box paddingLeft={2}>
+              <Text>{walletInfo.paymentAddress}</Text>
+            </Box>
+            {walletInfo.stakeAddress && (
+              <>
+                <Box marginTop={1}>
+                  <Text color="gray">Stake Address:</Text>
+                </Box>
+                <Box paddingLeft={2}>
+                  <Text>{walletInfo.stakeAddress}</Text>
+                </Box>
+              </>
+            )}
+          </Box>
+
+          <Box marginTop={1}>
+            <Text color="gray">Press Enter to exit</Text>
+          </Box>
         </Box>
-      </Box>
-    );
+      );
+    }
   }
 
   return null;

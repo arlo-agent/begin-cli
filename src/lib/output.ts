@@ -2,7 +2,7 @@
  * Output helpers for JSON vs pretty print modes.
  */
 
-import { BeginError, toBeginError, ExitCode } from './errors.js';
+import { BeginError, toBeginError, ExitCode } from "./errors.js";
 
 export interface OutputContext {
   json: boolean;
@@ -83,10 +83,10 @@ export function exitSuccess<T>(data?: T): never {
  * Format ADA amount from lovelace (safe BigInt math).
  */
 export function formatAda(lovelace: bigint | number | string): string {
-  const amount = typeof lovelace === 'bigint' ? lovelace : BigInt(lovelace);
+  const amount = typeof lovelace === "bigint" ? lovelace : BigInt(lovelace);
   const whole = amount / 1_000_000n;
   const frac = amount % 1_000_000n;
-  return `${whole.toString()}.${frac.toString().padStart(6, '0')}`;
+  return `${whole.toString()}.${frac.toString().padStart(6, "0")}`;
 }
 
 /**
@@ -108,7 +108,7 @@ export function formatAddress(address: string, length = 16): string {
  * Format timestamp (Date or unix seconds) as ISO.
  */
 export function formatTimestamp(date: Date | number): string {
-  const d = typeof date === 'number' ? new Date(date * 1000) : date;
+  const d = typeof date === "number" ? new Date(date * 1000) : date;
   return d.toISOString();
 }
 

@@ -1,11 +1,11 @@
-import React, { useState, useEffect } from 'react';
-import { Box, Text, useApp } from 'ink';
+import React, { useState, useEffect } from "react";
+import { Box, Text, useApp } from "ink";
 import {
   submitTransactionFromFile,
   waitForConfirmation,
   loadTxFromFile,
   type TransactionConfig,
-} from '../lib/transaction.js';
+} from "../lib/transaction.js";
 
 interface SubmitProps {
   txFile: string;
@@ -14,12 +14,7 @@ interface SubmitProps {
   jsonOutput?: boolean;
 }
 
-type SubmitState = 
-  | 'loading'
-  | 'submitting'
-  | 'confirming'
-  | 'success'
-  | 'error';
+type SubmitState = "loading" | "submitting" | "confirming" | "success" | "error";
 
 interface SubmitInfo {
   txHash: string;
@@ -27,14 +22,9 @@ interface SubmitInfo {
   confirmations?: number;
 }
 
-export function Submit({
-  txFile,
-  network,
-  wait = true,
-  jsonOutput = false,
-}: SubmitProps) {
+export function Submit({ txFile, network, wait = true, jsonOutput = false }: SubmitProps) {
   const { exit } = useApp();
-  const [state, setState] = useState<SubmitState>('loading');
+  const [state, setState] = useState<SubmitState>("loading");
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<SubmitInfo | null>(null);
   const [attempts, setAttempts] = useState(0);
@@ -46,12 +36,12 @@ export function Submit({
       try {
         // Verify file exists
         loadTxFromFile(txFile);
-        
-        setState('submitting');
-        
+
+        setState("submitting");
+
         // Submit transaction
         const submitResult = await submitTransactionFromFile(config, txFile);
-        
+
         setInfo({
           txHash: submitResult.txHash,
           confirmed: false,
@@ -60,81 +50,87 @@ export function Submit({
         // If not waiting for confirmation
         if (!wait) {
           if (jsonOutput) {
-            console.log(JSON.stringify({
-              status: 'submitted',
-              txHash: submitResult.txHash,
-              network,
-              confirmed: false,
-            }));
+            console.log(
+              JSON.stringify({
+                status: "submitted",
+                txHash: submitResult.txHash,
+                network,
+                confirmed: false,
+              })
+            );
           }
-          setState('success');
+          setState("success");
           setTimeout(() => exit(), 1000);
           return;
         }
 
         // Wait for confirmation
-        setState('confirming');
-        
+        setState("confirming");
+
         // Custom confirmation loop for progress updates
         const maxAttempts = 60;
         const intervalMs = 5000;
-        
+
         for (let i = 0; i < maxAttempts; i++) {
           setAttempts(i + 1);
-          
+
           const confirmResult = await waitForConfirmation(
             config,
             submitResult.txHash,
             1, // Single attempt
-            0  // No delay (we handle it)
+            0 // No delay (we handle it)
           );
-          
+
           if (confirmResult.confirmed) {
             setInfo({
               txHash: submitResult.txHash,
               confirmed: true,
               confirmations: confirmResult.confirmations,
             });
-            
+
             if (jsonOutput) {
-              console.log(JSON.stringify({
-                status: 'confirmed',
-                txHash: submitResult.txHash,
-                network,
-                confirmed: true,
-              }));
+              console.log(
+                JSON.stringify({
+                  status: "confirmed",
+                  txHash: submitResult.txHash,
+                  network,
+                  confirmed: true,
+                })
+              );
             }
-            
-            setState('success');
+
+            setState("success");
             setTimeout(() => exit(), 1000);
             return;
           }
-          
+
           // Wait before next attempt
           await new Promise((resolve) => setTimeout(resolve, intervalMs));
         }
-        
+
         // Timed out waiting for confirmation
         setInfo({
           txHash: submitResult.txHash,
           confirmed: false,
         });
-        
+
         if (jsonOutput) {
-          console.log(JSON.stringify({
-            status: 'submitted',
-            txHash: submitResult.txHash,
-            network,
-            confirmed: false,
-            note: 'Confirmation timed out, check tx hash manually',
-          }));
+          console.log(
+            JSON.stringify({
+              status: "submitted",
+              txHash: submitResult.txHash,
+              network,
+              confirmed: false,
+              note: "Confirmation timed out, check tx hash manually",
+            })
+          );
         }
-        
-        setState('success');
+
+        setState("success");
         setTimeout(() => exit(), 1000);
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Submission failed');
-        setState('error');
+        setError(err instanceof Error ? err.message : "Submission failed");
+        setState("error");
         setTimeout(() => exit(), 1500);
       }
     };
@@ -142,7 +138,7 @@ export function Submit({
     submit();
   }, []);
 
-  if (state === 'loading') {
+  if (state === "loading") {
     return (
       <Box padding={1}>
         <Text color="cyan">⏳ Loading signed transaction...</Text>
@@ -150,7 +146,7 @@ export function Submit({
     );
   }
 
-  if (state === 'submitting') {
+  if (state === "submitting") {
     return (
       <Box flexDirection="column" padding={1}>
         <Text color="cyan">📤 Submitting transaction to {network}...</Text>
@@ -158,7 +154,7 @@ export function Submit({
     );
   }
 
-  if (state === 'confirming') {
+  if (state === "confirming") {
     return (
       <Box flexDirection="column" padding={1}>
         <Text color="cyan">⏳ Waiting for confirmation... (attempt {attempts}/60)</Text>
@@ -173,7 +169,7 @@ export function Submit({
     );
   }
 
-  if (state === 'error') {
+  if (state === "error") {
     return (
       <Box flexDirection="column" padding={1}>
         <Text color="red">✗ Error: {error}</Text>
@@ -195,7 +191,7 @@ export function Submit({
       ) : (
         <Text color="yellow">✓ Transaction submitted (confirmation pending)</Text>
       )}
-      
+
       <Box marginTop={1} flexDirection="column">
         <Box>
           <Text color="gray">TX Hash: </Text>
@@ -207,16 +203,17 @@ export function Submit({
         </Box>
         {info?.confirmed && (
           <Box>
-            <Text color="gray">Status:  </Text>
+            <Text color="gray">Status: </Text>
             <Text color="green">Confirmed</Text>
           </Box>
         )}
       </Box>
-      
+
       <Box marginTop={1}>
         <Text color="gray">View on: </Text>
         <Text color="blue">
-          https://{network === 'mainnet' ? '' : network + '.'}cardanoscan.io/transaction/{info?.txHash}
+          https://{network === "mainnet" ? "" : network + "."}cardanoscan.io/transaction/
+          {info?.txHash}
         </Text>
       </Box>
     </Box>

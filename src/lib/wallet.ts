@@ -7,12 +7,12 @@
  * - v1 (password): Uses password-derived key (backward compatible)
  */
 
-import { MeshWallet } from '@meshsdk/core';
-import * as bip39 from 'bip39';
-import * as crypto from 'crypto';
-import * as fs from 'fs/promises';
-import * as path from 'path';
-import { homedir } from 'os';
+import { MeshWallet } from "@meshsdk/core";
+import * as bip39 from "bip39";
+import * as crypto from "crypto";
+import * as fs from "fs/promises";
+import * as path from "path";
+import { homedir } from "os";
 import {
   isKeychainAvailable,
   setKeychainKey,
@@ -20,7 +20,7 @@ import {
   generateEncryptionKey,
   encryptWithKey,
   type WalletFileV2,
-} from './keystore.js';
+} from "./keystore.js";
 
 // Encryption constants
 const SCRYPT_N = 2 ** 14; // CPU/memory cost parameter
@@ -91,7 +91,7 @@ export interface CreateWalletResult {
  * Get the wallets directory path
  */
 export function getWalletsDir(): string {
-  return path.join(homedir(), '.begin-cli', 'wallets');
+  return path.join(homedir(), ".begin-cli", "wallets");
 }
 
 /**
@@ -126,14 +126,14 @@ export async function walletExists(name: string): Promise<boolean> {
  */
 export function generateMnemonic(): string[] {
   const mnemonic = bip39.generateMnemonic(256); // 256 bits = 24 words
-  return mnemonic.split(' ');
+  return mnemonic.split(" ");
 }
 
 /**
  * Validate a BIP39 mnemonic
  */
 export function validateMnemonic(words: string[]): boolean {
-  const mnemonic = words.join(' ');
+  const mnemonic = words.join(" ");
   return bip39.validateMnemonic(mnemonic);
 }
 
@@ -164,18 +164,18 @@ function encryptMnemonic(
   const iv = crypto.randomBytes(IV_LENGTH);
   const key = deriveKey(password, salt);
 
-  const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
+  const cipher = crypto.createCipheriv("aes-256-gcm", key, iv);
   const plaintext = JSON.stringify(mnemonic);
 
-  const encrypted = Buffer.concat([cipher.update(plaintext, 'utf8'), cipher.final()]);
+  const encrypted = Buffer.concat([cipher.update(plaintext, "utf8"), cipher.final()]);
 
   const authTag = cipher.getAuthTag();
 
   return {
-    salt: salt.toString('hex'),
-    iv: iv.toString('hex'),
-    authTag: authTag.toString('hex'),
-    ciphertext: encrypted.toString('hex'),
+    salt: salt.toString("hex"),
+    iv: iv.toString("hex"),
+    authTag: authTag.toString("hex"),
+    ciphertext: encrypted.toString("hex"),
   };
 }
 
@@ -191,19 +191,19 @@ export function decryptMnemonic(
   },
   password: string
 ): string[] {
-  const salt = Buffer.from(encrypted.salt, 'hex');
-  const iv = Buffer.from(encrypted.iv, 'hex');
-  const authTag = Buffer.from(encrypted.authTag, 'hex');
-  const ciphertext = Buffer.from(encrypted.ciphertext, 'hex');
+  const salt = Buffer.from(encrypted.salt, "hex");
+  const iv = Buffer.from(encrypted.iv, "hex");
+  const authTag = Buffer.from(encrypted.authTag, "hex");
+  const ciphertext = Buffer.from(encrypted.ciphertext, "hex");
 
   const key = deriveKey(password, salt);
 
-  const decipher = crypto.createDecipheriv('aes-256-gcm', key, iv);
+  const decipher = crypto.createDecipheriv("aes-256-gcm", key, iv);
   decipher.setAuthTag(authTag);
 
   const decrypted = Buffer.concat([decipher.update(ciphertext), decipher.final()]);
 
-  return JSON.parse(decrypted.toString('utf8'));
+  return JSON.parse(decrypted.toString("utf8"));
 }
 
 /**
@@ -213,7 +213,7 @@ export function createMeshWallet(mnemonic: string[], networkId: 0 | 1): MeshWall
   return new MeshWallet({
     networkId,
     key: {
-      type: 'mnemonic',
+      type: "mnemonic",
       words: mnemonic,
     },
   });
@@ -338,7 +338,7 @@ export async function restoreWallet(
 ): Promise<WalletInfo> {
   // Validate mnemonic
   if (!validateMnemonic(mnemonic)) {
-    throw new Error('Invalid mnemonic phrase');
+    throw new Error("Invalid mnemonic phrase");
   }
 
   // Check if wallet already exists
@@ -435,7 +435,7 @@ export async function restoreWallet(
  */
 export async function loadWalletFile(name: string): Promise<WalletFile> {
   const filePath = getWalletPath(name);
-  const content = await fs.readFile(filePath, 'utf8');
+  const content = await fs.readFile(filePath, "utf8");
   return JSON.parse(content) as WalletFile;
 }
 
@@ -449,7 +449,7 @@ export async function unlockWallet(name: string, password: string): Promise<Mesh
 
   if (walletFile.version === 2) {
     // v2: Use keychain - import loadWalletWithKeychain from keystore
-    const { loadWalletWithKeychain } = await import('./keystore.js');
+    const { loadWalletWithKeychain } = await import("./keystore.js");
     const mnemonicStr = await loadWalletWithKeychain(name);
     const mnemonic = mnemonicStr.split(/\s+/);
     return createMeshWallet(mnemonic, walletFile.networkId);
@@ -467,7 +467,7 @@ export async function listWallets(): Promise<string[]> {
   try {
     const dir = getWalletsDir();
     const files = await fs.readdir(dir);
-    return files.filter((f) => f.endsWith('.json')).map((f) => f.replace('.json', ''));
+    return files.filter((f) => f.endsWith(".json")).map((f) => f.replace(".json", ""));
   } catch {
     return [];
   }

@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import { Box, Text, useInput, useApp } from 'ink';
-import TextInput from 'ink-text-input';
+import React, { useState, useEffect } from "react";
+import { Box, Text, useInput, useApp } from "ink";
+import TextInput from "ink-text-input";
 import {
   loadWallet,
   signTransactionFromFile,
@@ -8,8 +8,8 @@ import {
   loadTxFromFile,
   checkWalletAvailability,
   type TransactionConfig,
-} from '../lib/transaction.js';
-import { getPasswordFromEnv, PASSWORD_ENV_VAR } from '../lib/keystore.js';
+} from "../lib/transaction.js";
+import { getPasswordFromEnv, PASSWORD_ENV_VAR } from "../lib/keystore.js";
 
 interface SignProps {
   txFile: string;
@@ -20,7 +20,7 @@ interface SignProps {
   jsonOutput?: boolean;
 }
 
-type SignState = 'checking' | 'password' | 'signing' | 'success' | 'error';
+type SignState = "checking" | "password" | "signing" | "success" | "error";
 
 export function Sign({
   txFile,
@@ -31,11 +31,11 @@ export function Sign({
   jsonOutput = false,
 }: SignProps) {
   const { exit } = useApp();
-  const [state, setState] = useState<SignState>('checking');
+  const [state, setState] = useState<SignState>("checking");
   const [error, setError] = useState<string | null>(null);
-  const [password, setPassword] = useState(initialPassword || '');
+  const [password, setPassword] = useState(initialPassword || "");
   const [walletInfo, setWalletInfo] = useState<{
-    source: 'env' | 'wallet' | 'keychain';
+    source: "env" | "wallet" | "keychain";
     walletName?: string;
     needsPassword: boolean;
   } | null>(null);
@@ -52,17 +52,17 @@ export function Sign({
       // Verify tx file exists first
       loadTxFromFile(txFile);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load transaction file');
-      setState('error');
+      setError(err instanceof Error ? err.message : "Failed to load transaction file");
+      setState("error");
       setTimeout(() => exit(), 1500);
       return;
     }
 
     const availability = checkWalletAvailability(walletName);
-    
+
     if (!availability.available) {
-      setError(availability.error || 'No wallet available');
-      setState('error');
+      setError(availability.error || "No wallet available");
+      setState("error");
       setTimeout(() => exit(), 1500);
       return;
     }
@@ -80,7 +80,7 @@ export function Sign({
     if (!availability.needsPassword || effectivePassword) {
       doSign(effectivePassword);
     } else {
-      setState('password');
+      setState("password");
     }
   }, []);
 
@@ -94,8 +94,8 @@ export function Sign({
   // Perform the signing
   const doSign = async (pwd?: string) => {
     try {
-      setState('signing');
-      
+      setState("signing");
+
       // Load wallet from keystore
       const wallet = await loadWallet(
         {
@@ -104,45 +104,47 @@ export function Sign({
         },
         config
       );
-      
+
       const signResult = await signTransactionFromFile(wallet, txFile);
-      
+
       // Determine output file path
-      const outPath = outputFile || txFile.replace(/\.unsigned$/, '') + '.signed';
-      
+      const outPath = outputFile || txFile.replace(/\.unsigned$/, "") + ".signed";
+
       // Save signed transaction
       saveTxToFile(signResult.signedTx, outPath);
-      
+
       setResult({
         txHash: signResult.txHash,
         outputPath: outPath,
       });
-      
+
       if (jsonOutput) {
-        console.log(JSON.stringify({
-          status: 'signed',
-          txHash: signResult.txHash,
-          signedTx: outPath,
-          network,
-        }));
+        console.log(
+          JSON.stringify({
+            status: "signed",
+            txHash: signResult.txHash,
+            signedTx: outPath,
+            network,
+          })
+        );
       }
-      
-      setState('success');
+
+      setState("success");
       setTimeout(() => exit(), 1000);
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Signing failed';
+      const message = err instanceof Error ? err.message : "Signing failed";
       // Make password errors more user-friendly
-      if (message.includes('Incorrect password')) {
-        setError('Incorrect password. Please try again.');
+      if (message.includes("Incorrect password")) {
+        setError("Incorrect password. Please try again.");
       } else {
         setError(message);
       }
-      setState('error');
+      setState("error");
       setTimeout(() => exit(), 1500);
     }
   };
 
-  if (state === 'checking') {
+  if (state === "checking") {
     return (
       <Box padding={1}>
         <Text color="cyan">⏳ Checking wallet...</Text>
@@ -150,12 +152,14 @@ export function Sign({
     );
   }
 
-  if (state === 'password') {
+  if (state === "password") {
     return (
       <Box flexDirection="column" padding={1}>
         <Box marginBottom={1}>
           <Text color="cyan">🔐 Enter password for wallet </Text>
-          <Text bold color="yellow">{walletInfo?.walletName}</Text>
+          <Text bold color="yellow">
+            {walletInfo?.walletName}
+          </Text>
         </Box>
         <Box>
           <Text color="gray">Password: </Text>
@@ -170,21 +174,19 @@ export function Sign({
     );
   }
 
-  if (state === 'signing') {
+  if (state === "signing") {
     return (
       <Box flexDirection="column" padding={1}>
         <Text color="cyan">🔐 Signing transaction...</Text>
-        {walletInfo?.source === 'wallet' && (
+        {walletInfo?.source === "wallet" && (
           <Text color="gray">Using wallet: {walletInfo.walletName}</Text>
         )}
-        {walletInfo?.source === 'env' && (
-          <Text color="gray">Using environment variable</Text>
-        )}
+        {walletInfo?.source === "env" && <Text color="gray">Using environment variable</Text>}
       </Box>
     );
   }
 
-  if (state === 'error') {
+  if (state === "error") {
     return (
       <Box flexDirection="column" padding={1}>
         <Text color="red">✗ Error: {error}</Text>
@@ -196,18 +198,18 @@ export function Sign({
   return (
     <Box flexDirection="column" padding={1}>
       <Text color="green">✓ Transaction signed successfully!</Text>
-      
+
       <Box marginTop={1} flexDirection="column">
         <Box>
-          <Text color="gray">TX Hash:    </Text>
+          <Text color="gray">TX Hash: </Text>
           <Text>{result?.txHash}</Text>
         </Box>
         <Box>
-          <Text color="gray">Signed TX:  </Text>
+          <Text color="gray">Signed TX: </Text>
           <Text>{result?.outputPath}</Text>
         </Box>
       </Box>
-      
+
       <Box marginTop={1}>
         <Text color="gray">
           Submit with: begin submit {result?.outputPath} --network {network}

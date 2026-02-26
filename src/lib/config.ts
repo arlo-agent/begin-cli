@@ -3,13 +3,13 @@
  * Config location: ~/.begin-cli/config.json
  */
 
-import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
-import { homedir } from 'node:os';
-import { join } from 'node:path';
-import { errors } from './errors.js';
+import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
+import { homedir } from "node:os";
+import { join } from "node:path";
+import { errors } from "./errors.js";
 
-export type Network = 'mainnet' | 'preprod' | 'preview';
-export type Provider = 'blockfrost' | 'koios' | 'ogmios';
+export type Network = "mainnet" | "preprod" | "preview";
+export type Provider = "blockfrost" | "koios" | "ogmios";
 
 export interface Config {
   /** Default wallet name to use */
@@ -31,13 +31,13 @@ export interface Config {
 }
 
 const DEFAULT_CONFIG: Config = {
-  defaultWallet: 'main',
-  network: 'mainnet',
-  provider: 'blockfrost',
+  defaultWallet: "main",
+  network: "mainnet",
+  provider: "blockfrost",
 };
 
-const CONFIG_DIR = join(homedir(), '.begin-cli');
-const CONFIG_FILE = join(CONFIG_DIR, 'config.json');
+const CONFIG_DIR = join(homedir(), ".begin-cli");
+const CONFIG_FILE = join(CONFIG_DIR, "config.json");
 
 function ensureConfigDir(): void {
   if (!existsSync(CONFIG_DIR)) {
@@ -55,7 +55,7 @@ export function loadConfig(): Config {
       return { ...DEFAULT_CONFIG };
     }
 
-    const content = readFileSync(CONFIG_FILE, 'utf-8');
+    const content = readFileSync(CONFIG_FILE, "utf-8");
     const parsed = JSON.parse(content) as Partial<Config>;
 
     return {
@@ -64,9 +64,11 @@ export function loadConfig(): Config {
     };
   } catch (err) {
     if (err instanceof SyntaxError) {
-      throw errors.configError('Invalid config file: malformed JSON');
+      throw errors.configError("Invalid config file: malformed JSON");
     }
-    throw errors.configError(`Failed to read config: ${err instanceof Error ? err.message : String(err)}`);
+    throw errors.configError(
+      `Failed to read config: ${err instanceof Error ? err.message : String(err)}`
+    );
   }
 }
 
@@ -76,9 +78,11 @@ export function loadConfig(): Config {
 export function saveConfig(config: Config): void {
   try {
     ensureConfigDir();
-    writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2) + '\n', { mode: 0o600 });
+    writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2) + "\n", { mode: 0o600 });
   } catch (err) {
-    throw errors.configError(`Failed to save config: ${err instanceof Error ? err.message : String(err)}`);
+    throw errors.configError(
+      `Failed to save config: ${err instanceof Error ? err.message : String(err)}`
+    );
   }
 }
 
@@ -120,11 +124,11 @@ export function configExists(): boolean {
 }
 
 export function isValidNetwork(network: string): network is Network {
-  return ['mainnet', 'preprod', 'preview'].includes(network);
+  return ["mainnet", "preprod", "preview"].includes(network);
 }
 
 export function isValidProvider(provider: string): provider is Provider {
-  return ['blockfrost', 'koios', 'ogmios'].includes(provider);
+  return ["blockfrost", "koios", "ogmios"].includes(provider);
 }
 
 export function getBlockfrostKey(network: Network): string | undefined {

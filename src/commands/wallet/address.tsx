@@ -1,29 +1,29 @@
 /**
  * 'begin wallet address' command
- * 
+ *
  * Shows derived addresses from the wallet:
  * - Payment address (base address for receiving/sending)
  * - Enterprise address (payment only, no staking)
  * - Stake address (for staking operations)
  */
 
-import React, { useState, useEffect } from 'react';
-import { Box, Text, Newline } from 'ink';
+import React, { useState, useEffect } from "react";
+import { Box, Text, Newline } from "ink";
 import {
   deriveAddresses,
   shortenAddress,
   type NetworkType,
   type DerivedAddresses,
-} from '../../lib/address.js';
-import { generateQRCode } from '../../lib/qr.js';
+} from "../../lib/address.js";
+import { generateQRCode } from "../../lib/qr.js";
 import {
-  getMnemonic,
+  getMnemonicAsync,
   hasEnvMnemonic,
   getPreferredSource,
   getPasswordFromEnv,
   MNEMONIC_ENV_VAR,
   PASSWORD_ENV_VAR,
-} from '../../lib/keystore.js';
+} from "../../lib/keystore.js";
 
 interface WalletAddressProps {
   network: NetworkType;
@@ -34,20 +34,20 @@ interface WalletAddressProps {
   json?: boolean;
 }
 
-type LoadingState = 'loading' | 'need_password' | 'success' | 'error';
+type LoadingState = "loading" | "need_password" | "success" | "error";
 
 export function WalletAddress({
   network,
   walletName,
   password,
-  full = false,
+  full = true,
   qr = false,
   json = false,
 }: WalletAddressProps) {
-  const [state, setState] = useState<LoadingState>('loading');
+  const [state, setState] = useState<LoadingState>("loading");
   const [addresses, setAddresses] = useState<DerivedAddresses | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [source, setSource] = useState<string>('');
+  const [source, setSource] = useState<string>("");
   const [qrCode, setQrCode] = useState<string | null>(null);
 
   useEffect(() => {
@@ -55,34 +55,35 @@ export function WalletAddress({
       try {
         // Check if we have a source
         const preferredSource = getPreferredSource();
-        
+
         if (!preferredSource && !walletName) {
           setError(
             `No wallet available.\n` +
-            `\nOptions:\n` +
-            `  1. Set ${MNEMONIC_ENV_VAR} environment variable\n` +
-            `  2. Create a wallet with: begin wallet create\n` +
-            `  3. Import a wallet with: begin wallet import`
+              `\nOptions:\n` +
+              `  1. Set ${MNEMONIC_ENV_VAR} environment variable\n` +
+              `  2. Create a wallet with: begin wallet create\n` +
+              `  3. Import a wallet with: begin wallet import`
           );
-          setState('error');
+          setState("error");
           return;
         }
 
         // Password priority: --password flag > BEGIN_CLI_WALLET_PASSWORD env var > interactive prompt
         const effectivePassword = password || getPasswordFromEnv() || undefined;
 
-        // If using file-based wallet and no password provided
-        const needsPassword =
-          !hasEnvMnemonic() && !effectivePassword && (walletName || preferredSource?.type === 'file');
-
-        if (needsPassword) {
-          setState('need_password');
-          return;
+        // Get mnemonic (async: keychain wallets need no password; file-only wallets throw if no password)
+        let mnemonic: string;
+        try {
+          mnemonic = await getMnemonicAsync(effectivePassword, walletName ?? undefined);
+        } catch (loadErr) {
+          const msg = loadErr instanceof Error ? loadErr.message : String(loadErr);
+          if (!effectivePassword && (msg.includes("Password required") || msg.includes("password"))) {
+            setState("need_password");
+            return;
+          }
+          throw loadErr;
         }
 
-        // Get mnemonic from appropriate source
-        const mnemonic = getMnemonic(effectivePassword, walletName);
-        
         // Set source for display
         if (hasEnvMnemonic()) {
           setSource(`environment (${MNEMONIC_ENV_VAR})`);
@@ -95,10 +96,10 @@ export function WalletAddress({
         // Derive addresses
         const derived = await deriveAddresses(mnemonic, network);
         setAddresses(derived);
-        setState('success');
+        setState("success");
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Unknown error');
-        setState('error');
+        setError(err instanceof Error ? err.message : "Unknown error");
+        setState("error");
       }
     };
 
@@ -124,7 +125,7 @@ export function WalletAddress({
   }, [addresses, qr, json]);
 
   // Loading state
-  if (state === 'loading') {
+  if (state === "loading") {
     return (
       <Box>
         <Text>⏳ Deriving addresses...</Text>
@@ -133,12 +134,14 @@ export function WalletAddress({
   }
 
   // Need password
-  if (state === 'need_password') {
+  if (state === "need_password") {
     return (
       <Box flexDirection="column" padding={1}>
         <Text color="yellow">🔐 Password required to decrypt wallet</Text>
         <Newline />
-        <Text color="gray">Use --password flag, set {PASSWORD_ENV_VAR}, or set {MNEMONIC_ENV_VAR}</Text>
+        <Text color="gray">
+          Use --password flag, set {PASSWORD_ENV_VAR}, or set {MNEMONIC_ENV_VAR}
+        </Text>
         <Newline />
         <Text color="gray">Example: begin wallet address --password your-password</Text>
       </Box>
@@ -146,7 +149,7 @@ export function WalletAddress({
   }
 
   // Error state
-  if (state === 'error') {
+  if (state === "error") {
     return (
       <Box flexDirection="column" padding={1}>
         <Text color="red">Error: {error}</Text>
@@ -175,7 +178,9 @@ export function WalletAddress({
     <Box flexDirection="column" padding={1}>
       {/* Header */}
       <Box marginBottom={1}>
-        <Text bold color="cyan">Wallet Addresses</Text>
+        <Text bold color="cyan">
+          Wallet Addresses
+        </Text>
         <Text color="gray"> ({network})</Text>
       </Box>
 
@@ -258,39 +263,34 @@ export function WalletAddress({
  */
 interface SingleAddressProps {
   network: NetworkType;
-  addressType: 'payment' | 'enterprise' | 'stake';
+  addressType: "payment" | "enterprise" | "stake";
   walletName?: string;
   password?: string;
 }
 
-export function SingleAddress({
-  network,
-  addressType,
-  walletName,
-  password,
-}: SingleAddressProps) {
+export function SingleAddress({ network, addressType, walletName, password }: SingleAddressProps) {
   const [address, setAddress] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const derive = async () => {
       try {
-        const mnemonic = getMnemonic(password, walletName);
+        const mnemonic = await getMnemonicAsync(password, walletName);
         const addresses = await deriveAddresses(mnemonic, network);
-        
+
         switch (addressType) {
-          case 'payment':
+          case "payment":
             setAddress(addresses.baseAddress);
             break;
-          case 'enterprise':
+          case "enterprise":
             setAddress(addresses.enterpriseAddress);
             break;
-          case 'stake':
+          case "stake":
             setAddress(addresses.stakeAddress);
             break;
         }
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Unknown error');
+        setError(err instanceof Error ? err.message : "Unknown error");
       }
     };
 

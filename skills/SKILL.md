@@ -61,11 +61,11 @@ export BEGIN_CLI_MNEMONIC="word1 word2 word3 ... word24"
 ### Wallet Management
 
 ```bash
-# Create a new wallet (interactive - generates mnemonic)
-begin wallet create
+# Create a new wallet (silent by default; no seed/address shown)
+begin wallet create <name>
 
-# Create wallet non-interactively (agent mode)
-begin wallet create --json
+# Show recovery phrase and addresses after creating
+begin wallet create <name> --show-seed
 
 # List all wallets
 begin wallet list --json

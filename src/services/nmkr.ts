@@ -9,8 +9,8 @@
  *   NMKR_PROJECT_UID - Your NMKR project UID
  */
 
-import * as fs from 'fs';
-import * as path from 'path';
+import * as fs from "fs";
+import * as path from "path";
 
 // ============================================================================
 // Types
@@ -70,7 +70,7 @@ export interface NftDetails {
   description: string;
   ipfsLink: string;
   gatewayLink: string;
-  state: 'free' | 'reserved' | 'sold' | 'error';
+  state: "free" | "reserved" | "sold" | "error";
   minted: boolean;
   policyId: string;
   assetId: string;
@@ -85,7 +85,7 @@ export interface NftListItem {
   uid: string;
   name: string;
   displayName: string;
-  state: 'free' | 'reserved' | 'sold' | 'error';
+  state: "free" | "reserved" | "sold" | "error";
   ipfsLink: string;
 }
 
@@ -106,7 +106,7 @@ interface NmkrApiError {
 // NMKR Client
 // ============================================================================
 
-const DEFAULT_BASE_URL = 'https://studio-api.nmkr.io/v2';
+const DEFAULT_BASE_URL = "https://studio-api.nmkr.io/v2";
 
 export class NmkrClient {
   private apiKey: string;
@@ -127,10 +127,10 @@ export class NmkrClient {
     const projectUid = process.env.NMKR_PROJECT_UID;
 
     if (!apiKey) {
-      throw new Error('NMKR_API_KEY environment variable is required');
+      throw new Error("NMKR_API_KEY environment variable is required");
     }
     if (!projectUid) {
-      throw new Error('NMKR_PROJECT_UID environment variable is required');
+      throw new Error("NMKR_PROJECT_UID environment variable is required");
     }
 
     return new NmkrClient({ apiKey, projectUid });
@@ -149,25 +149,26 @@ export class NmkrClient {
   async uploadNft(params: UploadNftParams): Promise<UploadNftResult> {
     const imageData = await this.resolveFileData(params.image);
     const mimeType = this.detectMimeType(
-      typeof params.image === 'string' ? params.image : 'image.png'
+      typeof params.image === "string" ? params.image : "image.png"
     );
 
     // Build the request body for NMKR UploadNft endpoint
     const body: Record<string, unknown> = {
-      tokenname: params.name.replace(/\s+/g, ''), // No spaces in token name
+      tokenname: params.name.replace(/\s+/g, ""), // No spaces in token name
       displayname: params.displayName ?? params.name,
-      description: params.description ?? '',
+      description: params.description ?? "",
       previewImageNft: {
         mimetype: mimeType,
-        fileFromBase64: imageData.toString('base64'),
+        fileFromBase64: imageData.toString("base64"),
       },
     };
 
     // Add additional metadata if provided
     if (params.metadata && Object.keys(params.metadata).length > 0) {
-      body.metadataPlaceholder = Object.entries(params.metadata).map(
-        ([name, value]) => ({ name, value: String(value) })
-      );
+      body.metadataPlaceholder = Object.entries(params.metadata).map(([name, value]) => ({
+        name,
+        value: String(value),
+      }));
     }
 
     const response = await this.request<{
@@ -177,7 +178,7 @@ export class NmkrClient {
       ipfsGatewayAddress: string;
       state: string;
     }>(`/UploadNft/${this.projectUid}`, {
-      method: 'POST',
+      method: "POST",
       body: JSON.stringify(body),
     });
 
@@ -203,11 +204,11 @@ export class NmkrClient {
       txHash?: string;
       sendedTransaction?: string;
     }>(endpoint, {
-      method: 'POST',
+      method: "POST",
     });
 
     // NMKR might return txHash in different fields depending on state
-    const txHash = response.txHash || response.sendedTransaction || '';
+    const txHash = response.txHash || response.sendedTransaction || "";
 
     return {
       txHash,
@@ -237,7 +238,7 @@ export class NmkrClient {
       mintedTimestamp?: string;
       metadata: Record<string, unknown>;
     }>(`/GetNftDetailsById/${nftUid}`, {
-      method: 'GET',
+      method: "GET",
     });
 
     return {
@@ -248,7 +249,7 @@ export class NmkrClient {
       description: response.description,
       ipfsLink: response.ipfsLink,
       gatewayLink: response.gatewayLink,
-      state: response.state as NftDetails['state'],
+      state: response.state as NftDetails["state"],
       minted: response.minted,
       policyId: response.policyId,
       assetId: response.assetId,
@@ -263,7 +264,7 @@ export class NmkrClient {
    * List NFTs in the project
    */
   async listNfts(
-    state: 'free' | 'reserved' | 'sold' = 'free',
+    state: "free" | "reserved" | "sold" = "free",
     count: number = 50,
     page: number = 1
   ): Promise<NftListResult> {
@@ -279,7 +280,7 @@ export class NmkrClient {
         ipfsLink: string;
       }>
     >(endpoint, {
-      method: 'GET',
+      method: "GET",
     });
 
     // NMKR returns an array directly
@@ -288,7 +289,7 @@ export class NmkrClient {
       uid: nft.uid,
       name: nft.name,
       displayName: nft.displayname,
-      state: nft.state as NftListItem['state'],
+      state: nft.state as NftListItem["state"],
       ipfsLink: nft.ipfsLink,
     }));
 
@@ -311,7 +312,7 @@ export class NmkrClient {
     mintedNfts: number;
   }> {
     return this.request(`/GetProjectDetails/${this.projectUid}`, {
-      method: 'GET',
+      method: "GET",
     });
   }
 
@@ -324,8 +325,8 @@ export class NmkrClient {
 
     const headers: Record<string, string> = {
       Authorization: `Bearer ${this.apiKey}`,
-      'Content-Type': 'application/json',
-      Accept: 'application/json',
+      "Content-Type": "application/json",
+      Accept: "application/json",
       ...((options.headers as Record<string, string>) || {}),
     };
 
@@ -369,18 +370,18 @@ export class NmkrClient {
   private detectMimeType(filename: string): string {
     const ext = path.extname(filename).toLowerCase();
     const mimeTypes: Record<string, string> = {
-      '.png': 'image/png',
-      '.jpg': 'image/jpeg',
-      '.jpeg': 'image/jpeg',
-      '.gif': 'image/gif',
-      '.webp': 'image/webp',
-      '.svg': 'image/svg+xml',
-      '.mp4': 'video/mp4',
-      '.webm': 'video/webm',
-      '.mp3': 'audio/mpeg',
-      '.wav': 'audio/wav',
+      ".png": "image/png",
+      ".jpg": "image/jpeg",
+      ".jpeg": "image/jpeg",
+      ".gif": "image/gif",
+      ".webp": "image/webp",
+      ".svg": "image/svg+xml",
+      ".mp4": "video/mp4",
+      ".webm": "video/webm",
+      ".mp3": "audio/mpeg",
+      ".wav": "audio/wav",
     };
-    return mimeTypes[ext] || 'application/octet-stream';
+    return mimeTypes[ext] || "application/octet-stream";
   }
 }
 

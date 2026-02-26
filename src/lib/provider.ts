@@ -3,10 +3,10 @@
  * Uses @meshsdk/core with BlockfrostProvider
  */
 
-import { BlockfrostProvider } from '@meshsdk/core';
-import type { Network } from './config.js';
-import { getBlockfrostKey } from './config.js';
-import { errors } from './errors.js';
+import { BlockfrostProvider } from "@meshsdk/core";
+import type { Network } from "./config.js";
+import { getBlockfrostKey } from "./config.js";
+import { errors } from "./errors.js";
 
 const NETWORK_IDS: Record<Network, number> = {
   mainnet: 1,
@@ -20,7 +20,7 @@ const NETWORK_IDS: Record<Network, number> = {
  */
 function getApiKey(network: Network): string | undefined {
   // Check environment variables first (support both documented forms)
-  if (network === 'mainnet') {
+  if (network === "mainnet") {
     // Prefer explicit mainnet var if set
     const mainnetKey = process.env.BLOCKFROST_API_KEY_MAINNET;
     if (mainnetKey) return mainnetKey;
@@ -72,5 +72,5 @@ export function hasApiKey(network: Network): boolean {
 }
 
 // Re-export types from @meshsdk/core that are commonly used
-export { BlockfrostProvider } from '@meshsdk/core';
-export type { UTxO, Asset } from '@meshsdk/core';
+export { BlockfrostProvider } from "@meshsdk/core";
+export type { UTxO, Asset } from "@meshsdk/core";
