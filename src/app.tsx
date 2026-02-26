@@ -18,6 +18,8 @@ import { WalletCreate } from "./commands/wallet/create.js";
 import { WalletRestore } from "./commands/wallet/restore.js";
 import { WalletExport } from "./commands/wallet/export.js";
 import { WalletList } from "./commands/wallet/list.js";
+import { PolicyShow } from "./commands/policy/show.js";
+import { PolicySet } from "./commands/policy/set.js";
 import { MintCommand } from "./commands/mint/index.js";
 import { TokenSearch } from "./commands/token/search.js";
 import { TokenPrice } from "./commands/token/price.js";
