@@ -18,6 +18,8 @@ import { WalletCreate } from "./commands/wallet/create.js";
 import { WalletRestore } from "./commands/wallet/restore.js";
 import { WalletExport } from "./commands/wallet/export.js";
 import { WalletList } from "./commands/wallet/list.js";
+import { PolicyShow } from "./commands/policy/show.js";
+import { PolicySet } from "./commands/policy/set.js";
 import { MintCommand } from "./commands/mint/index.js";
 import { TokenSearch } from "./commands/token/search.js";
 import { TokenPrice } from "./commands/token/price.js";
@@ -58,6 +60,9 @@ export interface AppFlags {
   id?: string[];
   protocol?: string;
   showSeed: boolean;
+  // Policy flags
+  maxTx?: string;
+  dailyLimit?: string;
   yes: boolean;
   // Token discovery flags
   trending: boolean;
@@ -521,6 +526,30 @@ export function App({ command, subcommand, args, flags, showHelp }: AppProps) {
       <Box flexDirection="column">
         <Text color="red">Unknown token command: {subcommand || '(none)'}</Text>
         <Text color="gray">Available commands: search, price</Text>
+      </Box>
+    );
+  }
+
+  if (command === "policy") {
+    if (subcommand === "show" || !subcommand) {
+      return <PolicyShow json={flags.json} />;
+    }
+
+    if (subcommand === "set") {
+      return (
+        <PolicySet
+          maxTx={flags.maxTx}
+          dailyLimit={flags.dailyLimit}
+          asset={flags.asset?.[0] ?? "ADA"}
+          json={flags.json}
+        />
+      );
+    }
+
+    return (
+      <Box flexDirection="column">
+        <Text color="red">Unknown policy command: {subcommand}</Text>
+        <Text color="gray">Available commands: show, set</Text>
       </Box>
     );
   }
