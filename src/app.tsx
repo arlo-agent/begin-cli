@@ -59,6 +59,9 @@ export interface AppFlags {
   id?: string[];
   protocol?: string;
   showSeed: boolean;
+  // Policy flags
+  maxTx?: string;
+  dailyLimit?: string;
   yes: boolean;
   // Token discovery flags
   trending: boolean;
@@ -519,6 +522,30 @@ export function App({ command, subcommand, args, flags, showHelp }: AppProps) {
       <Box flexDirection="column">
         <Text color="red">Unknown token command: {subcommand || '(none)'}</Text>
         <Text color="gray">Available commands: search, price</Text>
+      </Box>
+    );
+  }
+
+  if (command === "policy") {
+    if (subcommand === "show" || !subcommand) {
+      return <PolicyShow json={flags.json} />;
+    }
+
+    if (subcommand === "set") {
+      return (
+        <PolicySet
+          maxTx={flags.maxTx}
+          dailyLimit={flags.dailyLimit}
+          asset={flags.asset?.[0] ?? "ADA"}
+          json={flags.json}
+        />
+      );
+    }
+
+    return (
+      <Box flexDirection="column">
+        <Text color="red">Unknown policy command: {subcommand}</Text>
+        <Text color="gray">Available commands: show, set</Text>
       </Box>
     );
   }

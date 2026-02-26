@@ -190,6 +190,9 @@ const cli = meow(
       address: { type: "string" },
       protocol: { type: "string" },
       showSeed: { type: "boolean", default: false },
+      // Policy flags
+      maxTx: { type: "string" },
+      dailyLimit: { type: "string" },
       // Token discovery flags
       trending: { type: "boolean", default: false },
       currency: { type: "string", shortFlag: "c", default: "EUR" },
@@ -246,6 +249,9 @@ if (command === "mcp") {
     address?: string;
     protocol?: string;
     showSeed: boolean;
+    // Policy flags
+    maxTx?: string;
+    dailyLimit?: string;
     // Token discovery flags
     trending: boolean;
     currency: string;
@@ -287,6 +293,8 @@ if (command === "mcp") {
     address: rawFlags.address,
     protocol: rawFlags.protocol,
     showSeed: rawFlags.showSeed,
+    maxTx: rawFlags.maxTx,
+    dailyLimit: rawFlags.dailyLimit,
     trending: rawFlags.trending,
     currency: rawFlags.currency,
     token: rawFlags.token,
