@@ -35,6 +35,19 @@ import type {
 
 const SOLANA_DERIVATION_PATH = "m/44'/501'/0'/0'";
 
+/**
+ * Parse a decimal amount string to bigint without floating-point
+ * @param amountStr - Amount as string (e.g., "1.5", "100", "0.000000001")
+ * @param decimals - Number of decimal places for the token
+ * @returns BigInt representation of the smallest unit
+ */
+function parseAmount(amountStr: string, decimals: number): bigint {
+  const [intPart, decPart = ""] = amountStr.split(".");
+  const paddedDecPart = decPart.padEnd(decimals, "0").slice(0, decimals);
+  const fullStr = intPart + paddedDecPart;
+  return BigInt(fullStr);
+}
+
 const RPC_URLS: Record<SolanaNetwork, string> = {
   "mainnet-beta": "https://api.mainnet-beta.solana.com",
   devnet: "https://api.devnet.solana.com",
@@ -48,7 +61,8 @@ export class SolanaAdapter implements IChainAdapter {
 
   constructor(network: SolanaNetwork = "mainnet-beta") {
     this.network = network;
-    this.connection = new Connection(RPC_URLS[network], "confirmed");
+    const rpcUrl = process.env.BEGIN_SOLANA_RPC || RPC_URLS[network];
+    this.connection = new Connection(rpcUrl, "confirmed");
   }
 
   /**
@@ -271,7 +285,7 @@ export class SolanaAdapter implements IChainAdapter {
         decimals = mintAccountInfo.value.data.parsed.info.decimals;
       }
 
-      const amountLamports = BigInt(Math.floor(params.amount * Math.pow(10, decimals)));
+      const amountLamports = parseAmount(String(params.amount), decimals);
 
       transaction.add(
         createTransferInstruction(fromAta, toAta, fromPubkey, amountLamports, [], tokenProgramId)
@@ -281,7 +295,7 @@ export class SolanaAdapter implements IChainAdapter {
       fee = await this.estimateFeeForTransaction(transaction, fromPubkey);
     } else {
       // Native SOL transfer
-      const lamports = Math.floor(params.amount * LAMPORTS_PER_SOL);
+      const lamports = parseAmount(String(params.amount), 9);
 
       transaction.add(
         SystemProgram.transfer({
@@ -347,7 +361,7 @@ export class SolanaAdapter implements IChainAdapter {
         SystemProgram.transfer({
           fromPubkey: dummyKeypair.publicKey,
           toPubkey,
-          lamports: Math.floor(params.amount * LAMPORTS_PER_SOL),
+          lamports: parseAmount(String(params.amount), 9),
         })
       );
     }

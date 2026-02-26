@@ -16,8 +16,10 @@ import type {
   TokenBalance,
 } from "./types.js";
 
-// BIP44 derivation path for Ethereum (same for all EVM chains)
-const EVM_DERIVATION_PATH = "m/44'/60'/0'/0/0";
+// BIP44 derivation path template for Ethereum (same for all EVM chains)
+// Format: m/44'/60'/account'/0/0
+const getEVMDerivationPath = (accountIndex: number): string =>
+  `m/44'/60'/${accountIndex}'/0/0`;
 
 // Network configurations
 interface NetworkConfig {
@@ -96,6 +98,29 @@ const NETWORK_CONFIGS: Record<EVMNetwork, NetworkConfig> = {
   },
 };
 
+// Environment variable names for RPC URLs
+const RPC_ENV_VARS: Record<EVMNetwork, string> = {
+  ethereum: "BEGIN_ETH_RPC",
+  base: "BEGIN_BASE_RPC",
+  polygon: "BEGIN_POLYGON_RPC",
+  arbitrum: "BEGIN_ARBITRUM_RPC",
+  optimism: "BEGIN_OPTIMISM_RPC",
+  bnb: "BEGIN_BNB_RPC",
+  avalanche: "BEGIN_AVALANCHE_RPC",
+};
+
+/**
+ * Get RPC URL for a network, preferring environment variable over hardcoded default
+ */
+function getRpcUrl(network: EVMNetwork): string {
+  const envVar = RPC_ENV_VARS[network];
+  const envValue = process.env[envVar];
+  if (envValue) {
+    return envValue;
+  }
+  return NETWORK_CONFIGS[network].rpcUrl;
+}
+
 // Standard ERC-20 ABI for balance and transfer
 const ERC20_ABI = [
   "function balanceOf(address owner) view returns (uint256)",
@@ -113,7 +138,7 @@ export class EVMAdapter implements IChainAdapter {
   constructor(network: EVMNetwork = "ethereum") {
     this.network = network;
     this.config = NETWORK_CONFIGS[network];
-    this.provider = new ethers.JsonRpcProvider(this.config.rpcUrl);
+    this.provider = new ethers.JsonRpcProvider(getRpcUrl(network));
   }
 
   /**
@@ -122,8 +147,8 @@ export class EVMAdapter implements IChainAdapter {
   private deriveWallet(mnemonic: string[], accountIndex: number = 0): ethers.HDNodeWallet {
     const mnemonicStr = mnemonic.join(" ");
 
-    // BIP44 path: m/44'/60'/0'/0/accountIndex
-    const path = accountIndex === 0 ? EVM_DERIVATION_PATH : `m/44'/60'/0'/0/${accountIndex}`;
+    // BIP44 path: m/44'/60'/account'/0/0
+    const path = getEVMDerivationPath(accountIndex);
 
     const hdNode = ethers.HDNodeWallet.fromPhrase(mnemonicStr, undefined, path);
     return hdNode;

@@ -24,8 +24,8 @@ bitcoin.initEccLib(ecc);
 const bip32 = BIP32Factory(ecc);
 const ECPair = ECPairFactory(ecc);
 
-// BIP84 derivation path for native SegWit
-const BITCOIN_DERIVATION_PATH = "m/84'/0'/0'/0/0";
+// Minimum output value to avoid dust (in satoshis)
+const DUST_THRESHOLD_SATOSHIS = 546;
 
 const BLOCKSTREAM_API: Record<BitcoinNetwork, string> = {
   mainnet: "https://blockstream.info/api",
@@ -319,15 +319,6 @@ export class BitcoinAdapter implements IChainAdapter {
     let estimatedVsize = 110 + 31 * 2;
 
     for (const utxo of sortedUtxos) {
-      // Get raw transaction for this UTXO
-      const apiUrl = BLOCKSTREAM_API[this.network];
-      const txResponse = await fetch(`${apiUrl}/tx/${utxo.txid}/hex`);
-      if (!txResponse.ok) {
-        throw new Error(`Failed to fetch transaction ${utxo.txid}`);
-      }
-      const rawTxHex = await txResponse.text();
-      const rawTx = bitcoin.Transaction.fromHex(rawTxHex);
-
       psbt.addInput({
         hash: utxo.txid,
         index: utxo.vout,
@@ -369,8 +360,7 @@ export class BitcoinAdapter implements IChainAdapter {
 
     // Add change output if significant
     const change = totalInput - amountSatoshis - estimatedFee;
-    if (change > 546) {
-      // Dust threshold
+    if (change > DUST_THRESHOLD_SATOSHIS) {
       psbt.addOutput({
         address: fromAddress,
         value: BigInt(change),
