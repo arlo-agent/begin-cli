@@ -1,0 +1,384 @@
+/**
+ * Unified market data service combining Minswap, CoinGecko, and Binance
+ */
+
+import { createCoinGeckoClient, isCoinGeckoTicker, type CoinGeckoPrice } from './coingecko.js';
+import { createMinswapClient, type MinswapToken } from './minswap.js';
+
+const MINSWAP_MAINNET_API = 'https://api-mainnet-prod.minswap.org';
+const BINANCE_DATA_API = 'https://data-api.binance.vision/api/v3';
+
+/**
+ * Token metrics from Minswap
+ */
+export interface TokenMetrics {
+  tokenId: string;
+  ticker: string;
+  name: string;
+  verified: boolean;
+  priceUsd: number;
+  priceAda: number;
+  change24h: number;
+  volume24h: number;
+  liquidity: number;
+  marketCap: number;
+  logoUrl?: string;
+}
+
+/**
+ * Unified price data (works for both CoinGecko and Minswap tokens)
+ */
+export interface PriceData {
+  ticker: string;
+  name: string;
+  price: number;
+  change24h: number;
+  volume24h: number;
+  marketCap: number;
+  currency: string;
+  source: 'coingecko' | 'minswap';
+}
+
+/**
+ * Binance kline (candlestick) data
+ */
+export interface KlineData {
+  openTime: number;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume: number;
+  closeTime: number;
+}
+
+/**
+ * Minswap asset search response
+ */
+interface MinswapAssetSearchResult {
+  id: string;
+  name: string;
+  ticker: string;
+  logo: string;
+  decimals: number;
+  is_verified: boolean;
+  policy_id: string;
+  asset_name: string;
+}
+
+/**
+ * Minswap asset metrics response
+ */
+interface MinswapAssetMetricsResult {
+  id: string;
+  name: string;
+  ticker: string;
+  logo: string;
+  decimals: number;
+  is_verified: boolean;
+  policy_id: string;
+  asset_name: string;
+  price_usd: number;
+  price_ada: number;
+  price_change_24h: number;
+  volume_24h: number;
+  liquidity: number;
+  market_cap: number;
+}
+
+/**
+ * Minswap metrics response wrapper
+ */
+interface MinswapMetricsResponse {
+  assets: MinswapAssetMetricsResult[];
+  total: number;
+}
+
+/**
+ * Search for Cardano native tokens on Minswap
+ */
+export async function searchTokens(
+  term: string,
+  limit: number = 20,
+  onlyVerified: boolean = true
+): Promise<TokenMetrics[]> {
+  const params = new URLSearchParams({
+    term,
+    limit: String(limit),
+    only_verified: String(onlyVerified),
+  });
+
+  const response = await fetch(`${MINSWAP_MAINNET_API}/v1/assets?${params}`);
+
+  if (!response.ok) {
+    if (response.status === 429) {
+      throw new Error('Minswap rate limit exceeded. Please try again later.');
+    }
+    throw new Error(`Minswap API error: ${response.status}`);
+  }
+
+  const assets = (await response.json()) as MinswapAssetSearchResult[];
+
+  // For search results, we need to fetch metrics separately to get price/volume
+  if (assets.length === 0) return [];
+
+  // Get metrics for found assets
+  return getTokenMetrics(
+    assets.map((a) => a.id),
+    'usd'
+  );
+}
+
+/**
+ * Get trending/top tokens by volume
+ */
+export async function getTrendingTokens(
+  limit: number = 20,
+  currency: string = 'usd'
+): Promise<TokenMetrics[]> {
+  const response = await fetch(`${MINSWAP_MAINNET_API}/v1/assets/metrics`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      term: '',
+      limit,
+      only_verified: true,
+      sort_direction: 'desc',
+      sort_field: 'volume_24h',
+      currency,
+    }),
+  });
+
+  if (!response.ok) {
+    if (response.status === 429) {
+      throw new Error('Minswap rate limit exceeded. Please try again later.');
+    }
+    throw new Error(`Minswap API error: ${response.status}`);
+  }
+
+  const data = (await response.json()) as MinswapMetricsResponse;
+  return data.assets.map(mapMetricsResult);
+}
+
+/**
+ * Get metrics for specific token IDs
+ */
+export async function getTokenMetrics(
+  tokenIds: string[],
+  currency: string = 'usd'
+): Promise<TokenMetrics[]> {
+  // Minswap metrics endpoint accepts a POST with term to filter
+  // We'll fetch top tokens and filter, or make individual calls
+  const results: TokenMetrics[] = [];
+
+  for (const tokenId of tokenIds) {
+    try {
+      const metrics = await getSingleTokenMetrics(tokenId, currency);
+      if (metrics) results.push(metrics);
+    } catch {
+      // Skip tokens that fail
+    }
+  }
+
+  return results;
+}
+
+/**
+ * Get metrics for a single token by ID
+ */
+export async function getSingleTokenMetrics(
+  tokenId: string,
+  currency: string = 'usd'
+): Promise<TokenMetrics | null> {
+  const response = await fetch(
+    `${MINSWAP_MAINNET_API}/v1/assets/${encodeURIComponent(tokenId)}/metrics?currency=${currency}`
+  );
+
+  if (!response.ok) {
+    if (response.status === 404) return null;
+    if (response.status === 429) {
+      throw new Error('Minswap rate limit exceeded. Please try again later.');
+    }
+    throw new Error(`Minswap API error: ${response.status}`);
+  }
+
+  const data = (await response.json()) as MinswapAssetMetricsResult;
+  return mapMetricsResult(data);
+}
+
+/**
+ * Search tokens by ticker and get the best match
+ */
+export async function findTokenByTicker(
+  ticker: string,
+  currency: string = 'usd'
+): Promise<TokenMetrics | null> {
+  const results = await searchTokens(ticker, 10, true);
+
+  // Find exact ticker match (case-insensitive)
+  const tickerUpper = ticker.toUpperCase();
+  const exactMatch = results.find((t) => t.ticker.toUpperCase() === tickerUpper);
+  if (exactMatch) return exactMatch;
+
+  // Return first result if no exact match
+  return results[0] ?? null;
+}
+
+/**
+ * Get unified price data for any supported token
+ * - For ADA/BTC/SOL: uses CoinGecko
+ * - For Cardano native tokens: uses Minswap
+ */
+export async function getPrice(
+  ticker: string,
+  currency: string = 'usd'
+): Promise<PriceData | null> {
+  const tickerUpper = ticker.toUpperCase();
+
+  // Check if it's a base currency (CoinGecko)
+  if (isCoinGeckoTicker(tickerUpper)) {
+    const client = createCoinGeckoClient();
+    const price = await client.getPrice(tickerUpper, currency);
+    if (!price) return null;
+
+    return {
+      ticker: price.ticker,
+      name: price.name,
+      price: price.price,
+      change24h: price.change24h,
+      volume24h: price.volume24h,
+      marketCap: price.marketCap,
+      currency: price.currency,
+      source: 'coingecko',
+    };
+  }
+
+  // Otherwise, try Minswap for Cardano native tokens
+  const token = await findTokenByTicker(tickerUpper, currency);
+  if (!token) return null;
+
+  return {
+    ticker: token.ticker,
+    name: token.name,
+    price: token.priceUsd,
+    change24h: token.change24h,
+    volume24h: token.volume24h,
+    marketCap: token.marketCap,
+    currency,
+    source: 'minswap',
+  };
+}
+
+/**
+ * Get Binance klines (candlestick) data for charting
+ */
+export async function getBinanceKlines(
+  symbol: string,
+  interval: string = '1d',
+  limit: number = 30
+): Promise<KlineData[]> {
+  const params = new URLSearchParams({
+    symbol,
+    interval,
+    limit: String(limit),
+  });
+
+  const response = await fetch(`${BINANCE_DATA_API}/klines?${params}`);
+
+  if (!response.ok) {
+    throw new Error(`Binance API error: ${response.status}`);
+  }
+
+  const data = (await response.json()) as Array<[
+    number, // Open time
+    string, // Open
+    string, // High
+    string, // Low
+    string, // Close
+    string, // Volume
+    number, // Close time
+    string, // Quote asset volume
+    number, // Number of trades
+    string, // Taker buy base asset volume
+    string, // Taker buy quote asset volume
+    string  // Ignore
+  ]>;
+
+  return data.map((kline) => ({
+    openTime: kline[0],
+    open: parseFloat(kline[1]),
+    high: parseFloat(kline[2]),
+    low: parseFloat(kline[3]),
+    close: parseFloat(kline[4]),
+    volume: parseFloat(kline[5]),
+    closeTime: kline[6],
+  }));
+}
+
+/**
+ * Get Binance symbol for a ticker pair
+ */
+export function getBinanceSymbol(ticker: string): string | null {
+  const symbolMap: Record<string, string> = {
+    ADA: 'ADAUSDT',
+    BTC: 'BTCUSDT',
+    SOL: 'SOLUSDT',
+  };
+  return symbolMap[ticker.toUpperCase()] ?? null;
+}
+
+/**
+ * Map Minswap metrics response to TokenMetrics
+ */
+function mapMetricsResult(data: MinswapAssetMetricsResult): TokenMetrics {
+  return {
+    tokenId: data.id,
+    ticker: data.ticker,
+    name: data.name,
+    verified: data.is_verified,
+    priceUsd: data.price_usd,
+    priceAda: data.price_ada,
+    change24h: data.price_change_24h,
+    volume24h: data.volume_24h,
+    liquidity: data.liquidity,
+    marketCap: data.market_cap,
+    logoUrl: data.logo,
+  };
+}
+
+/**
+ * Format price for display
+ */
+export function formatPrice(price: number, decimals?: number): string {
+  if (price === 0) return '$0.00';
+
+  // Determine appropriate decimal places based on magnitude
+  let dp = decimals;
+  if (dp === undefined) {
+    if (price >= 1000) dp = 2;
+    else if (price >= 1) dp = 2;
+    else if (price >= 0.01) dp = 4;
+    else if (price >= 0.0001) dp = 6;
+    else dp = 10;
+  }
+
+  return `$${price.toFixed(dp)}`;
+}
+
+/**
+ * Format percentage change for display
+ */
+export function formatChange(change: number): string {
+  const sign = change >= 0 ? '+' : '';
+  return `${sign}${change.toFixed(1)}%`;
+}
+
+/**
+ * Format large numbers with K/M/B suffixes
+ */
+export function formatCompact(value: number): string {
+  if (value >= 1_000_000_000) return `$${(value / 1_000_000_000).toFixed(1)}B`;
+  if (value >= 1_000_000) return `$${(value / 1_000_000).toFixed(1)}M`;
+  if (value >= 1_000) return `$${(value / 1_000).toFixed(0)}K`;
+  return `$${value.toFixed(0)}`;
+}

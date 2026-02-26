@@ -21,6 +21,10 @@ const cli = meow(
     cardano history <address>        Show transaction history for an address
     cardano send <to> <amount>       Send ADA (and native assets)
 
+    token search <query>             Search Cardano tokens by name/ticker
+    token search --trending          Show top tokens by 24h volume
+    token price <symbol>             Get price for ADA, BTC, SOL, or Cardano tokens
+
     wallet address                   Show derived wallet addresses
     wallet create <name> [--show-seed]  Create a new wallet (silent by default)
     wallet restore <name>            Restore a wallet from mnemonic (interactive)
@@ -78,6 +82,10 @@ const cli = meow(
     --address         Wallet address for swap orders (read-only)
     --protocol        Protocol override for cancel if not in pending list
 
+  Token Options
+    --trending        Show trending tokens by volume (token search)
+    --currency, -c    Currency for prices (default: usd)
+
   Environment
     BEGIN_CLI_MNEMONIC           Mnemonic for CI/agent use (bypasses keystore)
     BEGIN_CLI_WALLET_PASSWORD    Wallet password for automation (--password overrides)
@@ -123,6 +131,13 @@ const cli = meow(
     $ begin swap orders --address addr1qy...
     $ begin swap cancel --id <tx_in> --yes
 
+    # Token discovery
+    $ begin token search HOSKY
+    $ begin token search MIN --json
+    $ begin token search --trending
+    $ begin token price ADA
+    $ begin token price MIN --json
+
     # Offline signing workflow
     $ begin cardano send addr1qy... 10 --dry-run --output tx.unsigned
     $ begin sign tx.unsigned --wallet my-wallet --password mypass
@@ -163,6 +178,9 @@ const cli = meow(
       address: { type: "string" },
       protocol: { type: "string" },
       showSeed: { type: "boolean", default: false },
+      // Token discovery flags
+      trending: { type: "boolean", default: false },
+      currency: { type: "string", shortFlag: "c", default: "usd" },
     },
   }
 );
@@ -214,6 +232,9 @@ if (command === "mcp") {
     address?: string;
     protocol?: string;
     showSeed: boolean;
+    // Token discovery flags
+    trending: boolean;
+    currency: string;
   };
 
   const network = rawFlags.network ?? config.network ?? "mainnet";
@@ -250,6 +271,8 @@ if (command === "mcp") {
     address: rawFlags.address,
     protocol: rawFlags.protocol,
     showSeed: rawFlags.showSeed,
+    trending: rawFlags.trending,
+    currency: rawFlags.currency,
   };
 
   setOutputContext({ json: flags.json });
