@@ -25,6 +25,10 @@ const cli = meow(
     solana history <address>         Show Solana transaction history
     solana send <to> <amount>        Send SOL (use --asset for SPL tokens)
 
+    bitcoin balance <address>        Check BTC balance for an address
+    bitcoin history <address>        Show Bitcoin transaction history
+    bitcoin send <to> <amount>       Send BTC
+
     token search <query>             Search Cardano tokens by name/ticker
     token search --trending          Show top tokens by 24h volume
     token price <symbol>             Get price for ADA, BTC, SOL, or Cardano tokens

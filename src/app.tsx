@@ -5,6 +5,7 @@ import { CardanoUtxos } from "./commands/cardano/utxos.js";
 import { CardanoHistory } from "./commands/cardano/history.js";
 import { CardanoSend } from "./commands/cardano/send.js";
 import { SolanaBalance, SolanaHistory, SolanaSend } from "./commands/solana/index.js";
+import { BitcoinBalance, BitcoinHistory, BitcoinSend } from "./commands/bitcoin/index.js";
 import { Receive } from "./commands/receive.js";
 import { StakePools } from "./commands/stake/pools.js";
 import { StakeDelegate } from "./commands/stake/delegate.js";
@@ -28,7 +29,7 @@ import { Buy } from "./commands/buy.js";
 import { isValidNetwork, type Network } from "./lib/config.js";
 import type { NetworkType } from "./lib/address.js";
 import type { ChainFilter } from "./services/market.js";
-import type { SolanaNetwork } from "./lib/chains/types.js";
+import type { SolanaNetwork, BitcoinNetwork } from "./lib/chains/types.js";
 
 export interface AppFlags {
   network: string;
@@ -295,6 +296,69 @@ export function App({ command, subcommand, args, flags, showHelp }: AppProps) {
     return (
       <Box flexDirection="column">
         <Text color="red">Unknown solana command: {subcommand || "(none)"}</Text>
+        <Text color="gray">Available commands: balance, history, send</Text>
+      </Box>
+    );
+  }
+
+  // ---- Bitcoin commands ----
+  if (command === "bitcoin") {
+    // Map network to Bitcoin network (mainnet -> mainnet, preprod/preview -> testnet)
+    const bitcoinNetwork: BitcoinNetwork =
+      network === "mainnet" ? "mainnet" : "testnet";
+
+    if (subcommand === "balance") {
+      const address = args[0];
+      if (!address)
+        return invalidUsage("Address is required", "begin bitcoin balance <address>");
+      return (
+        <BitcoinBalance address={address} network={bitcoinNetwork} json={flags.json} />
+      );
+    }
+
+    if (subcommand === "history") {
+      const address = args[0];
+      if (!address)
+        return invalidUsage("Address is required", "begin bitcoin history <address>");
+      return (
+        <BitcoinHistory
+          address={address}
+          network={bitcoinNetwork}
+          json={flags.json}
+          limit={flags.limit}
+        />
+      );
+    }
+
+    if (subcommand === "send") {
+      const [to, amountStr] = args;
+      if (!to || !amountStr)
+        return invalidUsage(
+          "Recipient address and amount are required",
+          "begin bitcoin send <to> <amount> [options]"
+        );
+      const amount = Number(amountStr);
+      if (!Number.isFinite(amount) || amount <= 0)
+        return invalidUsage(
+          "Amount must be a positive number",
+          "begin bitcoin send <to> <amount> [options]"
+        );
+      return (
+        <BitcoinSend
+          to={to}
+          amount={amount}
+          network={bitcoinNetwork}
+          walletName={flags.wallet}
+          password={flags.password}
+          jsonOutput={flags.json}
+          yes={flags.yes}
+        />
+      );
+    }
+
+    return (
+      <Box flexDirection="column">
+        <Text color="red">Unknown bitcoin command: {subcommand || "(none)"}</Text>
         <Text color="gray">Available commands: balance, history, send</Text>
       </Box>
     );
