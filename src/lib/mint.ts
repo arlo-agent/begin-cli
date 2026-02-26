@@ -8,8 +8,8 @@
  * - Cardano address validation
  */
 
-import * as fs from 'fs';
-import * as path from 'path';
+import * as fs from "fs";
+import * as path from "path";
 
 // ============================================================================
 // Types
@@ -54,12 +54,12 @@ export interface MintCostEstimate {
 // ============================================================================
 
 const SUPPORTED_IMAGE_TYPES: Record<string, string> = {
-  '.png': 'image/png',
-  '.jpg': 'image/jpeg',
-  '.jpeg': 'image/jpeg',
-  '.gif': 'image/gif',
-  '.webp': 'image/webp',
-  '.svg': 'image/svg+xml',
+  ".png": "image/png",
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".gif": "image/gif",
+  ".webp": "image/webp",
+  ".svg": "image/svg+xml",
 };
 
 const MAX_IMAGE_SIZE_MB = 10; // NMKR limit
@@ -81,10 +81,8 @@ export async function readImageFile(filePath: string): Promise<ImageFileInfo> {
   const mimeType = SUPPORTED_IMAGE_TYPES[ext];
 
   if (!mimeType) {
-    const supported = Object.keys(SUPPORTED_IMAGE_TYPES).join(', ');
-    throw new Error(
-      `Unsupported image format: ${ext}. Supported formats: ${supported}`
-    );
+    const supported = Object.keys(SUPPORTED_IMAGE_TYPES).join(", ");
+    throw new Error(`Unsupported image format: ${ext}. Supported formats: ${supported}`);
   }
 
   // Read file
@@ -94,9 +92,7 @@ export async function readImageFile(filePath: string): Promise<ImageFileInfo> {
   // Check size
   if (size > MAX_IMAGE_SIZE_BYTES) {
     const sizeMb = (size / (1024 * 1024)).toFixed(2);
-    throw new Error(
-      `Image file too large: ${sizeMb}MB. Maximum size is ${MAX_IMAGE_SIZE_MB}MB`
-    );
+    throw new Error(`Image file too large: ${sizeMb}MB. Maximum size is ${MAX_IMAGE_SIZE_MB}MB`);
   }
 
   // Validate magic bytes for common formats
@@ -116,18 +112,18 @@ export async function readImageFile(filePath: string): Promise<ImageFileInfo> {
  */
 function validateImageMagicBytes(buffer: Buffer, extension: string): void {
   if (buffer.length < 8) {
-    throw new Error('Image file is too small to be valid');
+    throw new Error("Image file is too small to be valid");
   }
 
   const magicBytes: Record<string, number[][]> = {
-    '.png': [[0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]],
-    '.jpg': [[0xff, 0xd8, 0xff]],
-    '.jpeg': [[0xff, 0xd8, 0xff]],
-    '.gif': [
+    ".png": [[0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]],
+    ".jpg": [[0xff, 0xd8, 0xff]],
+    ".jpeg": [[0xff, 0xd8, 0xff]],
+    ".gif": [
       [0x47, 0x49, 0x46, 0x38, 0x37, 0x61], // GIF87a
       [0x47, 0x49, 0x46, 0x38, 0x39, 0x61], // GIF89a
     ],
-    '.webp': [[0x52, 0x49, 0x46, 0x46]], // RIFF header
+    ".webp": [[0x52, 0x49, 0x46, 0x46]], // RIFF header
   };
 
   const expectedMagic = magicBytes[extension];
@@ -136,9 +132,7 @@ function validateImageMagicBytes(buffer: Buffer, extension: string): void {
     return;
   }
 
-  const matches = expectedMagic.some((magic) =>
-    magic.every((byte, i) => buffer[i] === byte)
-  );
+  const matches = expectedMagic.some((magic) => magic.every((byte, i) => buffer[i] === byte));
 
   if (!matches) {
     throw new Error(
@@ -191,7 +185,7 @@ export function formatMetadata(params: {
   if (params.attributes) {
     for (const [key, value] of Object.entries(params.attributes)) {
       // Avoid overwriting reserved fields
-      if (!['name', 'image', 'mediaType', 'description', 'files'].includes(key)) {
+      if (!["name", "image", "mediaType", "description", "files"].includes(key)) {
         metadata[key] = value;
       }
     }
@@ -200,7 +194,7 @@ export function formatMetadata(params: {
   // Add any additional metadata
   if (params.additionalMetadata) {
     for (const [key, value] of Object.entries(params.additionalMetadata)) {
-      if (!['name', 'image', 'mediaType', 'description', 'files'].includes(key)) {
+      if (!["name", "image", "mediaType", "description", "files"].includes(key)) {
         metadata[key] = value;
       }
     }
@@ -222,7 +216,7 @@ export function validateMetadataLengths(params: {
   const errors: string[] = [];
 
   // Token name (on-chain identifier)
-  const tokenNameBytes = Buffer.byteLength(params.name, 'utf8');
+  const tokenNameBytes = Buffer.byteLength(params.name, "utf8");
   if (tokenNameBytes > 32) {
     errors.push(
       `Token name too long: ${tokenNameBytes} bytes (max 32). Use --name for short identifier.`
@@ -231,24 +225,20 @@ export function validateMetadataLengths(params: {
 
   // Check for invalid characters in token name
   if (!/^[a-zA-Z0-9_]+$/.test(params.name)) {
-    errors.push(
-      'Token name should only contain letters, numbers, and underscores'
-    );
+    errors.push("Token name should only contain letters, numbers, and underscores");
   }
 
   // Display name
   if (params.displayName) {
-    const displayNameBytes = Buffer.byteLength(params.displayName, 'utf8');
+    const displayNameBytes = Buffer.byteLength(params.displayName, "utf8");
     if (displayNameBytes > 64) {
-      errors.push(
-        `Display name quite long: ${displayNameBytes} bytes. Consider keeping under 64.`
-      );
+      errors.push(`Display name quite long: ${displayNameBytes} bytes. Consider keeping under 64.`);
     }
   }
 
   // Description - warn if very long
   if (params.description) {
-    const descBytes = Buffer.byteLength(params.description, 'utf8');
+    const descBytes = Buffer.byteLength(params.description, "utf8");
     if (descBytes > 512) {
       errors.push(
         `Description is ${descBytes} bytes. Very long descriptions may not display properly.`
@@ -294,7 +284,7 @@ export function estimateMintCost(): MintCostEstimate {
       `Total:    ~${totalAda.toFixed(1)} ADA`,
     ]
       .filter(Boolean)
-      .join('\n'),
+      .join("\n"),
   };
 }
 
@@ -307,30 +297,32 @@ export function estimateMintCost(): MintCostEstimate {
  */
 export function validateCardanoAddress(address: string): {
   valid: boolean;
-  network?: 'mainnet' | 'testnet';
-  type?: 'base' | 'enterprise' | 'stake';
+  network?: "mainnet" | "testnet";
+  type?: "base" | "enterprise" | "stake";
   error?: string;
 } {
   if (!address) {
-    return { valid: false, error: 'Address is required' };
+    return { valid: false, error: "Address is required" };
   }
 
   // Check prefix
-  const isMainnet = address.startsWith('addr1');
-  const isTestnet = address.startsWith('addr_test1');
-  const isStake = address.startsWith('stake1') || address.startsWith('stake_test1');
+  const isMainnet = address.startsWith("addr1");
+  const isTestnet = address.startsWith("addr_test1");
+  const isStake = address.startsWith("stake1") || address.startsWith("stake_test1");
 
   if (!isMainnet && !isTestnet && !isStake) {
     return {
       valid: false,
-      error: 'Invalid address format. Must start with addr1 (mainnet), addr_test1 (testnet), or stake1/stake_test1',
+      error:
+        "Invalid address format. Must start with addr1 (mainnet), addr_test1 (testnet), or stake1/stake_test1",
     };
   }
 
   if (isStake) {
     return {
       valid: false,
-      error: 'Stake addresses cannot receive NFTs. Please provide a payment address (addr1... or addr_test1...)',
+      error:
+        "Stake addresses cannot receive NFTs. Please provide a payment address (addr1... or addr_test1...)",
     };
   }
 
@@ -351,18 +343,18 @@ export function validateCardanoAddress(address: string): {
   if (!bech32Chars.test(dataPart)) {
     return {
       valid: false,
-      error: 'Address contains invalid characters',
+      error: "Address contains invalid characters",
     };
   }
 
   // Determine address type from length
   // Base addresses are longer (include stake credential)
   // Enterprise addresses are shorter
-  const type = address.length > 90 ? 'base' : 'enterprise';
+  const type = address.length > 90 ? "base" : "enterprise";
 
   return {
     valid: true,
-    network: isMainnet ? 'mainnet' : 'testnet',
+    network: isMainnet ? "mainnet" : "testnet",
     type,
   };
 }
@@ -372,7 +364,7 @@ export function validateCardanoAddress(address: string): {
  */
 export function validateAddressNetwork(
   address: string,
-  expectedNetwork: 'mainnet' | 'preprod' | 'preview'
+  expectedNetwork: "mainnet" | "preprod" | "preview"
 ): { valid: boolean; error?: string } {
   const validation = validateCardanoAddress(address);
 
@@ -381,8 +373,8 @@ export function validateAddressNetwork(
   }
 
   const addressNetwork = validation.network;
-  const expectedIsMainnet = expectedNetwork === 'mainnet';
-  const addressIsMainnet = addressNetwork === 'mainnet';
+  const expectedIsMainnet = expectedNetwork === "mainnet";
+  const addressIsMainnet = addressNetwork === "mainnet";
 
   if (expectedIsMainnet !== addressIsMainnet) {
     return {
@@ -412,5 +404,5 @@ export function formatFileSize(bytes: number): string {
  */
 export function truncate(str: string, maxLen: number): string {
   if (str.length <= maxLen) return str;
-  return str.slice(0, maxLen - 3) + '...';
+  return str.slice(0, maxLen - 3) + "...";
 }

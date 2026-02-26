@@ -15,14 +15,23 @@
     "run": "pnpm build && pnpm start",
     "dev:cli": "tsx src/cli.tsx",
     "link": "pnpm link --global",
-    "lint": "eslint src --ext .ts,.tsx",
+    "lint": "eslint src",
+    "lint:fix": "eslint src --fix",
+    "format": "prettier --write \"src/**/*.{ts,tsx,json,md}\"",
+    "format:check": "prettier --check \"src/**/*.{ts,tsx,json,md}\"",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
     "clean": "rm -rf dist",
     "prepublishOnly": "pnpm run build"
   },
-  "keywords": ["cardano", "blockchain", "cli", "ink", "wallet"],
+  "keywords": [
+    "cardano",
+    "blockchain",
+    "cli",
+    "ink",
+    "wallet"
+  ],
   "author": "beginwallet",
   "license": "MIT",
   "dependencies": {
@@ -36,15 +45,30 @@
     "react": "^18.3.1"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@types/node": "^22.10.0",
     "@types/qrcode-terminal": "^0.12.2",
     "@types/react": "^18.3.12",
+    "eslint": "^10.0.2",
+    "eslint-config-prettier": "^10.1.8",
+    "prettier": "^3.8.1",
+    "tsx": "^4.8.1",
     "typescript": "^5.6.3",
-    "vitest": "^3.0.0",
-    "tsx": "^4.8.1"
+    "typescript-eslint": "^8.56.1",
+    "vitest": "^3.0.0"
   },
   "engines": {
     "node": ">=18"
   },
-  "files": ["dist"]
+  "files": [
+    "dist"
+  ],
+  "optionalDependencies": {
+    "keytar": "^7.9.0"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "keytar"
+    ]
+  }
 }

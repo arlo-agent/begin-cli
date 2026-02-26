@@ -4,11 +4,7 @@
  * Pure functions for token swaps via Minswap aggregator.
  */
 
-import {
-  createMinswapClient,
-  MockMinswapClient,
-  type SwapEstimate,
-} from '../services/minswap.js';
+import { createMinswapClient, MockMinswapClient, type SwapEstimate } from "../services/minswap.js";
 import {
   resolveTokenId,
   formatSwapQuote,
@@ -16,15 +12,15 @@ import {
   extractWitnessSet,
   type ResolvedToken,
   type FormattedQuote,
-} from '../lib/swap.js';
+} from "../lib/swap.js";
 import {
   loadWallet,
   checkWalletAvailability,
   getWalletAddress,
   type TransactionConfig,
   type WalletOptions,
-} from '../lib/transaction.js';
-import { getPasswordFromEnv } from '../lib/keystore.js';
+} from "../lib/transaction.js";
+import { getPasswordFromEnv } from "../lib/keystore.js";
 
 export interface SwapQuoteParams {
   from: string;
@@ -36,7 +32,7 @@ export interface SwapQuoteParams {
 }
 
 export interface SwapQuoteResult {
-  status: 'success' | 'error';
+  status: "success" | "error";
   network: string;
   from?: {
     token: string;
@@ -58,7 +54,7 @@ export interface SwapQuoteResult {
     dex: string;
     aggregator: string;
   };
-  paths?: SwapEstimate['paths'];
+  paths?: SwapEstimate["paths"];
   multiHop?: boolean;
   formatted?: FormattedQuote;
   error?: string;
@@ -77,7 +73,7 @@ export interface SwapExecuteParams {
 }
 
 export interface SwapExecuteResult {
-  status: 'success' | 'error';
+  status: "success" | "error";
   txHash?: string;
   from?: {
     token: string;
@@ -97,24 +93,15 @@ export interface SwapExecuteResult {
  * Get a swap quote without executing
  */
 export async function getSwapQuote(params: SwapQuoteParams): Promise<SwapQuoteResult> {
-  const {
-    from,
-    to,
-    amount,
-    slippage = 0.5,
-    multiHop = true,
-    network = 'mainnet',
-  } = params;
+  const { from, to, amount, slippage = 0.5, multiHop = true, network = "mainnet" } = params;
 
   try {
     // Validate slippage
     validateSlippage(slippage);
 
     // Create client (use mock if env flag set)
-    const useMock = process.env.MINSWAP_MOCK === 'true';
-    const client = useMock
-      ? new MockMinswapClient(network)
-      : createMinswapClient(network);
+    const useMock = process.env.MINSWAP_MOCK === "true";
+    const client = useMock ? new MockMinswapClient(network) : createMinswapClient(network);
 
     // Resolve token IDs
     const [resolvedFrom, resolvedTo] = await Promise.all([
@@ -124,10 +111,10 @@ export async function getSwapQuote(params: SwapQuoteParams): Promise<SwapQuoteRe
 
     if (resolvedFrom.tokenId === resolvedTo.tokenId) {
       return {
-        status: 'error',
+        status: "error",
         network,
         slippage,
-        error: 'Cannot swap a token for itself',
+        error: "Cannot swap a token for itself",
       };
     }
 
@@ -145,7 +132,7 @@ export async function getSwapQuote(params: SwapQuoteParams): Promise<SwapQuoteRe
     const formatted = formatSwapQuote(estimate, resolvedFrom, resolvedTo);
 
     return {
-      status: 'success',
+      status: "success",
       network,
       from: {
         token: resolvedFrom.ticker,
@@ -174,10 +161,10 @@ export async function getSwapQuote(params: SwapQuoteParams): Promise<SwapQuoteRe
     };
   } catch (err) {
     return {
-      status: 'error',
+      status: "error",
       network,
       slippage: slippage,
-      error: err instanceof Error ? err.message : 'Failed to get quote',
+      error: err instanceof Error ? err.message : "Failed to get quote",
     };
   }
 }
@@ -194,25 +181,25 @@ export async function executeSwap(params: SwapExecuteParams): Promise<SwapExecut
     multiHop = true,
     wallet: walletName,
     password: initialPassword,
-    network = 'mainnet',
+    network = "mainnet",
   } = params;
 
   // Check wallet availability
   const availability = checkWalletAvailability(walletName);
   if (!availability.available) {
     return {
-      status: 'error',
+      status: "error",
       network,
-      error: availability.error || 'No wallet available',
+      error: availability.error || "No wallet available",
     };
   }
 
   const effectivePassword = initialPassword || getPasswordFromEnv() || undefined;
   if (availability.needsPassword && !effectivePassword) {
     return {
-      status: 'error',
+      status: "error",
       network,
-      error: 'Password is required for wallet decryption',
+      error: "Password is required for wallet decryption",
     };
   }
 
@@ -230,10 +217,8 @@ export async function executeSwap(params: SwapExecuteParams): Promise<SwapExecut
     const senderAddress = await getWalletAddress(meshWallet);
 
     // Create client
-    const useMock = process.env.MINSWAP_MOCK === 'true';
-    const client = useMock
-      ? new MockMinswapClient(network)
-      : createMinswapClient(network);
+    const useMock = process.env.MINSWAP_MOCK === "true";
+    const client = useMock ? new MockMinswapClient(network) : createMinswapClient(network);
 
     // Resolve tokens
     const [resolvedFrom, resolvedTo] = await Promise.all([
@@ -243,9 +228,9 @@ export async function executeSwap(params: SwapExecuteParams): Promise<SwapExecut
 
     if (resolvedFrom.tokenId === resolvedTo.tokenId) {
       return {
-        status: 'error',
+        status: "error",
         network,
-        error: 'Cannot swap a token for itself',
+        error: "Cannot swap a token for itself",
       };
     }
 
@@ -285,7 +270,7 @@ export async function executeSwap(params: SwapExecuteParams): Promise<SwapExecut
     });
 
     return {
-      status: 'success',
+      status: "success",
       txHash: submitResult.txId,
       from: {
         token: resolvedFrom.ticker,
@@ -301,9 +286,9 @@ export async function executeSwap(params: SwapExecuteParams): Promise<SwapExecut
     };
   } catch (err) {
     return {
-      status: 'error',
+      status: "error",
       network,
-      error: err instanceof Error ? err.message : 'Swap execution failed',
+      error: err instanceof Error ? err.message : "Swap execution failed",
     };
   }
 }

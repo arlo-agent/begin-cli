@@ -1,17 +1,17 @@
-import React, { useState, useEffect } from 'react';
-import { Box, Text, useApp } from 'ink';
-import TextInput from 'ink-text-input';
+import React, { useState, useEffect } from "react";
+import { Box, Text, useApp } from "ink";
+import TextInput from "ink-text-input";
 import {
   getDelegationStatus,
   getMockDelegationStatus,
   lovelaceToAda,
   type DelegationStatus,
-} from '../../lib/staking.js';
+} from "../../lib/staking.js";
 import {
   loadWallet,
   checkWalletAvailability,
   type TransactionConfig,
-} from '../../lib/transaction.js';
+} from "../../lib/transaction.js";
 
 interface StakeStatusProps {
   network: string;
@@ -21,16 +21,10 @@ interface StakeStatusProps {
   stakeAddress?: string; // Optional - allow checking any address directly
 }
 
-type StatusState =
-  | 'checking'
-  | 'password'
-  | 'loading-wallet'
-  | 'loading'
-  | 'success'
-  | 'error';
+type StatusState = "checking" | "password" | "loading-wallet" | "loading" | "success" | "error";
 
 interface WalletInfo {
-  source: 'env' | 'wallet';
+  source: "env" | "wallet" | "keychain";
   walletName?: string;
   needsPassword: boolean;
 }
@@ -43,10 +37,10 @@ export function StakeStatus({
   stakeAddress: providedStakeAddress,
 }: StakeStatusProps) {
   const { exit } = useApp();
-  const [state, setState] = useState<StatusState>('checking');
+  const [state, setState] = useState<StatusState>("checking");
   const [status, setStatus] = useState<DelegationStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [password, setPassword] = useState(initialPassword || '');
+  const [password, setPassword] = useState(initialPassword || "");
   const [walletInfo, setWalletInfo] = useState<WalletInfo | null>(null);
   const [stakeAddress, setStakeAddress] = useState<string | null>(providedStakeAddress || null);
 
@@ -64,8 +58,8 @@ export function StakeStatus({
     const availability = checkWalletAvailability(walletName);
 
     if (!availability.available) {
-      setError(availability.error || 'No wallet available');
-      setState('error');
+      setError(availability.error || "No wallet available");
+      setState("error");
       setTimeout(() => exit(), 2000);
       return;
     }
@@ -80,7 +74,7 @@ export function StakeStatus({
     if (!availability.needsPassword || initialPassword) {
       initWallet(initialPassword, availability.walletName);
     } else {
-      setState('password');
+      setState("password");
     }
   }, []);
 
@@ -94,17 +88,14 @@ export function StakeStatus({
   // Initialize wallet and derive stake address
   const initWallet = async (pwd?: string, wName?: string) => {
     try {
-      setState('loading-wallet');
+      setState("loading-wallet");
 
-      const loadedWallet = await loadWallet(
-        { walletName: wName, password: pwd },
-        config
-      );
+      const loadedWallet = await loadWallet({ walletName: wName, password: pwd }, config);
 
       // Get stake/reward address from wallet
       const rewardAddresses = await loadedWallet.getRewardAddresses();
       if (!rewardAddresses || rewardAddresses.length === 0) {
-        throw new Error('Could not derive stake address from wallet');
+        throw new Error("Could not derive stake address from wallet");
       }
       const derivedStakeAddress = rewardAddresses[0];
       setStakeAddress(derivedStakeAddress);
@@ -112,47 +103,47 @@ export function StakeStatus({
       // Continue with status fetch
       await fetchStatus(derivedStakeAddress);
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to load wallet';
-      if (message.includes('Incorrect password')) {
-        setError('Incorrect password. Please try again.');
+      const message = err instanceof Error ? err.message : "Failed to load wallet";
+      if (message.includes("Incorrect password")) {
+        setError("Incorrect password. Please try again.");
       } else {
         setError(message);
       }
-      setState('error');
+      setState("error");
       setTimeout(() => exit(), 2000);
     }
   };
 
   const fetchStatus = async (effectiveStakeAddress: string) => {
     try {
-      setState('loading');
+      setState("loading");
       const apiKey = process.env.BLOCKFROST_API_KEY;
 
       if (!apiKey) {
         // Use mock data
-        console.error('\n⚠ No BLOCKFROST_API_KEY set - using mock data\n');
+        console.error("\n⚠ No BLOCKFROST_API_KEY set - using mock data\n");
         const mockStatus = getMockDelegationStatus();
         setStatus({ ...mockStatus, stakeAddress: effectiveStakeAddress });
-        setState('success');
+        setState("success");
         return;
       }
 
       const delegationStatus = await getDelegationStatus(effectiveStakeAddress, network);
       setStatus(delegationStatus);
-      setState('success');
+      setState("success");
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch delegation status');
-      setState('error');
+      setError(err instanceof Error ? err.message : "Failed to fetch delegation status");
+      setState("error");
       setTimeout(() => exit(), 2000);
     }
   };
 
   // JSON output
   if (json) {
-    if (state === 'checking' || state === 'loading-wallet' || state === 'loading') {
-      return <Text>{JSON.stringify({ status: 'loading' })}</Text>;
+    if (state === "checking" || state === "loading-wallet" || state === "loading") {
+      return <Text>{JSON.stringify({ status: "loading" })}</Text>;
     }
-    if (state === 'error') {
+    if (state === "error") {
       console.log(JSON.stringify({ error }, null, 2));
       setTimeout(() => exit(), 100);
       return null;
@@ -172,9 +163,9 @@ export function StakeStatus({
             : null,
           rewards: {
             available: status?.rewardsAvailable,
-            availableAda: status ? lovelaceToAda(status.rewardsAvailable) : '0',
+            availableAda: status ? lovelaceToAda(status.rewardsAvailable) : "0",
             totalWithdrawn: status?.totalWithdrawn,
-            totalWithdrawnAda: status ? lovelaceToAda(status.totalWithdrawn) : '0',
+            totalWithdrawnAda: status ? lovelaceToAda(status.totalWithdrawn) : "0",
           },
           activeEpoch: status?.activeEpoch,
           network,
@@ -188,7 +179,7 @@ export function StakeStatus({
   }
 
   // Render checking state
-  if (state === 'checking') {
+  if (state === "checking") {
     return (
       <Box padding={1}>
         <Text color="cyan">⏳ Checking wallet availability...</Text>
@@ -197,7 +188,7 @@ export function StakeStatus({
   }
 
   // Render password prompt
-  if (state === 'password') {
+  if (state === "password") {
     return (
       <Box flexDirection="column" padding={1}>
         <Box marginBottom={1}>
@@ -220,22 +211,20 @@ export function StakeStatus({
   }
 
   // Render loading wallet state
-  if (state === 'loading-wallet') {
+  if (state === "loading-wallet") {
     return (
       <Box flexDirection="column" padding={1}>
         <Text color="cyan">⏳ Loading wallet...</Text>
-        {walletInfo?.source === 'wallet' && (
+        {walletInfo?.source === "wallet" && (
           <Text color="gray">Decrypting {walletInfo.walletName}...</Text>
         )}
-        {walletInfo?.source === 'env' && (
-          <Text color="gray">Using environment variable</Text>
-        )}
+        {walletInfo?.source === "env" && <Text color="gray">Using environment variable</Text>}
       </Box>
     );
   }
 
   // Human-readable output
-  if (state === 'loading') {
+  if (state === "loading") {
     return (
       <Box>
         <Text color="cyan">⏳ Checking delegation status...</Text>
@@ -243,7 +232,7 @@ export function StakeStatus({
     );
   }
 
-  if (state === 'error') {
+  if (state === "error") {
     return (
       <Box flexDirection="column" padding={1}>
         <Text color="red">Error: {error}</Text>
@@ -262,9 +251,7 @@ export function StakeStatus({
           Delegation Status
         </Text>
         <Text color="gray"> ({network})</Text>
-        {walletInfo?.source === 'wallet' && (
-          <Text color="gray"> [{walletInfo.walletName}]</Text>
-        )}
+        {walletInfo?.source === "wallet" && <Text color="gray"> [{walletInfo.walletName}]</Text>}
       </Box>
 
       <Box flexDirection="column" borderStyle="round" borderColor="gray" padding={1}>
@@ -318,10 +305,10 @@ export function StakeStatus({
                   <Text
                     color={
                       status.delegatedPool.saturation > 90
-                        ? 'red'
+                        ? "red"
                         : status.delegatedPool.saturation > 70
-                          ? 'yellow'
-                          : 'green'
+                          ? "yellow"
+                          : "green"
                     }
                   >
                     {status.delegatedPool.saturation.toFixed(1)}%
@@ -351,25 +338,21 @@ export function StakeStatus({
 
       {Number(status.rewardsAvailable) > 0 && (
         <Box marginTop={1}>
-          <Text color="gray">
-            Tip: Use `begin stake withdraw` to withdraw your rewards
-          </Text>
+          <Text color="gray">Tip: Use `begin stake withdraw` to withdraw your rewards</Text>
         </Box>
       )}
 
       {!status.isRegistered && (
         <Box marginTop={1}>
-          <Text color="gray">
-            Tip: Use `begin stake delegate {'<pool-id>'}` to start staking
-          </Text>
+          <Text color="gray">Tip: Use `begin stake delegate {"<pool-id>"}` to start staking</Text>
         </Box>
       )}
 
       {status.isRegistered && !status.delegatedPool && (
         <Box marginTop={1}>
           <Text color="yellow">
-            ⚠ Your stake key is registered but not delegated. Use `begin stake delegate{' '}
-            {'<pool-id>'}` to earn rewards.
+            ⚠ Your stake key is registered but not delegated. Use `begin stake delegate{" "}
+            {"<pool-id>"}` to earn rewards.
           </Text>
         </Box>
       )}

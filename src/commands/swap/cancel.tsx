@@ -1,20 +1,20 @@
-import React, { useEffect, useState } from 'react';
-import { Box, Text, useApp, useInput } from 'ink';
-import TextInput from 'ink-text-input';
+import React, { useEffect, useState } from "react";
+import { Box, Text, useApp, useInput } from "ink";
+import TextInput from "ink-text-input";
 import {
   createMinswapClient,
   MockMinswapClient,
   type MinswapClient,
   type Protocol,
-} from '../../services/minswap.js';
+} from "../../services/minswap.js";
 import {
   checkWalletAvailability,
   getWalletAddress,
   loadWallet,
   type TransactionConfig,
-} from '../../lib/transaction.js';
-import { extractWitnessSet } from '../../lib/swap.js';
-import type { MeshWallet } from '@meshsdk/core';
+} from "../../lib/transaction.js";
+import { extractWitnessSet } from "../../lib/swap.js";
+import type { MeshWallet } from "@meshsdk/core";
 
 interface SwapCancelProps {
   network: string;
@@ -27,33 +27,33 @@ interface SwapCancelProps {
 }
 
 type CancelState =
-  | 'checking'
-  | 'password'
-  | 'loading-wallet'
-  | 'loading-orders'
-  | 'confirm'
-  | 'building'
-  | 'signing'
-  | 'submitting'
-  | 'success'
-  | 'cancelled'
-  | 'error';
+  | "checking"
+  | "password"
+  | "loading-wallet"
+  | "loading-orders"
+  | "confirm"
+  | "building"
+  | "signing"
+  | "submitting"
+  | "success"
+  | "cancelled"
+  | "error";
 
 const PROTOCOLS: Protocol[] = [
-  'MinswapV2',
-  'Minswap',
-  'MinswapStable',
-  'MuesliSwap',
-  'Splash',
-  'SundaeSwapV3',
-  'SundaeSwap',
-  'VyFinance',
-  'CswapV1',
-  'WingRidersV2',
-  'WingRiders',
-  'WingRidersStableV2',
-  'Spectrum',
-  'SplashStable',
+  "MinswapV2",
+  "Minswap",
+  "MinswapStable",
+  "MuesliSwap",
+  "Splash",
+  "SundaeSwapV3",
+  "SundaeSwap",
+  "VyFinance",
+  "CswapV1",
+  "WingRidersV2",
+  "WingRiders",
+  "WingRidersStableV2",
+  "Spectrum",
+  "SplashStable",
 ];
 
 export function SwapCancel({
@@ -66,9 +66,9 @@ export function SwapCancel({
   json,
 }: SwapCancelProps) {
   const { exit } = useApp();
-  const [state, setState] = useState<CancelState>('checking');
+  const [state, setState] = useState<CancelState>("checking");
   const [error, setError] = useState<string | null>(null);
-  const [password, setPassword] = useState(initialPassword || '');
+  const [password, setPassword] = useState(initialPassword || "");
   const [wallet, setWallet] = useState<MeshWallet | null>(null);
   const [senderAddress, setSenderAddress] = useState<string | null>(null);
   const [client, setClient] = useState<MinswapClient | null>(null);
@@ -78,13 +78,13 @@ export function SwapCancel({
   const config: TransactionConfig = { network };
 
   useEffect(() => {
-    const useMock = process.env.MINSWAP_MOCK === 'true';
+    const useMock = process.env.MINSWAP_MOCK === "true";
     setClient(useMock ? new MockMinswapClient(network) : createMinswapClient(network));
 
     const availability = checkWalletAvailability(walletName);
     if (!availability.available) {
-      setError(availability.error || 'No wallet available');
-      setState('error');
+      setError(availability.error || "No wallet available");
+      setState("error");
       setTimeout(() => exit(), 2000);
       return;
     }
@@ -92,12 +92,12 @@ export function SwapCancel({
     if (!availability.needsPassword || initialPassword) {
       initWallet(initialPassword, availability.walletName);
     } else {
-      setState('password');
+      setState("password");
     }
   }, []);
 
   useEffect(() => {
-    if (state !== 'loading-orders' || !client || !senderAddress) return;
+    if (state !== "loading-orders" || !client || !senderAddress) return;
 
     const loadOrders = async () => {
       try {
@@ -107,9 +107,7 @@ export function SwapCancel({
         );
 
         const overrideProtocol =
-          protocol && PROTOCOLS.includes(protocol as Protocol)
-            ? (protocol as Protocol)
-            : undefined;
+          protocol && PROTOCOLS.includes(protocol as Protocol) ? (protocol as Protocol) : undefined;
 
         const resolved = ids.map((id) => {
           const foundProtocol = pendingMap.get(id.toLowerCase());
@@ -129,11 +127,11 @@ export function SwapCancel({
         if (yes) {
           await executeCancel(resolved);
         } else {
-          setState('confirm');
+          setState("confirm");
         }
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to load pending orders');
-        setState('error');
+        setError(err instanceof Error ? err.message : "Failed to load pending orders");
+        setState("error");
         setTimeout(() => exit(), 2000);
       }
     };
@@ -143,20 +141,20 @@ export function SwapCancel({
 
   const initWallet = async (pwd?: string, wName?: string) => {
     try {
-      setState('loading-wallet');
+      setState("loading-wallet");
       const loadedWallet = await loadWallet({ walletName: wName, password: pwd }, config);
       setWallet(loadedWallet);
       const address = await getWalletAddress(loadedWallet);
       setSenderAddress(address);
-      setState('loading-orders');
+      setState("loading-orders");
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to load wallet';
-      if (message.includes('Incorrect password')) {
-        setError('Incorrect password. Please try again.');
+      const message = err instanceof Error ? err.message : "Failed to load wallet";
+      if (message.includes("Incorrect password")) {
+        setError("Incorrect password. Please try again.");
       } else {
         setError(message);
       }
-      setState('error');
+      setState("error");
       setTimeout(() => exit(), 2000);
     }
   };
@@ -170,33 +168,33 @@ export function SwapCancel({
   const executeCancel = async (ordersToCancel: Array<{ txIn: string; protocol: Protocol }>) => {
     try {
       if (!wallet || !client || !senderAddress) {
-        throw new Error('Wallet not loaded');
+        throw new Error("Wallet not loaded");
       }
 
-      setState('building');
+      setState("building");
       const buildResult = await client.buildCancelTx({
         sender: senderAddress,
         orders: ordersToCancel,
       });
 
-      setState('signing');
+      setState("signing");
       const signedTx = await wallet.signTx(buildResult.cbor);
       const witnessSet = await extractWitnessSet(signedTx);
 
-      setState('submitting');
+      setState("submitting");
       const submitResult = await client.submitTx({
         cbor: buildResult.cbor,
         witnessSet,
       });
 
       setTxId(submitResult.txId);
-      setState('success');
+      setState("success");
 
       if (json) {
         console.log(
           JSON.stringify(
             {
-              status: 'success',
+              status: "success",
               txId: submitResult.txId,
               orders: ordersToCancel,
               network,
@@ -209,35 +207,35 @@ export function SwapCancel({
 
       setTimeout(() => exit(), 2000);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Cancel failed');
-      setState('error');
+      setError(err instanceof Error ? err.message : "Cancel failed");
+      setState("error");
       setTimeout(() => exit(), 2000);
     }
   };
 
   useInput((input, key) => {
-    if (state !== 'confirm') return;
-    if (input === 'y' || input === 'Y') {
+    if (state !== "confirm") return;
+    if (input === "y" || input === "Y") {
       executeCancel(orders);
-    } else if (input === 'n' || input === 'N' || key.escape) {
-      setState('cancelled');
+    } else if (input === "n" || input === "N" || key.escape) {
+      setState("cancelled");
       setTimeout(() => exit(), 500);
     }
   });
 
-  if (json && state === 'error') {
+  if (json && state === "error") {
     console.log(JSON.stringify({ error, ids }, null, 2));
     exit();
     return null;
   }
 
-  if (json && state === 'cancelled') {
-    console.log(JSON.stringify({ status: 'cancelled' }));
+  if (json && state === "cancelled") {
+    console.log(JSON.stringify({ status: "cancelled" }));
     exit();
     return null;
   }
 
-  if (state === 'checking') {
+  if (state === "checking") {
     return (
       <Box padding={1}>
         <Text color="cyan">⏳ Checking wallet availability...</Text>
@@ -245,12 +243,14 @@ export function SwapCancel({
     );
   }
 
-  if (state === 'password') {
+  if (state === "password") {
     return (
       <Box flexDirection="column" padding={1}>
         <Box marginBottom={1}>
           <Text color="cyan">🔐 Enter password for wallet </Text>
-          <Text bold color="yellow">{walletName}</Text>
+          <Text bold color="yellow">
+            {walletName}
+          </Text>
         </Box>
         <Box>
           <Text color="gray">Password: </Text>
@@ -265,7 +265,7 @@ export function SwapCancel({
     );
   }
 
-  if (state === 'loading-wallet') {
+  if (state === "loading-wallet") {
     return (
       <Box flexDirection="column" padding={1}>
         <Text color="cyan">⏳ Loading wallet...</Text>
@@ -273,7 +273,7 @@ export function SwapCancel({
     );
   }
 
-  if (state === 'loading-orders') {
+  if (state === "loading-orders") {
     return (
       <Box flexDirection="column" padding={1}>
         <Text color="cyan">⏳ Resolving pending orders...</Text>
@@ -281,7 +281,7 @@ export function SwapCancel({
     );
   }
 
-  if (state === 'error') {
+  if (state === "error") {
     return (
       <Box flexDirection="column" padding={1}>
         <Text color="red">✗ Error: {error}</Text>
@@ -289,7 +289,7 @@ export function SwapCancel({
     );
   }
 
-  if (state === 'cancelled') {
+  if (state === "cancelled") {
     return (
       <Box padding={1}>
         <Text color="yellow">Cancel request aborted</Text>
@@ -297,7 +297,7 @@ export function SwapCancel({
     );
   }
 
-  if (state === 'building') {
+  if (state === "building") {
     return (
       <Box flexDirection="column" padding={1}>
         <Text color="cyan">🔨 Building cancel transaction...</Text>
@@ -305,7 +305,7 @@ export function SwapCancel({
     );
   }
 
-  if (state === 'signing') {
+  if (state === "signing") {
     return (
       <Box flexDirection="column" padding={1}>
         <Text color="cyan">🔐 Signing transaction...</Text>
@@ -313,7 +313,7 @@ export function SwapCancel({
     );
   }
 
-  if (state === 'submitting') {
+  if (state === "submitting") {
     return (
       <Box flexDirection="column" padding={1}>
         <Text color="cyan">📤 Submitting cancellation...</Text>
@@ -321,7 +321,7 @@ export function SwapCancel({
     );
   }
 
-  if (state === 'success') {
+  if (state === "success") {
     if (json) {
       return null;
     }
@@ -337,22 +337,19 @@ export function SwapCancel({
     );
   }
 
-  if (state !== 'confirm') {
+  if (state !== "confirm") {
     return null;
   }
 
   return (
     <Box flexDirection="column" padding={1}>
       <Box marginBottom={1}>
-        <Text bold color="cyan">Cancel Swap Orders</Text>
+        <Text bold color="cyan">
+          Cancel Swap Orders
+        </Text>
         <Text color="gray"> ({network})</Text>
       </Box>
-      <Box
-        flexDirection="column"
-        borderStyle="round"
-        borderColor="gray"
-        padding={1}
-      >
+      <Box flexDirection="column" borderStyle="round" borderColor="gray" padding={1}>
         {orders.map((order, index) => (
           <Text key={`${order.txIn}-${index}`}>
             {index + 1}. {order.txIn} ({order.protocol})

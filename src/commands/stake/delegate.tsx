@@ -1,19 +1,19 @@
-import React, { useState, useEffect } from 'react';
-import { Box, Text, useInput, useApp } from 'ink';
-import TextInput from 'ink-text-input';
+import React, { useState, useEffect } from "react";
+import { Box, Text, useInput, useApp } from "ink";
+import TextInput from "ink-text-input";
 import {
   fetchPoolDetails,
   getDelegationStatus,
   lovelaceToAda,
   getMockPools,
   type StakePool,
-} from '../../lib/staking.js';
+} from "../../lib/staking.js";
 import {
   loadWallet,
   checkWalletAvailability,
   type TransactionConfig,
-} from '../../lib/transaction.js';
-import type { MeshWallet } from '@meshsdk/core';
+} from "../../lib/transaction.js";
+import type { MeshWallet } from "@meshsdk/core";
 
 interface StakeDelegateProps {
   poolId: string;
@@ -25,20 +25,20 @@ interface StakeDelegateProps {
 }
 
 type DelegateState =
-  | 'checking'
-  | 'password'
-  | 'loading-wallet'
-  | 'loading'
-  | 'confirm'
-  | 'building'
-  | 'signing'
-  | 'submitting'
-  | 'success'
-  | 'error'
-  | 'cancelled';
+  | "checking"
+  | "password"
+  | "loading-wallet"
+  | "loading"
+  | "confirm"
+  | "building"
+  | "signing"
+  | "submitting"
+  | "success"
+  | "error"
+  | "cancelled";
 
 interface WalletInfo {
-  source: 'env' | 'wallet';
+  source: "env" | "wallet" | "keychain";
   walletName?: string;
   needsPassword: boolean;
 }
@@ -52,12 +52,12 @@ export function StakeDelegate({
   password: initialPassword,
 }: StakeDelegateProps) {
   const { exit } = useApp();
-  const [state, setState] = useState<DelegateState>('checking');
+  const [state, setState] = useState<DelegateState>("checking");
   const [pool, setPool] = useState<StakePool | null>(null);
   const [needsRegistration, setNeedsRegistration] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [txHash, setTxHash] = useState<string | null>(null);
-  const [password, setPassword] = useState(initialPassword || '');
+  const [password, setPassword] = useState(initialPassword || "");
   const [walletInfo, setWalletInfo] = useState<WalletInfo | null>(null);
   const [stakeAddress, setStakeAddress] = useState<string | null>(null);
   const [wallet, setWallet] = useState<MeshWallet | null>(null);
@@ -69,8 +69,8 @@ export function StakeDelegate({
     const availability = checkWalletAvailability(walletName);
 
     if (!availability.available) {
-      setError(availability.error || 'No wallet available');
-      setState('error');
+      setError(availability.error || "No wallet available");
+      setState("error");
       setTimeout(() => exit(), 2000);
       return;
     }
@@ -85,7 +85,7 @@ export function StakeDelegate({
     if (!availability.needsPassword || initialPassword) {
       initWallet(initialPassword, availability.walletName);
     } else {
-      setState('password');
+      setState("password");
     }
   }, []);
 
@@ -99,18 +99,15 @@ export function StakeDelegate({
   // Initialize wallet and derive stake address
   const initWallet = async (pwd?: string, wName?: string) => {
     try {
-      setState('loading-wallet');
+      setState("loading-wallet");
 
-      const loadedWallet = await loadWallet(
-        { walletName: wName, password: pwd },
-        config
-      );
+      const loadedWallet = await loadWallet({ walletName: wName, password: pwd }, config);
       setWallet(loadedWallet);
 
       // Get stake/reward address from wallet
       const rewardAddresses = await loadedWallet.getRewardAddresses();
       if (!rewardAddresses || rewardAddresses.length === 0) {
-        throw new Error('Could not derive stake address from wallet');
+        throw new Error("Could not derive stake address from wallet");
       }
       const derivedStakeAddress = rewardAddresses[0];
       setStakeAddress(derivedStakeAddress);
@@ -118,25 +115,25 @@ export function StakeDelegate({
       // Continue with pool loading
       await loadPoolData(derivedStakeAddress);
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to load wallet';
-      if (message.includes('Incorrect password')) {
-        setError('Incorrect password. Please try again.');
+      const message = err instanceof Error ? err.message : "Failed to load wallet";
+      if (message.includes("Incorrect password")) {
+        setError("Incorrect password. Please try again.");
       } else {
         setError(message);
       }
-      setState('error');
+      setState("error");
       setTimeout(() => exit(), 2000);
     }
   };
 
   const loadPoolData = async (effectiveStakeAddress: string) => {
     try {
-      setState('loading');
+      setState("loading");
       const apiKey = process.env.BLOCKFROST_API_KEY;
 
       if (!apiKey) {
         // Use mock data
-        console.error('\n⚠ No BLOCKFROST_API_KEY set - using mock data\n');
+        console.error("\n⚠ No BLOCKFROST_API_KEY set - using mock data\n");
         const mockPools = getMockPools();
         const mockPool = mockPools.find(
           (p) => p.poolId === poolId || p.ticker.toLowerCase() === poolId.toLowerCase()
@@ -146,15 +143,15 @@ export function StakeDelegate({
           setNeedsRegistration(false); // Mock: assume registered
         } else {
           setError(`Pool not found: ${poolId}`);
-          setState('error');
+          setState("error");
           return;
         }
 
         if (yes) {
-          setState('building');
+          setState("building");
           simulateDelegation();
         } else {
-          setState('confirm');
+          setState("confirm");
         }
         return;
       }
@@ -163,7 +160,7 @@ export function StakeDelegate({
       const poolDetails = await fetchPoolDetails(poolId, network);
       if (!poolDetails) {
         setError(`Pool not found: ${poolId}`);
-        setState('error');
+        setState("error");
         return;
       }
       setPool(poolDetails);
@@ -173,26 +170,26 @@ export function StakeDelegate({
       setNeedsRegistration(!status.isRegistered);
 
       if (yes) {
-        setState('building');
+        setState("building");
         simulateDelegation();
       } else {
-        setState('confirm');
+        setState("confirm");
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load pool data');
-      setState('error');
+      setError(err instanceof Error ? err.message : "Failed to load pool data");
+      setState("error");
     }
   };
 
   useInput((input, key) => {
     if (json) return;
-    if (state !== 'confirm') return;
+    if (state !== "confirm") return;
 
-    if (input === 'y' || input === 'Y') {
-      setState('building');
+    if (input === "y" || input === "Y") {
+      setState("building");
       void simulateDelegation();
-    } else if (input === 'n' || input === 'N' || key.escape) {
-      setState('cancelled');
+    } else if (input === "n" || input === "N" || key.escape) {
+      setState("cancelled");
       setTimeout(() => exit(), 500);
     }
   });
@@ -208,33 +205,33 @@ export function StakeDelegate({
     // 6. const txHash = await wallet.submitTx(signedTx);
 
     await new Promise((resolve) => setTimeout(resolve, 1000));
-    setState('signing');
+    setState("signing");
 
     await new Promise((resolve) => setTimeout(resolve, 1500));
-    setState('submitting');
+    setState("submitting");
 
     await new Promise((resolve) => setTimeout(resolve, 2000));
-    setTxHash('mock_delegation_tx_' + Date.now().toString(36));
-    setState('success');
+    setTxHash("mock_delegation_tx_" + Date.now().toString(36));
+    setState("success");
 
     setTimeout(() => exit(), 2000);
   };
 
   // JSON output
   if (json) {
-    if (state === 'checking' || state === 'loading-wallet' || state === 'loading') {
-      return <Text>{JSON.stringify({ status: 'loading' })}</Text>;
+    if (state === "checking" || state === "loading-wallet" || state === "loading") {
+      return <Text>{JSON.stringify({ status: "loading" })}</Text>;
     }
-    if (state === 'error') {
+    if (state === "error") {
       console.log(JSON.stringify({ error, poolId }, null, 2));
       setTimeout(() => exit(), 100);
       return null;
     }
-    if (state === 'success') {
+    if (state === "success") {
       console.log(
         JSON.stringify(
           {
-            status: 'success',
+            status: "success",
             txHash,
             poolId: pool?.poolId,
             ticker: pool?.ticker,
@@ -252,11 +249,12 @@ export function StakeDelegate({
     console.log(
       JSON.stringify(
         {
-          status: 'confirm_required',
+          status: "confirm_required",
           pool,
           stakeAddress,
           needsRegistration,
-          message: 'Run without --json to confirm delegation interactively, or use --yes to skip confirmation',
+          message:
+            "Run without --json to confirm delegation interactively, or use --yes to skip confirmation",
         },
         null,
         2
@@ -267,7 +265,7 @@ export function StakeDelegate({
   }
 
   // Render checking state
-  if (state === 'checking') {
+  if (state === "checking") {
     return (
       <Box padding={1}>
         <Text color="cyan">⏳ Checking wallet availability...</Text>
@@ -276,7 +274,7 @@ export function StakeDelegate({
   }
 
   // Render password prompt
-  if (state === 'password') {
+  if (state === "password") {
     return (
       <Box flexDirection="column" padding={1}>
         <Box marginBottom={1}>
@@ -299,22 +297,20 @@ export function StakeDelegate({
   }
 
   // Render loading wallet state
-  if (state === 'loading-wallet') {
+  if (state === "loading-wallet") {
     return (
       <Box flexDirection="column" padding={1}>
         <Text color="cyan">⏳ Loading wallet...</Text>
-        {walletInfo?.source === 'wallet' && (
+        {walletInfo?.source === "wallet" && (
           <Text color="gray">Decrypting {walletInfo.walletName}...</Text>
         )}
-        {walletInfo?.source === 'env' && (
-          <Text color="gray">Using environment variable</Text>
-        )}
+        {walletInfo?.source === "env" && <Text color="gray">Using environment variable</Text>}
       </Box>
     );
   }
 
   // Human-readable output
-  if (state === 'loading') {
+  if (state === "loading") {
     return (
       <Box>
         <Text color="cyan">⏳ Loading pool information...</Text>
@@ -322,7 +318,7 @@ export function StakeDelegate({
     );
   }
 
-  if (state === 'error') {
+  if (state === "error") {
     return (
       <Box flexDirection="column" padding={1}>
         <Text color="red">Error: {error}</Text>
@@ -330,7 +326,7 @@ export function StakeDelegate({
     );
   }
 
-  if (state === 'cancelled') {
+  if (state === "cancelled") {
     return (
       <Box>
         <Text color="yellow">Delegation cancelled</Text>
@@ -338,16 +334,18 @@ export function StakeDelegate({
     );
   }
 
-  if (state === 'building') {
+  if (state === "building") {
     return (
       <Box flexDirection="column" padding={1}>
         <Text color="cyan">🔨 Building delegation transaction...</Text>
-        {needsRegistration && <Text color="gray">Including stake key registration certificate</Text>}
+        {needsRegistration && (
+          <Text color="gray">Including stake key registration certificate</Text>
+        )}
       </Box>
     );
   }
 
-  if (state === 'signing') {
+  if (state === "signing") {
     return (
       <Box flexDirection="column" padding={1}>
         <Text color="cyan">🔐 Signing transaction...</Text>
@@ -355,7 +353,7 @@ export function StakeDelegate({
     );
   }
 
-  if (state === 'submitting') {
+  if (state === "submitting") {
     return (
       <Box flexDirection="column" padding={1}>
         <Text color="cyan">📤 Submitting to blockchain...</Text>
@@ -363,7 +361,7 @@ export function StakeDelegate({
     );
   }
 
-  if (state === 'success') {
+  if (state === "success") {
     return (
       <Box flexDirection="column" padding={1}>
         <Text color="green">✓ Delegation successful!</Text>
@@ -398,9 +396,7 @@ export function StakeDelegate({
           Delegate Stake
         </Text>
         <Text color="gray"> ({network})</Text>
-        {walletInfo?.source === 'wallet' && (
-          <Text color="gray"> [{walletInfo.walletName}]</Text>
-        )}
+        {walletInfo?.source === "wallet" && <Text color="gray"> [{walletInfo.walletName}]</Text>}
       </Box>
 
       {pool && (
@@ -423,7 +419,7 @@ export function StakeDelegate({
           </Box>
           <Box>
             <Text color="gray">Saturation: </Text>
-            <Text color={pool.saturation > 90 ? 'red' : pool.saturation > 70 ? 'yellow' : 'green'}>
+            <Text color={pool.saturation > 90 ? "red" : pool.saturation > 70 ? "yellow" : "green"}>
               {pool.saturation.toFixed(1)}%
             </Text>
             <Text color="gray"> | Delegators: </Text>
@@ -442,13 +438,15 @@ export function StakeDelegate({
       {needsRegistration && (
         <Box marginTop={1} flexDirection="column">
           <Text color="yellow">⚠ First-time delegation - stake key registration required</Text>
-          <Text color="gray">This will include a 2 ADA deposit (refundable when you deregister)</Text>
+          <Text color="gray">
+            This will include a 2 ADA deposit (refundable when you deregister)
+          </Text>
         </Box>
       )}
 
       <Box marginTop={1}>
         <Text color="gray">Estimated fee: </Text>
-        <Text color="yellow">~{needsRegistration ? '2.17' : '0.17'} ADA</Text>
+        <Text color="yellow">~{needsRegistration ? "2.17" : "0.17"} ADA</Text>
         {needsRegistration && <Text color="gray"> (includes 2 ADA registration deposit)</Text>}
       </Box>
 

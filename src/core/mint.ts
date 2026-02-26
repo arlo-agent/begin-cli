@@ -4,17 +4,14 @@
  * Pure functions for NFT minting via NMKR.
  */
 
-import {
-  NmkrClient,
-  isNmkrConfigured,
-} from '../services/nmkr.js';
+import { NmkrClient, isNmkrConfigured } from "../services/nmkr.js";
 import {
   readImageFile,
   validateCardanoAddress,
   validateAddressNetwork,
   validateMetadataLengths,
   estimateMintCost,
-} from '../lib/mint.js';
+} from "../lib/mint.js";
 
 export interface MintNftParams {
   /** Path to image file */
@@ -32,7 +29,7 @@ export interface MintNftParams {
 }
 
 export interface MintNftResult {
-  status: 'success' | 'error';
+  status: "success" | "error";
   nftUid?: string;
   ipfsHash?: string;
   ipfsUrl?: string;
@@ -51,24 +48,17 @@ export interface MintNftResult {
  * Mint an NFT via NMKR and send to an address
  */
 export async function mintNft(params: MintNftParams): Promise<MintNftResult> {
-  const {
-    image,
-    name,
-    to,
-    displayName,
-    description,
-    network = 'mainnet',
-  } = params;
+  const { image, name, to, displayName, description, network = "mainnet" } = params;
 
   // Check NMKR configuration
   if (!isNmkrConfigured()) {
     return {
-      status: 'error',
+      status: "error",
       toAddress: to,
       network,
       error:
-        'NMKR not configured. Set NMKR_API_KEY and NMKR_PROJECT_UID environment variables. ' +
-        'Get your API key at: https://studio.nmkr.io',
+        "NMKR not configured. Set NMKR_API_KEY and NMKR_PROJECT_UID environment variables. " +
+        "Get your API key at: https://studio.nmkr.io",
     };
   }
 
@@ -76,7 +66,7 @@ export async function mintNft(params: MintNftParams): Promise<MintNftResult> {
   const addrValidation = validateCardanoAddress(to);
   if (!addrValidation.valid) {
     return {
-      status: 'error',
+      status: "error",
       toAddress: to,
       network,
       error: `Invalid address: ${addrValidation.error}`,
@@ -86,11 +76,11 @@ export async function mintNft(params: MintNftParams): Promise<MintNftResult> {
   // Validate address network matches
   const networkValidation = validateAddressNetwork(
     to,
-    network as 'mainnet' | 'preprod' | 'preview'
+    network as "mainnet" | "preprod" | "preview"
   );
   if (!networkValidation.valid) {
     return {
-      status: 'error',
+      status: "error",
       toAddress: to,
       network,
       error: networkValidation.error,
@@ -122,7 +112,7 @@ export async function mintNft(params: MintNftParams): Promise<MintNftResult> {
 
     // Upload NFT
     const uploadResult = await client.uploadNft({
-      name: name.replace(/\s+/g, ''), // No spaces in token name
+      name: name.replace(/\s+/g, ""), // No spaces in token name
       displayName: displayName || name,
       description,
       image: imageFile.buffer,
@@ -137,13 +127,13 @@ export async function mintNft(params: MintNftParams): Promise<MintNftResult> {
 
     // Poll for completion if needed
     let finalTxHash = mintResult.txHash;
-    if (!finalTxHash && mintResult.state !== 'sold') {
+    if (!finalTxHash && mintResult.state !== "sold") {
       const finalDetails = await pollForCompletion(client, uploadResult.nftUid);
-      finalTxHash = finalDetails.txHash || '';
+      finalTxHash = finalDetails.txHash || "";
     }
 
     return {
-      status: 'success',
+      status: "success",
       nftUid: uploadResult.nftUid,
       ipfsHash: uploadResult.ipfsHash,
       ipfsUrl: uploadResult.ipfsGatewayUrl,
@@ -158,10 +148,10 @@ export async function mintNft(params: MintNftParams): Promise<MintNftResult> {
     };
   } catch (err) {
     return {
-      status: 'error',
+      status: "error",
       toAddress: to,
       network,
-      error: err instanceof Error ? err.message : 'Minting failed',
+      error: err instanceof Error ? err.message : "Minting failed",
     };
   }
 }
@@ -181,15 +171,15 @@ async function pollForCompletion(
     try {
       const details = await client.getNftDetails(nftUid);
 
-      if (details.state === 'sold' || details.minted) {
+      if (details.state === "sold" || details.minted) {
         return {
-          txHash: '', // NMKR may not return this directly
+          txHash: "", // NMKR may not return this directly
           state: details.state,
         };
       }
 
-      if (details.state === 'error') {
-        throw new Error('Minting failed on NMKR side');
+      if (details.state === "error") {
+        throw new Error("Minting failed on NMKR side");
       }
     } catch (err) {
       // Continue polling on transient errors
@@ -197,7 +187,7 @@ async function pollForCompletion(
     }
   }
 
-  throw new Error('Timed out waiting for mint confirmation');
+  throw new Error("Timed out waiting for mint confirmation");
 }
 
 function sleep(ms: number): Promise<void> {

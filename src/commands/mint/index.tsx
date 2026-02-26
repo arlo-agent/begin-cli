@@ -1,11 +1,11 @@
-import React, { useEffect, useState } from 'react';
-import { Box, Text, useApp, useInput } from 'ink';
+import React, { useEffect, useState } from "react";
+import { Box, Text, useApp, useInput } from "ink";
 import {
   NmkrClient,
   isNmkrConfigured,
   type UploadNftResult,
   type MintAndSendResult,
-} from '../../services/nmkr.js';
+} from "../../services/nmkr.js";
 import {
   readImageFile,
   validateCardanoAddress,
@@ -14,9 +14,9 @@ import {
   estimateMintCost,
   formatFileSize,
   type ImageFileInfo,
-} from '../../lib/mint.js';
-import { outputSuccess, exitWithError, isJsonMode } from '../../lib/output.js';
-import { errors, ExitCode } from '../../lib/errors.js';
+} from "../../lib/mint.js";
+import { outputSuccess, exitWithError, isJsonMode } from "../../lib/output.js";
+import { errors, ExitCode } from "../../lib/errors.js";
 
 // ============================================================================
 // Types
@@ -42,14 +42,14 @@ interface MintCommandProps {
 }
 
 type MintState =
-  | 'validating'
-  | 'confirm'
-  | 'uploading'
-  | 'minting'
-  | 'polling'
-  | 'success'
-  | 'cancelled'
-  | 'error';
+  | "validating"
+  | "confirm"
+  | "uploading"
+  | "minting"
+  | "polling"
+  | "success"
+  | "cancelled"
+  | "error";
 
 interface MintInfo {
   imageFile?: ImageFileInfo;
@@ -73,7 +73,7 @@ export function MintCommand({
   jsonOutput = false,
 }: MintCommandProps) {
   const { exit } = useApp();
-  const [state, setState] = useState<MintState>('validating');
+  const [state, setState] = useState<MintState>("validating");
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<MintInfo>({});
 
@@ -84,8 +84,8 @@ export function MintCommand({
         // Check NMKR configuration
         if (!isNmkrConfigured()) {
           throw new Error(
-            'NMKR not configured. Set NMKR_API_KEY and NMKR_PROJECT_UID environment variables.\n' +
-              'Get your API key at: https://studio.nmkr.io'
+            "NMKR not configured. Set NMKR_API_KEY and NMKR_PROJECT_UID environment variables.\n" +
+              "Get your API key at: https://studio.nmkr.io"
           );
         }
 
@@ -98,7 +98,7 @@ export function MintCommand({
         // Validate address network matches CLI network
         const networkValidation = validateAddressNetwork(
           toAddress,
-          network as 'mainnet' | 'preprod' | 'preview'
+          network as "mainnet" | "preprod" | "preview"
         );
         if (!networkValidation.valid) {
           throw new Error(networkValidation.error);
@@ -126,13 +126,13 @@ export function MintCommand({
         const costEstimate = estimateMintCost();
 
         setInfo({ imageFile, costEstimate });
-        setState('confirm');
+        setState("confirm");
       } catch (err) {
-        const message = err instanceof Error ? err.message : 'Validation failed';
+        const message = err instanceof Error ? err.message : "Validation failed";
         setError(message);
-        setState('error');
+        setState("error");
         if (jsonOutput) {
-          exitWithError(errors.invalidArgument('mint', message));
+          exitWithError(errors.invalidArgument("mint", message));
         }
         setTimeout(() => exit(), 2000);
       }
@@ -143,7 +143,7 @@ export function MintCommand({
 
   // ---- Auto-confirm with --yes flag ----
   useEffect(() => {
-    if ((yes || jsonOutput) && state === 'confirm') {
+    if ((yes || jsonOutput) && state === "confirm") {
       handleMint();
     }
   }, [yes, jsonOutput, state]);
@@ -151,12 +151,12 @@ export function MintCommand({
   // ---- Keyboard input for confirmation ----
   useInput((input, key) => {
     if (jsonOutput) return;
-    if (state !== 'confirm') return;
+    if (state !== "confirm") return;
 
-    if (input === 'y' || input === 'Y') {
+    if (input === "y" || input === "Y") {
       handleMint();
-    } else if (input === 'n' || input === 'N' || key.escape) {
-      setState('cancelled');
+    } else if (input === "n" || input === "N" || key.escape) {
+      setState("cancelled");
       setTimeout(() => exit(), 500);
     }
   });
@@ -167,7 +167,7 @@ export function MintCommand({
       const client = NmkrClient.fromEnv();
 
       // Upload NFT
-      setState('uploading');
+      setState("uploading");
       const uploadResult = await client.uploadNft({
         name,
         displayName: displayName || name,
@@ -177,7 +177,7 @@ export function MintCommand({
       setInfo((prev) => ({ ...prev, uploadResult }));
 
       // Mint and send
-      setState('minting');
+      setState("minting");
       const mintResult = await client.mintAndSend({
         nftUid: uploadResult.nftUid,
         receiverAddress: toAddress,
@@ -186,14 +186,14 @@ export function MintCommand({
       setInfo((prev) => ({ ...prev, mintResult }));
 
       // Poll for completion if needed
-      if (!mintResult.txHash && mintResult.state !== 'sold') {
-        setState('polling');
+      if (!mintResult.txHash && mintResult.state !== "sold") {
+        setState("polling");
         const finalDetails = await pollForCompletion(client, uploadResult.nftUid);
         setInfo((prev) => ({
           ...prev,
           mintResult: {
             ...prev.mintResult!,
-            txHash: finalDetails.txHash || '',
+            txHash: finalDetails.txHash || "",
             state: finalDetails.state,
           },
         }));
@@ -202,7 +202,7 @@ export function MintCommand({
       // Success
       if (jsonOutput) {
         outputSuccess({
-          status: 'minted',
+          status: "minted",
           nftUid: uploadResult.nftUid,
           ipfsHash: uploadResult.ipfsHash,
           ipfsUrl: uploadResult.ipfsGatewayUrl,
@@ -213,12 +213,12 @@ export function MintCommand({
         process.exit(ExitCode.SUCCESS);
       }
 
-      setState('success');
+      setState("success");
       setTimeout(() => exit(), 2000);
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Minting failed';
+      const message = err instanceof Error ? err.message : "Minting failed";
       setError(message);
-      setState('error');
+      setState("error");
       if (jsonOutput) {
         exitWithError(err);
       }
@@ -228,7 +228,7 @@ export function MintCommand({
 
   // ---- Render states ----
 
-  if (state === 'validating') {
+  if (state === "validating") {
     return (
       <Box padding={1}>
         <Text color="cyan">⏳ Validating inputs...</Text>
@@ -236,7 +236,7 @@ export function MintCommand({
     );
   }
 
-  if (state === 'error') {
+  if (state === "error") {
     return (
       <Box flexDirection="column" padding={1}>
         <Text color="red">✗ Error: {error}</Text>
@@ -250,7 +250,7 @@ export function MintCommand({
     );
   }
 
-  if (state === 'cancelled') {
+  if (state === "cancelled") {
     return (
       <Box padding={1}>
         <Text color="yellow">Minting cancelled</Text>
@@ -258,7 +258,7 @@ export function MintCommand({
     );
   }
 
-  if (state === 'uploading') {
+  if (state === "uploading") {
     return (
       <Box flexDirection="column" padding={1}>
         <Text color="cyan">📤 Uploading image to IPFS...</Text>
@@ -267,7 +267,7 @@ export function MintCommand({
     );
   }
 
-  if (state === 'minting') {
+  if (state === "minting") {
     return (
       <Box flexDirection="column" padding={1}>
         <Text color="cyan">🔨 Minting NFT...</Text>
@@ -281,7 +281,7 @@ export function MintCommand({
     );
   }
 
-  if (state === 'polling') {
+  if (state === "polling") {
     return (
       <Box flexDirection="column" padding={1}>
         <Text color="cyan">⏳ Waiting for transaction...</Text>
@@ -290,7 +290,7 @@ export function MintCommand({
     );
   }
 
-  if (state === 'success') {
+  if (state === "success") {
     const txHash = info.mintResult?.txHash;
     const explorerUrl = getExplorerUrl(network, txHash);
 
@@ -308,13 +308,13 @@ export function MintCommand({
             <Text color="blue">{info.uploadResult?.ipfsGatewayUrl}</Text>
           </Box>
           <Box>
-            <Text color="gray">To:   </Text>
+            <Text color="gray">To: </Text>
             <Text>{shortenAddr(toAddress)}</Text>
           </Box>
           {txHash && (
             <>
               <Box>
-                <Text color="gray">TX:   </Text>
+                <Text color="gray">TX: </Text>
                 <Text>{txHash}</Text>
               </Box>
               <Box marginTop={1}>
@@ -338,19 +338,14 @@ export function MintCommand({
         <Text color="gray"> ({network})</Text>
       </Box>
 
-      <Box
-        flexDirection="column"
-        borderStyle="round"
-        borderColor="gray"
-        padding={1}
-      >
+      <Box flexDirection="column" borderStyle="round" borderColor="gray" padding={1}>
         {/* NFT Info */}
         <Box>
-          <Text color="gray">Name:        </Text>
+          <Text color="gray">Name: </Text>
           <Text bold>{displayName || name}</Text>
         </Box>
         <Box>
-          <Text color="gray">Token Name:  </Text>
+          <Text color="gray">Token Name: </Text>
           <Text>{name}</Text>
         </Box>
         {description && (
@@ -362,21 +357,18 @@ export function MintCommand({
 
         {/* Image Info */}
         <Box marginTop={1}>
-          <Text color="gray">Image:       </Text>
-          <Text>{info.imageFile?.path.split('/').pop()}</Text>
-          <Text color="gray">
-            {' '}
-            ({formatFileSize(info.imageFile?.size || 0)})
-          </Text>
+          <Text color="gray">Image: </Text>
+          <Text>{info.imageFile?.path.split("/").pop()}</Text>
+          <Text color="gray"> ({formatFileSize(info.imageFile?.size || 0)})</Text>
         </Box>
         <Box>
-          <Text color="gray">Format:      </Text>
+          <Text color="gray">Format: </Text>
           <Text>{info.imageFile?.mimeType}</Text>
         </Box>
 
         {/* Destination */}
         <Box marginTop={1}>
-          <Text color="gray">To Address:  </Text>
+          <Text color="gray">To Address: </Text>
           <Text>{shortenAddr(toAddress)}</Text>
         </Box>
 
@@ -410,12 +402,12 @@ function shortenAddr(addr: string): string {
 
 function truncateText(text: string, maxLen: number): string {
   if (text.length <= maxLen) return text;
-  return text.slice(0, maxLen - 3) + '...';
+  return text.slice(0, maxLen - 3) + "...";
 }
 
 function getExplorerUrl(network: string, txHash?: string): string {
-  if (!txHash) return '';
-  const prefix = network === 'mainnet' ? '' : `${network}.`;
+  if (!txHash) return "";
+  const prefix = network === "mainnet" ? "" : `${network}.`;
   return `https://${prefix}cardanoscan.io/transaction/${txHash}`;
 }
 
@@ -431,16 +423,16 @@ async function pollForCompletion(
     try {
       const details = await client.getNftDetails(nftUid);
 
-      if (details.state === 'sold' || details.minted) {
+      if (details.state === "sold" || details.minted) {
         // Try to find tx hash from the asset info
         return {
-          txHash: '', // NMKR may not return this directly
+          txHash: "", // NMKR may not return this directly
           state: details.state,
         };
       }
 
-      if (details.state === 'error') {
-        throw new Error('Minting failed on NMKR side');
+      if (details.state === "error") {
+        throw new Error("Minting failed on NMKR side");
       }
     } catch (err) {
       // Continue polling on transient errors
@@ -448,7 +440,7 @@ async function pollForCompletion(
     }
   }
 
-  throw new Error('Timed out waiting for mint confirmation');
+  throw new Error("Timed out waiting for mint confirmation");
 }
 
 function sleep(ms: number): Promise<void> {

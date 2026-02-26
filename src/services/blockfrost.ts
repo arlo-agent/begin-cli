@@ -1,6 +1,6 @@
 /**
  * Blockfrost API service for Cardano blockchain queries
- * 
+ *
  * For production use, set BLOCKFROST_API_KEY environment variable.
  * Get your free API key at: https://blockfrost.io
  */
@@ -30,9 +30,9 @@ interface BlockfrostAddressResponse {
 }
 
 const BLOCKFROST_URLS: Record<string, string> = {
-  mainnet: 'https://cardano-mainnet.blockfrost.io/api/v0',
-  preprod: 'https://cardano-preprod.blockfrost.io/api/v0',
-  preview: 'https://cardano-preview.blockfrost.io/api/v0',
+  mainnet: "https://cardano-mainnet.blockfrost.io/api/v0",
+  preprod: "https://cardano-preprod.blockfrost.io/api/v0",
+  preview: "https://cardano-preview.blockfrost.io/api/v0",
 };
 
 /**
@@ -48,7 +48,7 @@ export async function fetchBalance(address: string, network: string): Promise<Ba
 
   // If no API key, return mock data for development
   if (!apiKey) {
-    console.error('\n⚠ No BLOCKFROST_API_KEY set - returning mock data\n');
+    console.error("\n⚠ No BLOCKFROST_API_KEY set - returning mock data\n");
     return getMockBalance();
   }
 
@@ -61,20 +61,20 @@ export async function fetchBalance(address: string, network: string): Promise<Ba
   if (!response.ok) {
     if (response.status === 404) {
       // Address not found - might be unused
-      return { lovelace: '0', tokens: [] };
+      return { lovelace: "0", tokens: [] };
     }
     if (response.status === 403) {
-      throw new Error('Invalid API key or rate limit exceeded');
+      throw new Error("Invalid API key or rate limit exceeded");
     }
     throw new Error(`Blockfrost API error: ${response.status} ${response.statusText}`);
   }
 
-  const data = await response.json() as BlockfrostAddressResponse;
+  const data = (await response.json()) as BlockfrostAddressResponse;
 
   // Parse the amounts
-  const lovelace = data.amount.find((a) => a.unit === 'lovelace')?.quantity || '0';
+  const lovelace = data.amount.find((a) => a.unit === "lovelace")?.quantity || "0";
   const tokens: Token[] = data.amount
-    .filter((a) => a.unit !== 'lovelace')
+    .filter((a) => a.unit !== "lovelace")
     .map((a) => ({
       unit: a.unit,
       name: decodeTokenName(a.unit),
@@ -91,7 +91,7 @@ function decodeTokenName(unit: string): string | null {
   if (unit.length <= 56) return null; // Just policy ID, no asset name
   const assetNameHex = unit.slice(56);
   try {
-    return Buffer.from(assetNameHex, 'hex').toString('utf8');
+    return Buffer.from(assetNameHex, "hex").toString("utf8");
   } catch {
     return null;
   }
@@ -102,17 +102,17 @@ function decodeTokenName(unit: string): string | null {
  */
 function getMockBalance(): BalanceResult {
   return {
-    lovelace: '125430000', // 125.43 ADA
+    lovelace: "125430000", // 125.43 ADA
     tokens: [
       {
-        unit: 'a0028f350aaabe0545fdcb56b039bfb08e4bb4d8c4d7c3c7d481c235484f534b59',
-        name: 'HOSKY',
-        quantity: '1000000',
+        unit: "a0028f350aaabe0545fdcb56b039bfb08e4bb4d8c4d7c3c7d481c235484f534b59",
+        name: "HOSKY",
+        quantity: "1000000",
       },
       {
-        unit: 'b0028f350aaabe0545fdcb56b039bfb08e4bb4d8c4d7c3c7d481c235534e454b',
-        name: 'SNEK',
-        quantity: '500',
+        unit: "b0028f350aaabe0545fdcb56b039bfb08e4bb4d8c4d7c3c7d481c235534e454b",
+        name: "SNEK",
+        quantity: "500",
       },
     ],
   };

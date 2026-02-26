@@ -130,8 +130,11 @@ Native Tokens:
 ### Step 3: Create or Restore a Wallet
 
 ```bash
-# Create new wallet (saves encrypted to ~/.begin-cli/)
+# Create new wallet (saves encrypted to ~/.begin-cli/, silent by default)
 begin wallet create mywallet
+
+# Show recovery phrase and addresses after creating
+begin wallet create mywallet --show-seed
 
 # Or restore from mnemonic
 begin wallet restore mywallet --mnemonic "word1 word2 ... word24"
@@ -210,12 +213,12 @@ begin stake withdraw --yes
 
 | Command | Description |
 |---------|-------------|
-| `begin wallet create <name>` | Create a new wallet |
+| `begin wallet create <name>` | Create a new wallet (use `--show-seed` to display recovery phrase and addresses) |
 | `begin wallet restore <name>` | Restore from mnemonic |
 | `begin wallet list` | List all wallets |
 | `begin wallet address` | Show receiving address |
 | `begin wallet address --qr` | Show address with QR code |
-| `begin wallet export` | Export wallet (encrypted) |
+| `begin wallet export [name]` | Show mnemonic phrase (use with care) |
 
 ### Balance & History
 
@@ -457,7 +460,13 @@ print(f"Balance: {balance['data']['balance']['ada']} ADA")
 
 - Wallets are encrypted at rest using AES-256-GCM
 - Stored in `~/.begin-cli/wallets/`
-- Password required for signing operations
+- Password required for signing operations (unless OS keychain is used)
+
+**OS keychain (optional):** When available, begin-cli can store wallet keys in the system keychain (macOS Keychain, Windows Credential Manager, or Linux Secret Service) so you don’t need to enter a password each time. This uses the optional dependency **keytar**.
+
+- **With pnpm:** pnpm 10+ disables install scripts by default. To allow keytar’s native addon to build, either add `"pnpm": { "onlyBuiltDependencies": ["keytar"] }` to `package.json` (already set in this repo) or run `pnpm approve-builds` and approve keytar. Then run `pnpm install` again.
+- **On Linux:** Install libsecret development headers so keytar can build (e.g. `sudo apt-get install libsecret-1-dev` on Debian/Ubuntu, `libsecret-devel` on Red Hat, `libsecret` on Arch).
+- **Debugging:** If you see “OS keychain not available”, run with `DEBUG=begin-cli:keychain` to log the reason (e.g. keytar failed to load vs keychain access denied).
 
 ### Environment Variable Mode
 

@@ -18,8 +18,8 @@ import {
   calculateBalance,
   type TransactionConfig,
   type WalletOptions,
-} from '../lib/transaction.js';
-import { getPasswordFromEnv } from '../lib/keystore.js';
+} from "../lib/transaction.js";
+import { getPasswordFromEnv } from "../lib/keystore.js";
 
 export interface SendParams {
   to: string;
@@ -33,7 +33,7 @@ export interface SendParams {
 }
 
 export interface SendResult {
-  status: 'built' | 'submitted' | 'confirmed' | 'error';
+  status: "built" | "submitted" | "confirmed" | "error";
   txHash?: string;
   unsignedTx?: string;
   fromAddress?: string;
@@ -49,9 +49,9 @@ function lovelaceToAdaDisplay(lovelace: string): string {
     const v = BigInt(lovelace);
     const whole = v / 1_000_000n;
     const frac = v % 1_000_000n;
-    return `${whole.toString()}.${frac.toString().padStart(6, '0')}`;
+    return `${whole.toString()}.${frac.toString().padStart(6, "0")}`;
   } catch {
-    return '0.000000';
+    return "0.000000";
   }
 }
 
@@ -64,7 +64,7 @@ export async function sendAda(params: SendParams): Promise<SendResult> {
     amount,
     wallet: walletName,
     password: initialPassword,
-    network = 'mainnet',
+    network = "mainnet",
     assets = [],
     dryRun = false,
   } = params;
@@ -75,12 +75,12 @@ export async function sendAda(params: SendParams): Promise<SendResult> {
   const availability = checkWalletAvailability(walletName);
   if (!availability.available) {
     return {
-      status: 'error',
+      status: "error",
       toAddress: to,
       amountAda: amount,
       assets,
       network,
-      error: availability.error || 'No wallet available',
+      error: availability.error || "No wallet available",
     };
   }
 
@@ -88,12 +88,13 @@ export async function sendAda(params: SendParams): Promise<SendResult> {
   const effectivePassword = initialPassword || getPasswordFromEnv() || undefined;
   if (availability.needsPassword && !effectivePassword) {
     return {
-      status: 'error',
+      status: "error",
       toAddress: to,
       amountAda: amount,
       assets,
       network,
-      error: 'Password is required for wallet decryption. Set BEGIN_CLI_WALLET_PASSWORD or provide --password.',
+      error:
+        "Password is required for wallet decryption. Set BEGIN_CLI_WALLET_PASSWORD or provide --password.",
     };
   }
 
@@ -113,7 +114,7 @@ export async function sendAda(params: SendParams): Promise<SendResult> {
     // Check if wallet has funds
     if (utxos.length === 0 || BigInt(lovelace) === 0n) {
       return {
-        status: 'error',
+        status: "error",
         fromAddress,
         toAddress: to,
         amountAda: amount,
@@ -126,15 +127,16 @@ export async function sendAda(params: SendParams): Promise<SendResult> {
     // Build transaction
     let result;
     try {
-      result = assets.length > 0
-        ? await buildMultiAssetTx(meshWallet, to, amount, parseAssets(assets))
-        : await buildSendAdaTx(meshWallet, to, amount);
+      result =
+        assets.length > 0
+          ? await buildMultiAssetTx(meshWallet, to, amount, parseAssets(assets))
+          : await buildSendAdaTx(meshWallet, to, amount);
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      if (msg.includes('UTxO Balance Insufficient')) {
+      if (msg.includes("UTxO Balance Insufficient")) {
         const availableAda = lovelaceToAdaDisplay(lovelace);
         return {
-          status: 'error',
+          status: "error",
           fromAddress,
           toAddress: to,
           amountAda: amount,
@@ -149,7 +151,7 @@ export async function sendAda(params: SendParams): Promise<SendResult> {
     // Dry run: return unsigned tx
     if (dryRun) {
       return {
-        status: 'built',
+        status: "built",
         unsignedTx: result.unsignedTx,
         fromAddress,
         toAddress: to,
@@ -170,19 +172,19 @@ export async function sendAda(params: SendParams): Promise<SendResult> {
 
     if (!confirmResult.confirmed) {
       return {
-        status: 'submitted',
+        status: "submitted",
         txHash: submitResult.txHash,
         fromAddress,
         toAddress: to,
         amountAda: amount,
         assets,
         network,
-        error: 'Transaction submitted but confirmation timed out. Check tx hash manually.',
+        error: "Transaction submitted but confirmation timed out. Check tx hash manually.",
       };
     }
 
     return {
-      status: 'confirmed',
+      status: "confirmed",
       txHash: confirmResult.txHash,
       fromAddress,
       toAddress: to,
@@ -191,9 +193,9 @@ export async function sendAda(params: SendParams): Promise<SendResult> {
       network,
     };
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Transaction failed';
+    const message = err instanceof Error ? err.message : "Transaction failed";
     return {
-      status: 'error',
+      status: "error",
       toAddress: to,
       amountAda: amount,
       assets,

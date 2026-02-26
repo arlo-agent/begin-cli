@@ -87,8 +87,9 @@ begin receive --wallet <name> --qr   # Show QR code
 ### Wallet Management
 
 ```bash
-# Create new wallet (interactive)
+# Create new wallet (silent by default; use --show-seed to display recovery phrase and addresses)
 begin wallet create <name>
+begin wallet create <name> --show-seed
 
 # Restore from mnemonic (interactive)
 begin wallet restore <name>

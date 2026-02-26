@@ -72,9 +72,9 @@ interface BlockfrostAccountResponse {
 }
 
 const BLOCKFROST_URLS: Record<string, string> = {
-  mainnet: 'https://cardano-mainnet.blockfrost.io/api/v0',
-  preprod: 'https://cardano-preprod.blockfrost.io/api/v0',
-  preview: 'https://cardano-preview.blockfrost.io/api/v0',
+  mainnet: "https://cardano-mainnet.blockfrost.io/api/v0",
+  preprod: "https://cardano-preprod.blockfrost.io/api/v0",
+  preview: "https://cardano-preview.blockfrost.io/api/v0",
 };
 
 /**
@@ -83,7 +83,7 @@ const BLOCKFROST_URLS: Record<string, string> = {
 function getHeaders(): Record<string, string> {
   const apiKey = process.env.BLOCKFROST_API_KEY;
   if (!apiKey) {
-    throw new Error('BLOCKFROST_API_KEY environment variable is required');
+    throw new Error("BLOCKFROST_API_KEY environment variable is required");
   }
   return { project_id: apiKey };
 }
@@ -104,7 +104,7 @@ export async function searchPools(
   const headers = getHeaders();
 
   // If query looks like a pool ID (starts with "pool1"), fetch directly
-  if (query.toLowerCase().startsWith('pool1')) {
+  if (query.toLowerCase().startsWith("pool1")) {
     try {
       const pool = await fetchPoolDetails(query, network);
       return pool ? [pool] : [];
@@ -116,14 +116,14 @@ export async function searchPools(
   // Otherwise search by fetching pools and filtering by ticker
   // Blockfrost doesn't have a direct ticker search, so we fetch pools
   // and check metadata. For efficiency, we use the pools list endpoint.
-  
+
   const response = await fetch(`${baseUrl}/pools?count=100&order=desc`, { headers });
-  
+
   if (!response.ok) {
     throw new Error(`Blockfrost API error: ${response.status}`);
   }
 
-  const poolIds = await response.json() as string[];
+  const poolIds = (await response.json()) as string[];
   const results: StakePool[] = [];
   const queryLower = query.toLowerCase();
 
@@ -133,10 +133,11 @@ export async function searchPools(
 
     try {
       const pool = await fetchPoolDetails(poolId, network);
-      if (pool && (
-        pool.ticker.toLowerCase().includes(queryLower) ||
-        pool.name.toLowerCase().includes(queryLower)
-      )) {
+      if (
+        pool &&
+        (pool.ticker.toLowerCase().includes(queryLower) ||
+          pool.name.toLowerCase().includes(queryLower))
+      ) {
         results.push(pool);
       }
     } catch {
@@ -169,19 +170,19 @@ export async function fetchPoolDetails(poolId: string, network: string): Promise
     throw new Error(`Failed to fetch pool: ${poolResponse.status}`);
   }
 
-  const poolData = await poolResponse.json() as BlockfrostPoolResponse;
-  
+  const poolData = (await poolResponse.json()) as BlockfrostPoolResponse;
+
   let metadata: BlockfrostPoolMetadata | null = null;
   if (metadataResponse.ok) {
-    metadata = await metadataResponse.json() as BlockfrostPoolMetadata;
+    metadata = (await metadataResponse.json()) as BlockfrostPoolMetadata;
   }
 
   return {
     poolId: poolData.pool_id,
-    ticker: metadata?.ticker || 'N/A',
-    name: metadata?.name || poolId.slice(0, 20) + '...',
-    description: metadata?.description || '',
-    homepage: metadata?.homepage || '',
+    ticker: metadata?.ticker || "N/A",
+    name: metadata?.name || poolId.slice(0, 20) + "...",
+    description: metadata?.description || "",
+    homepage: metadata?.homepage || "",
     pledge: poolData.live_pledge,
     cost: poolData.fixed_cost,
     margin: poolData.margin_cost * 100, // Convert to percentage
@@ -189,7 +190,10 @@ export async function fetchPoolDetails(poolId: string, network: string): Promise
     blocksProduced: poolData.blocks_minted,
     liveStake: poolData.live_stake,
     liveDelegators: poolData.live_delegators,
-    retiring: poolData.retirement.length > 0 ? poolData.retirement[poolData.retirement.length - 1] : undefined,
+    retiring:
+      poolData.retirement.length > 0
+        ? poolData.retirement[poolData.retirement.length - 1]
+        : undefined,
   };
 }
 
@@ -206,12 +210,12 @@ export async function listTopPools(network: string, limit: number = 10): Promise
 
   // Fetch pool list
   const response = await fetch(`${baseUrl}/pools?count=${limit * 2}&order=desc`, { headers });
-  
+
   if (!response.ok) {
     throw new Error(`Blockfrost API error: ${response.status}`);
   }
 
-  const poolIds = await response.json() as string[];
+  const poolIds = (await response.json()) as string[];
   const pools: StakePool[] = [];
 
   for (const poolId of poolIds.slice(0, limit)) {
@@ -249,16 +253,16 @@ export async function getDelegationStatus(
         stakeAddress,
         isRegistered: false,
         delegatedPool: null,
-        rewardsAvailable: '0',
-        totalWithdrawn: '0',
+        rewardsAvailable: "0",
+        totalWithdrawn: "0",
         activeEpoch: null,
       };
     }
     throw new Error(`Failed to fetch account: ${response.status}`);
   }
 
-  const account = await response.json() as BlockfrostAccountResponse;
-  
+  const account = (await response.json()) as BlockfrostAccountResponse;
+
   let delegatedPool: StakePool | null = null;
   if (account.pool_id) {
     try {
@@ -305,7 +309,7 @@ export function lovelaceToAda(lovelace: string): string {
 export function deriveStakeAddress(paymentAddress: string, network: string): string {
   // This would normally be done via MeshJS wallet
   // For now, return mock stake address for development
-  const prefix = network === 'mainnet' ? 'stake1' : 'stake_test1';
+  const prefix = network === "mainnet" ? "stake1" : "stake_test1";
   return `${prefix}mock_stake_address_derived_from_payment`;
 }
 
@@ -315,45 +319,45 @@ export function deriveStakeAddress(paymentAddress: string, network: string): str
 export function getMockPools(): StakePool[] {
   return [
     {
-      poolId: 'pool1pu5jlj4q9w9jlxeu370a3c9myx47md5j5m2str0naunn2q3lkdy',
-      ticker: 'BLOOM',
-      name: 'Bloom Pool',
-      description: 'High-performance stake pool for the Cardano ecosystem',
-      homepage: 'https://bloompool.io',
-      pledge: '500000000000',
-      cost: '340000000',
+      poolId: "pool1pu5jlj4q9w9jlxeu370a3c9myx47md5j5m2str0naunn2q3lkdy",
+      ticker: "BLOOM",
+      name: "Bloom Pool",
+      description: "High-performance stake pool for the Cardano ecosystem",
+      homepage: "https://bloompool.io",
+      pledge: "500000000000",
+      cost: "340000000",
       margin: 2.5,
       saturation: 65.4,
       blocksProduced: 1234,
-      liveStake: '35000000000000',
+      liveStake: "35000000000000",
       liveDelegators: 4521,
     },
     {
-      poolId: 'pool1z5uqdk7dzdxaae5633fqfcu2eqzy3a3rgtuvy087fdld7yws0xt',
-      ticker: 'SNEK',
-      name: 'Snek Pool',
-      description: 'Community pool supporting the SNEK token',
-      homepage: 'https://snekpool.com',
-      pledge: '100000000000',
-      cost: '340000000',
+      poolId: "pool1z5uqdk7dzdxaae5633fqfcu2eqzy3a3rgtuvy087fdld7yws0xt",
+      ticker: "SNEK",
+      name: "Snek Pool",
+      description: "Community pool supporting the SNEK token",
+      homepage: "https://snekpool.com",
+      pledge: "100000000000",
+      cost: "340000000",
       margin: 1.0,
       saturation: 42.1,
       blocksProduced: 567,
-      liveStake: '22000000000000',
+      liveStake: "22000000000000",
       liveDelegators: 2103,
     },
     {
-      poolId: 'pool1hhjjzklvdlz9e6e4qfywqqkvk8dw7x9g4c4m2sj7m8wnk8c4vv7',
-      ticker: 'GENS',
-      name: 'Genesis Pool',
-      description: 'Original stake pool since Shelley launch',
-      homepage: 'https://genesispool.io',
-      pledge: '250000000000',
-      cost: '340000000',
+      poolId: "pool1hhjjzklvdlz9e6e4qfywqqkvk8dw7x9g4c4m2sj7m8wnk8c4vv7",
+      ticker: "GENS",
+      name: "Genesis Pool",
+      description: "Original stake pool since Shelley launch",
+      homepage: "https://genesispool.io",
+      pledge: "250000000000",
+      cost: "340000000",
       margin: 3.0,
       saturation: 88.9,
       blocksProduced: 2890,
-      liveStake: '60000000000000',
+      liveStake: "60000000000000",
       liveDelegators: 8932,
     },
   ];
@@ -361,11 +365,11 @@ export function getMockPools(): StakePool[] {
 
 export function getMockDelegationStatus(): DelegationStatus {
   return {
-    stakeAddress: 'stake1uy4s2fc8qjzqchpjxh6yjzgx3ckg4zhfz8rpvj0l0wvtqgsxhfr8c',
+    stakeAddress: "stake1uy4s2fc8qjzqchpjxh6yjzgx3ckg4zhfz8rpvj0l0wvtqgsxhfr8c",
     isRegistered: true,
     delegatedPool: getMockPools()[0],
-    rewardsAvailable: '15430000',
-    totalWithdrawn: '125000000',
+    rewardsAvailable: "15430000",
+    totalWithdrawn: "125000000",
     activeEpoch: 445,
   };
 }

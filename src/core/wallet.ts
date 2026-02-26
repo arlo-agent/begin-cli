@@ -9,19 +9,19 @@ import {
   restoreWallet as libRestoreWallet,
   validateMnemonic,
   type WalletConfig,
-} from '../lib/wallet.js';
+} from "../lib/wallet.js";
 import {
   loadWallet,
   checkWalletAvailability,
   getWalletAddress,
   type WalletOptions,
   type TransactionConfig,
-} from '../lib/transaction.js';
+} from "../lib/transaction.js";
 import {
   listWallets as libListWallets,
   getDefaultWallet,
   hasEnvMnemonic,
-} from '../lib/keystore.js';
+} from "../lib/keystore.js";
 
 export interface WalletCreateResult {
   name: string;
@@ -38,7 +38,7 @@ export interface WalletRestoreResult {
 
 export interface WalletAddressResult {
   walletName?: string;
-  source: 'env' | 'wallet';
+  source: "env" | "wallet" | "keychain";
   address: string;
   stakeAddress?: string;
   network: string;
@@ -56,7 +56,7 @@ export interface WalletListResult {
 export async function createWallet(
   name: string,
   password: string,
-  network: string = 'mainnet'
+  network: string = "mainnet"
 ): Promise<WalletCreateResult> {
   // Check if wallet already exists
   const wallets = libListWallets();
@@ -67,7 +67,7 @@ export async function createWallet(
   // Create wallet config
   const walletConfig: WalletConfig = {
     name,
-    networkId: network === 'mainnet' ? 1 : 0,
+    networkId: network === "mainnet" ? 1 : 0,
   };
 
   // Create the wallet (generates mnemonic, encrypts, saves)
@@ -88,14 +88,14 @@ export async function restoreWallet(
   name: string,
   mnemonic: string,
   password: string,
-  network: string = 'mainnet'
+  network: string = "mainnet"
 ): Promise<WalletRestoreResult> {
   // Parse mnemonic
   const mnemonicWords = mnemonic.trim().split(/\s+/);
 
   // Validate mnemonic
   if (!validateMnemonic(mnemonicWords)) {
-    throw new Error('Invalid mnemonic phrase');
+    throw new Error("Invalid mnemonic phrase");
   }
 
   // Check if wallet already exists
@@ -107,7 +107,7 @@ export async function restoreWallet(
   // Create wallet config
   const walletConfig: WalletConfig = {
     name,
-    networkId: network === 'mainnet' ? 1 : 0,
+    networkId: network === "mainnet" ? 1 : 0,
   };
 
   // Restore the wallet
@@ -126,18 +126,18 @@ export async function restoreWallet(
 export async function getWalletAddresses(
   walletName: string | undefined,
   password: string | undefined,
-  network: string = 'mainnet'
+  network: string = "mainnet"
 ): Promise<WalletAddressResult> {
   const availability = checkWalletAvailability(walletName);
 
   if (!availability.available) {
-    throw new Error(availability.error || 'No wallet available');
+    throw new Error(availability.error || "No wallet available");
   }
 
   // For env-based wallet, password is not needed
   // For file-based wallet, password is required
   if (availability.needsPassword && !password) {
-    throw new Error('Password is required for wallet decryption');
+    throw new Error("Password is required for wallet decryption");
   }
 
   const config: TransactionConfig = { network };
@@ -184,7 +184,7 @@ export function getWalletList(): WalletListResult {
 export async function getReceiveAddress(
   walletName: string | undefined,
   password: string | undefined,
-  network: string = 'mainnet'
+  network: string = "mainnet"
 ): Promise<string> {
   const result = await getWalletAddresses(walletName, password, network);
   return result.address;

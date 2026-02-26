@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from 'react';
-import { Box, Text, useApp, useInput } from 'ink';
-import TextInput from 'ink-text-input';
+import React, { useEffect, useState } from "react";
+import { Box, Text, useApp, useInput } from "ink";
+import TextInput from "ink-text-input";
 import {
   loadWallet,
   buildSendAdaTx,
@@ -16,19 +16,19 @@ import {
   calculateBalance,
   checkWalletAvailability,
   type TransactionConfig,
-} from '../../lib/transaction.js';
-import { getPasswordFromEnv, PASSWORD_ENV_VAR } from '../../lib/keystore.js';
-import { outputSuccess, exitWithError } from '../../lib/output.js';
-import { ExitCode, errors } from '../../lib/errors.js';
+} from "../../lib/transaction.js";
+import { getPasswordFromEnv, PASSWORD_ENV_VAR } from "../../lib/keystore.js";
+import { outputSuccess, exitWithError } from "../../lib/output.js";
+import { ExitCode, errors } from "../../lib/errors.js";
 
 function lovelaceToAdaDisplay(lovelace: string): string {
   try {
     const v = BigInt(lovelace);
     const whole = v / 1_000_000n;
     const frac = v % 1_000_000n;
-    return `${whole.toString()}.${frac.toString().padStart(6, '0')}`;
+    return `${whole.toString()}.${frac.toString().padStart(6, "0")}`;
   } catch {
-    return '0.000000';
+    return "0.000000";
   }
 }
 
@@ -46,17 +46,17 @@ interface CardanoSendProps {
 }
 
 type SendState =
-  | 'checking'
-  | 'password'
-  | 'loading'
-  | 'confirm'
-  | 'building'
-  | 'signing'
-  | 'submitting'
-  | 'confirming'
-  | 'success'
-  | 'cancelled'
-  | 'error';
+  | "checking"
+  | "password"
+  | "loading"
+  | "confirm"
+  | "building"
+  | "signing"
+  | "submitting"
+  | "confirming"
+  | "success"
+  | "cancelled"
+  | "error";
 
 interface TxInfo {
   fromAddress: string;
@@ -66,7 +66,7 @@ interface TxInfo {
   estimatedFee: string;
   availableAda?: string;
   utxoCount?: number;
-  walletSource?: 'env' | 'wallet';
+  walletSource?: "env" | "wallet" | "keychain";
   unsignedTx?: string;
   unsignedTxPath?: string;
   signedTx?: string;
@@ -74,7 +74,7 @@ interface TxInfo {
 }
 
 interface WalletInfo {
-  source: 'env' | 'wallet';
+  source: "env" | "wallet" | "keychain";
   walletName?: string;
   needsPassword: boolean;
 }
@@ -92,17 +92,17 @@ export function CardanoSend({
   yes = false,
 }: CardanoSendProps) {
   const { exit } = useApp();
-  const [state, setState] = useState<SendState>('checking');
+  const [state, setState] = useState<SendState>("checking");
   const [txInfo, setTxInfo] = useState<TxInfo | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [password, setPassword] = useState(initialPassword || '');
+  const [password, setPassword] = useState(initialPassword || "");
   const [walletInfo, setWalletInfo] = useState<WalletInfo | null>(null);
 
   const config: TransactionConfig = { network };
 
-  const initWallet = async (pwd?: string, wName?: string, source?: WalletInfo['source']) => {
+  const initWallet = async (pwd?: string, wName?: string, source?: WalletInfo["source"]) => {
     try {
-      setState('loading');
+      setState("loading");
 
       const wallet = await loadWallet({ walletName: wName, password: pwd }, config);
       const fromAddress = await getWalletAddress(wallet);
@@ -115,17 +115,19 @@ export function CardanoSend({
         toAddress: to,
         amountAda: amount,
         assets,
-        estimatedFee: '~0.17', // rough estimate before building
+        estimatedFee: "~0.17", // rough estimate before building
         availableAda,
         utxoCount: utxos.length,
         walletSource: source,
       });
 
-      setState('confirm');
+      setState("confirm");
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to load wallet';
-      setError(message.includes('Incorrect password') ? 'Incorrect password. Please try again.' : message);
-      setState('error');
+      const message = err instanceof Error ? err.message : "Failed to load wallet";
+      setError(
+        message.includes("Incorrect password") ? "Incorrect password. Please try again." : message
+      );
+      setState("error");
       if (jsonOutput) exitWithError(err);
       setTimeout(() => exit(), 2000);
     }
@@ -136,9 +138,9 @@ export function CardanoSend({
     const availability = checkWalletAvailability(walletName);
 
     if (!availability.available) {
-      const msg = availability.error || 'No wallet available';
+      const msg = availability.error || "No wallet available";
       setError(msg);
-      setState('error');
+      setState("error");
       if (jsonOutput) exitWithError(errors.walletError(msg));
       setTimeout(() => exit(), 2000);
       return;
@@ -159,13 +161,15 @@ export function CardanoSend({
     }
 
     if (jsonOutput) {
-      setError(`Password required (pass --password, set ${PASSWORD_ENV_VAR}, or use BEGIN_CLI_MNEMONIC)`);
-      setState('error');
-      exitWithError(errors.missingArgument('password'));
+      setError(
+        `Password required (pass --password, set ${PASSWORD_ENV_VAR}, or use BEGIN_CLI_MNEMONIC)`
+      );
+      setState("error");
+      exitWithError(errors.missingArgument("password"));
       return;
     }
 
-    setState('password');
+    setState("password");
   }, []);
 
   const handlePasswordSubmit = () => {
@@ -176,7 +180,7 @@ export function CardanoSend({
 
   const handleSend = async () => {
     try {
-      setState('building');
+      setState("building");
 
       // Password priority: local state (from prompt) > --password flag > env var
       const effectivePassword = password || initialPassword || getPasswordFromEnv() || undefined;
@@ -192,13 +196,19 @@ export function CardanoSend({
       const availableAda = lovelaceToAdaDisplay(lovelace);
       setTxInfo((prev) =>
         prev
-          ? { ...prev, fromAddress, availableAda, utxoCount: utxos.length, walletSource: walletInfo?.source }
+          ? {
+              ...prev,
+              fromAddress,
+              availableAda,
+              utxoCount: utxos.length,
+              walletSource: walletInfo?.source,
+            }
           : {
               fromAddress,
               toAddress: to,
               amountAda: amount,
               assets,
-              estimatedFee: '~0.17',
+              estimatedFee: "~0.17",
               availableAda,
               utxoCount: utxos.length,
               walletSource: walletInfo?.source,
@@ -207,18 +217,18 @@ export function CardanoSend({
 
       if (utxos.length === 0 || BigInt(lovelace) === 0n) {
         const sourceHint =
-          walletInfo?.source === 'env'
-            ? 'Note: BEGIN_CLI_MNEMONIC is set, so this command is using it. Unset it or pass --wallet <name>.'
-            : walletInfo?.source === 'wallet'
-              ? 'If you expected funds here, double-check you selected the correct wallet name and password.'
-              : 'Double-check your wallet source and configuration.';
+          walletInfo?.source === "env"
+            ? "Note: BEGIN_CLI_MNEMONIC is set, so this command is using it. Unset it or pass --wallet <name>."
+            : walletInfo?.source === "wallet"
+              ? "If you expected funds here, double-check you selected the correct wallet name and password."
+              : "Double-check your wallet source and configuration.";
         throw new Error(
           [
             `No spendable UTxOs found for this wallet on ${network}.`,
             `From address: ${fromAddress}`,
             sourceHint,
             `Also verify you’re on the right network (mainnet vs preprod/preview) and that the recipient address matches it.`,
-          ].join('\n')
+          ].join("\n")
         );
       }
 
@@ -231,20 +241,20 @@ export function CardanoSend({
             : await buildSendAdaTx(wallet, to, amount);
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
-        if (msg.includes('UTxO Balance Insufficient')) {
+        if (msg.includes("UTxO Balance Insufficient")) {
           const sourceHint =
-            walletInfo?.source === 'env'
-              ? 'BEGIN_CLI_MNEMONIC is set, so this command is using it (which may not be the wallet you checked).'
-              : 'If you expected funds here, ensure you’re using the correct wallet (--wallet) and network (--network).';
+            walletInfo?.source === "env"
+              ? "BEGIN_CLI_MNEMONIC is set, so this command is using it (which may not be the wallet you checked)."
+              : "If you expected funds here, ensure you’re using the correct wallet (--wallet) and network (--network).";
           throw new Error(
             [
-              'UTxO Balance Insufficient.',
+              "UTxO Balance Insufficient.",
               `Wallet balance (from UTxOs): ~${availableAda} ADA across ${utxos.length} UTxOs`,
               `From address: ${fromAddress}`,
               `Network: ${network}`,
               sourceHint,
-              'Tip: run `begin wallet address --full` and `begin cardano utxos <address> --network <network>` to confirm the UTxOs you are actually spending from.',
-            ].join('\n')
+              "Tip: run `begin wallet address --full` and `begin cardano utxos <address> --network <network>` to confirm the UTxOs you are actually spending from.",
+            ].join("\n")
           );
         }
         throw e;
@@ -259,48 +269,50 @@ export function CardanoSend({
         setTxInfo((prev) => (prev ? { ...prev, unsignedTxPath: outPath } : null));
 
         if (jsonOutput) {
-          outputSuccess({ status: 'built', unsignedTx: outPath, network });
+          outputSuccess({ status: "built", unsignedTx: outPath, network });
           process.exit(ExitCode.SUCCESS);
         }
 
-        setState('success');
+        setState("success");
         setTimeout(() => exit(), 1000);
         return;
       }
 
       // Sign
-      setState('signing');
+      setState("signing");
       const signResult = await signTransaction(wallet, result.unsignedTx);
-      setTxInfo((prev) => (prev ? { ...prev, signedTx: signResult.signedTx, txHash: signResult.txHash } : null));
+      setTxInfo((prev) =>
+        prev ? { ...prev, signedTx: signResult.signedTx, txHash: signResult.txHash } : null
+      );
 
       // Submit
-      setState('submitting');
+      setState("submitting");
       const submitResult = await submitTransaction(config, signResult.signedTx);
       setTxInfo((prev) => (prev ? { ...prev, txHash: submitResult.txHash } : null));
 
       // Confirm
-      setState('confirming');
+      setState("confirming");
       const confirmResult = await waitForConfirmation(config, submitResult.txHash, 60, 5000);
 
       if (!confirmResult.confirmed) {
-        const msg = 'Transaction submitted but confirmation timed out. Check tx hash manually.';
+        const msg = "Transaction submitted but confirmation timed out. Check tx hash manually.";
         setError(msg);
-        setState('error');
+        setState("error");
         if (jsonOutput) exitWithError(errors.networkError(msg));
         setTimeout(() => exit(), 2000);
         return;
       }
 
       if (jsonOutput) {
-        outputSuccess({ status: 'confirmed', txHash: confirmResult.txHash, network });
+        outputSuccess({ status: "confirmed", txHash: confirmResult.txHash, network });
         process.exit(ExitCode.SUCCESS);
       }
 
-      setState('success');
+      setState("success");
       setTimeout(() => exit(), 1500);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Transaction failed');
-      setState('error');
+      setError(err instanceof Error ? err.message : "Transaction failed");
+      setState("error");
       if (jsonOutput) exitWithError(err);
       setTimeout(() => exit(), 2000);
     }
@@ -308,14 +320,14 @@ export function CardanoSend({
 
   // Auto-proceed in JSON mode or with --yes flag (no interactive confirmation)
   useEffect(() => {
-    if ((jsonOutput || yes) && state === 'confirm') {
+    if ((jsonOutput || yes) && state === "confirm") {
       handleSend();
     }
   }, [jsonOutput, yes, state]);
 
   // Auto-proceed in non-JSON mode when --yes is set
   useEffect(() => {
-    if (!jsonOutput && yes && state === 'confirm') {
+    if (!jsonOutput && yes && state === "confirm") {
       handleSend();
     }
   }, [jsonOutput, yes, state]);
@@ -323,17 +335,17 @@ export function CardanoSend({
   // Handle keyboard input for confirmation
   useInput((input, key) => {
     if (jsonOutput) return;
-    if (state !== 'confirm') return;
+    if (state !== "confirm") return;
 
-    if (input === 'y' || input === 'Y') {
+    if (input === "y" || input === "Y") {
       handleSend();
-    } else if (input === 'n' || input === 'N' || key.escape) {
-      setState('cancelled');
+    } else if (input === "n" || input === "N" || key.escape) {
+      setState("cancelled");
       setTimeout(() => exit(), 500);
     }
   });
 
-  if (state === 'checking') {
+  if (state === "checking") {
     return (
       <Box padding={1}>
         <Text color="cyan">⏳ Checking wallet availability...</Text>
@@ -341,32 +353,41 @@ export function CardanoSend({
     );
   }
 
-  if (state === 'password') {
+  if (state === "password") {
     return (
       <Box flexDirection="column" padding={1}>
         <Box marginBottom={1}>
           <Text color="cyan">🔐 Enter password for wallet </Text>
-          <Text bold color="yellow">{walletInfo?.walletName}</Text>
+          <Text bold color="yellow">
+            {walletInfo?.walletName}
+          </Text>
         </Box>
         <Box>
           <Text color="gray">Password: </Text>
-          <TextInput value={password} onChange={setPassword} onSubmit={handlePasswordSubmit} mask="*" />
+          <TextInput
+            value={password}
+            onChange={setPassword}
+            onSubmit={handlePasswordSubmit}
+            mask="*"
+          />
         </Box>
       </Box>
     );
   }
 
-  if (state === 'loading') {
+  if (state === "loading") {
     return (
       <Box flexDirection="column" padding={1}>
         <Text color="cyan">⏳ Loading wallet...</Text>
-        {walletInfo?.source === 'wallet' && <Text color="gray">Decrypting {walletInfo.walletName}...</Text>}
-        {walletInfo?.source === 'env' && <Text color="gray">Using environment variable</Text>}
+        {walletInfo?.source === "wallet" && (
+          <Text color="gray">Decrypting {walletInfo.walletName}...</Text>
+        )}
+        {walletInfo?.source === "env" && <Text color="gray">Using environment variable</Text>}
       </Box>
     );
   }
 
-  if (state === 'error') {
+  if (state === "error") {
     return (
       <Box flexDirection="column" padding={1}>
         <Text color="red">✗ Error: {error}</Text>
@@ -380,7 +401,7 @@ export function CardanoSend({
     );
   }
 
-  if (state === 'cancelled') {
+  if (state === "cancelled") {
     return (
       <Box padding={1}>
         <Text color="yellow">Transaction cancelled</Text>
@@ -388,7 +409,7 @@ export function CardanoSend({
     );
   }
 
-  if (state === 'building') {
+  if (state === "building") {
     return (
       <Box flexDirection="column" padding={1}>
         <Text color="cyan">🔨 Building transaction...</Text>
@@ -397,7 +418,7 @@ export function CardanoSend({
     );
   }
 
-  if (state === 'signing') {
+  if (state === "signing") {
     return (
       <Box flexDirection="column" padding={1}>
         <Text color="cyan">🔐 Signing transaction...</Text>
@@ -405,7 +426,7 @@ export function CardanoSend({
     );
   }
 
-  if (state === 'submitting') {
+  if (state === "submitting") {
     return (
       <Box flexDirection="column" padding={1}>
         <Text color="cyan">📤 Submitting transaction to {network}...</Text>
@@ -413,7 +434,7 @@ export function CardanoSend({
     );
   }
 
-  if (state === 'confirming') {
+  if (state === "confirming") {
     return (
       <Box flexDirection="column" padding={1}>
         <Text color="cyan">⏳ Waiting for confirmation...</Text>
@@ -428,17 +449,19 @@ export function CardanoSend({
     );
   }
 
-  if (state === 'success') {
+  if (state === "success") {
     if (dryRun) {
       return (
         <Box flexDirection="column" padding={1}>
           <Text color="green">✓ Transaction built successfully (dry run)</Text>
           <Box marginTop={1}>
             <Text color="gray">Unsigned TX saved to: </Text>
-            <Text>{txInfo?.unsignedTxPath || outputFile || '(unknown)'}</Text>
+            <Text>{txInfo?.unsignedTxPath || outputFile || "(unknown)"}</Text>
           </Box>
           <Box marginTop={1}>
-            <Text color="gray">Sign with: begin sign {'<tx-file>'} --wallet {'<wallet-name>'}</Text>
+            <Text color="gray">
+              Sign with: begin sign {"<tx-file>"} --wallet {"<wallet-name>"}
+            </Text>
           </Box>
         </Box>
       );
@@ -454,7 +477,8 @@ export function CardanoSend({
         <Box marginTop={1}>
           <Text color="gray">View on: </Text>
           <Text color="blue">
-            https://{network === 'mainnet' ? '' : network + '.'}cardanoscan.io/transaction/{txInfo?.txHash}
+            https://{network === "mainnet" ? "" : network + "."}cardanoscan.io/transaction/
+            {txInfo?.txHash}
           </Text>
         </Box>
       </Box>
@@ -465,39 +489,45 @@ export function CardanoSend({
   return (
     <Box flexDirection="column" padding={1}>
       <Box marginBottom={1}>
-        <Text bold color="cyan">Send ADA</Text>
+        <Text bold color="cyan">
+          Send ADA
+        </Text>
         <Text color="gray"> ({network})</Text>
         {dryRun && <Text color="yellow"> [DRY RUN]</Text>}
-        {walletInfo?.source === 'wallet' && <Text color="gray"> [{walletInfo.walletName}]</Text>}
+        {walletInfo?.source === "wallet" && <Text color="gray"> [{walletInfo.walletName}]</Text>}
       </Box>
 
       <Box flexDirection="column" borderStyle="round" borderColor="gray" padding={1}>
         <Box>
-          <Text color="gray">From:   </Text>
+          <Text color="gray">From: </Text>
           <Text>
             {txInfo?.fromAddress.slice(0, 30)}...{txInfo?.fromAddress.slice(-10)}
           </Text>
         </Box>
         <Box>
-          <Text color="gray">To:     </Text>
+          <Text color="gray">To: </Text>
           <Text>
             {to.slice(0, 30)}...{to.slice(-10)}
           </Text>
         </Box>
         <Box>
           <Text color="gray">Amount: </Text>
-          <Text bold color="green">{amount} ADA</Text>
+          <Text bold color="green">
+            {amount} ADA
+          </Text>
           <Text color="gray"> ({adaToLovelace(amount)} lovelace)</Text>
         </Box>
 
-        {typeof txInfo?.availableAda === 'string' && typeof txInfo?.utxoCount === 'number' && (
+        {typeof txInfo?.availableAda === "string" && typeof txInfo?.utxoCount === "number" && (
           <Box>
             <Text color="gray">Available: </Text>
             <Text color="green">{txInfo.availableAda} ADA</Text>
             <Text color="gray"> across </Text>
             <Text>{txInfo.utxoCount}</Text>
             <Text color="gray"> UTxOs</Text>
-            {txInfo.walletSource === 'env' && <Text color="yellow"> (from BEGIN_CLI_MNEMONIC)</Text>}
+            {txInfo.walletSource === "env" && (
+              <Text color="yellow"> (from BEGIN_CLI_MNEMONIC)</Text>
+            )}
           </Box>
         )}
 
@@ -513,7 +543,7 @@ export function CardanoSend({
         )}
 
         <Box marginTop={1}>
-          <Text color="gray">Fee:    </Text>
+          <Text color="gray">Fee: </Text>
           <Text color="yellow">{txInfo?.estimatedFee} ADA</Text>
           <Text color="gray"> (estimated)</Text>
         </Box>

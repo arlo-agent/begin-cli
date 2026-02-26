@@ -14,15 +14,15 @@ import {
   lovelaceToAda,
   type StakePool,
   type DelegationStatus,
-} from '../lib/staking.js';
+} from "../lib/staking.js";
 import {
   loadWallet,
   checkWalletAvailability,
   type TransactionConfig,
   type WalletOptions,
-} from '../lib/transaction.js';
-import { getPasswordFromEnv } from '../lib/keystore.js';
-import { hasApiKey } from '../lib/provider.js';
+} from "../lib/transaction.js";
+import { getPasswordFromEnv } from "../lib/keystore.js";
+import { hasApiKey } from "../lib/provider.js";
 
 export { StakePool, DelegationStatus };
 
@@ -49,7 +49,7 @@ export interface StakePoolsResult {
 }
 
 export interface DelegateResult {
-  status: 'success' | 'error';
+  status: "success" | "error";
   txHash?: string;
   poolId?: string;
   ticker?: string;
@@ -61,7 +61,7 @@ export interface DelegateResult {
 }
 
 export interface WithdrawResult {
-  status: 'success' | 'error';
+  status: "success" | "error";
   txHash?: string;
   amount: string;
   amountAda: string;
@@ -77,17 +77,17 @@ export interface WithdrawResult {
 export async function getStakeStatus(
   wallet: string | undefined,
   password: string | undefined,
-  network: string = 'mainnet'
+  network: string = "mainnet"
 ): Promise<StakeStatusResult> {
   const availability = checkWalletAvailability(wallet);
 
   if (!availability.available) {
-    throw new Error(availability.error || 'No wallet available');
+    throw new Error(availability.error || "No wallet available");
   }
 
   const effectivePassword = password || getPasswordFromEnv() || undefined;
   if (availability.needsPassword && !effectivePassword) {
-    throw new Error('Password is required for wallet decryption');
+    throw new Error("Password is required for wallet decryption");
   }
 
   const config: TransactionConfig = { network };
@@ -101,12 +101,12 @@ export async function getStakeStatus(
   // Get stake address
   const rewardAddresses = await meshWallet.getRewardAddresses();
   if (!rewardAddresses || rewardAddresses.length === 0) {
-    throw new Error('Could not derive stake address from wallet');
+    throw new Error("Could not derive stake address from wallet");
   }
   const stakeAddress = rewardAddresses[0];
 
   // Check if we have API key
-  if (!hasApiKey(network as 'mainnet' | 'preprod' | 'preview')) {
+  if (!hasApiKey(network as "mainnet" | "preprod" | "preview")) {
     const mockStatus = getMockDelegationStatus();
     return {
       stakeAddress,
@@ -146,11 +146,11 @@ export async function getStakeStatus(
  */
 export async function getStakePools(
   search: string | undefined,
-  network: string = 'mainnet',
+  network: string = "mainnet",
   limit: number = 10
 ): Promise<StakePoolsResult> {
   // Check if we have API key
-  if (!hasApiKey(network as 'mainnet' | 'preprod' | 'preview')) {
+  if (!hasApiKey(network as "mainnet" | "preprod" | "preview")) {
     const mockPools = getMockPools();
     const filtered = search
       ? mockPools.filter(
@@ -192,26 +192,26 @@ export async function delegateStake(
   poolId: string,
   wallet: string | undefined,
   password: string | undefined,
-  network: string = 'mainnet'
+  network: string = "mainnet"
 ): Promise<DelegateResult> {
   const availability = checkWalletAvailability(wallet);
 
   if (!availability.available) {
     return {
-      status: 'error',
+      status: "error",
       registrationIncluded: false,
       network,
-      error: availability.error || 'No wallet available',
+      error: availability.error || "No wallet available",
     };
   }
 
   const effectivePassword = password || getPasswordFromEnv() || undefined;
   if (availability.needsPassword && !effectivePassword) {
     return {
-      status: 'error',
+      status: "error",
       registrationIncluded: false,
       network,
-      error: 'Password is required for wallet decryption',
+      error: "Password is required for wallet decryption",
     };
   }
 
@@ -227,7 +227,7 @@ export async function delegateStake(
     // Get stake address
     const rewardAddresses = await meshWallet.getRewardAddresses();
     if (!rewardAddresses || rewardAddresses.length === 0) {
-      throw new Error('Could not derive stake address from wallet');
+      throw new Error("Could not derive stake address from wallet");
     }
     const stakeAddress = rewardAddresses[0];
 
@@ -235,11 +235,11 @@ export async function delegateStake(
     let pool: StakePool | null = null;
     let needsRegistration = false;
 
-    if (hasApiKey(network as 'mainnet' | 'preprod' | 'preview')) {
+    if (hasApiKey(network as "mainnet" | "preprod" | "preview")) {
       pool = await fetchPoolDetails(poolId, network);
       if (!pool) {
         return {
-          status: 'error',
+          status: "error",
           registrationIncluded: false,
           network,
           error: `Pool not found: ${poolId}`,
@@ -251,12 +251,13 @@ export async function delegateStake(
     } else {
       // Mock mode
       const mockPools = getMockPools();
-      pool = mockPools.find(
-        (p) => p.poolId === poolId || p.ticker.toLowerCase() === poolId.toLowerCase()
-      ) || null;
+      pool =
+        mockPools.find(
+          (p) => p.poolId === poolId || p.ticker.toLowerCase() === poolId.toLowerCase()
+        ) || null;
       if (!pool) {
         return {
-          status: 'error',
+          status: "error",
           registrationIncluded: false,
           network,
           error: `Pool not found: ${poolId}`,
@@ -267,10 +268,10 @@ export async function delegateStake(
 
     // Mock delegation transaction
     // TODO: Implement real delegation with MeshJS Transaction
-    const mockTxHash = 'mock_delegation_tx_' + Date.now().toString(36);
+    const mockTxHash = "mock_delegation_tx_" + Date.now().toString(36);
 
     return {
-      status: 'success',
+      status: "success",
       txHash: mockTxHash,
       poolId: pool.poolId,
       ticker: pool.ticker,
@@ -281,10 +282,10 @@ export async function delegateStake(
     };
   } catch (err) {
     return {
-      status: 'error',
+      status: "error",
       registrationIncluded: false,
       network,
-      error: err instanceof Error ? err.message : 'Delegation failed',
+      error: err instanceof Error ? err.message : "Delegation failed",
     };
   }
 }
@@ -297,28 +298,28 @@ export async function delegateStake(
 export async function withdrawRewards(
   wallet: string | undefined,
   password: string | undefined,
-  network: string = 'mainnet'
+  network: string = "mainnet"
 ): Promise<WithdrawResult> {
   const availability = checkWalletAvailability(wallet);
 
   if (!availability.available) {
     return {
-      status: 'error',
-      amount: '0',
-      amountAda: '0',
+      status: "error",
+      amount: "0",
+      amountAda: "0",
       network,
-      error: availability.error || 'No wallet available',
+      error: availability.error || "No wallet available",
     };
   }
 
   const effectivePassword = password || getPasswordFromEnv() || undefined;
   if (availability.needsPassword && !effectivePassword) {
     return {
-      status: 'error',
-      amount: '0',
-      amountAda: '0',
+      status: "error",
+      amount: "0",
+      amountAda: "0",
       network,
-      error: 'Password is required for wallet decryption',
+      error: "Password is required for wallet decryption",
     };
   }
 
@@ -334,37 +335,37 @@ export async function withdrawRewards(
     // Get stake address
     const rewardAddresses = await meshWallet.getRewardAddresses();
     if (!rewardAddresses || rewardAddresses.length === 0) {
-      throw new Error('Could not derive stake address from wallet');
+      throw new Error("Could not derive stake address from wallet");
     }
     const stakeAddress = rewardAddresses[0];
 
     // Get rewards available
-    let rewardsAvailable = '0';
-    if (hasApiKey(network as 'mainnet' | 'preprod' | 'preview')) {
+    let rewardsAvailable = "0";
+    if (hasApiKey(network as "mainnet" | "preprod" | "preview")) {
       const status = await libGetDelegationStatus(stakeAddress, network);
       rewardsAvailable = status.rewardsAvailable;
     } else {
       // Mock rewards
-      rewardsAvailable = '15430000';
+      rewardsAvailable = "15430000";
     }
 
-    if (rewardsAvailable === '0' || BigInt(rewardsAvailable) === 0n) {
+    if (rewardsAvailable === "0" || BigInt(rewardsAvailable) === 0n) {
       return {
-        status: 'error',
-        amount: '0',
-        amountAda: '0',
+        status: "error",
+        amount: "0",
+        amountAda: "0",
         stakeAddress,
         network,
-        error: 'No rewards available to withdraw',
+        error: "No rewards available to withdraw",
       };
     }
 
     // Mock withdrawal transaction
     // TODO: Implement real withdrawal with MeshJS Transaction
-    const mockTxHash = 'mock_withdraw_tx_' + Date.now().toString(36);
+    const mockTxHash = "mock_withdraw_tx_" + Date.now().toString(36);
 
     return {
-      status: 'success',
+      status: "success",
       txHash: mockTxHash,
       amount: rewardsAvailable,
       amountAda: lovelaceToAda(rewardsAvailable),
@@ -374,11 +375,11 @@ export async function withdrawRewards(
     };
   } catch (err) {
     return {
-      status: 'error',
-      amount: '0',
-      amountAda: '0',
+      status: "error",
+      amount: "0",
+      amountAda: "0",
       network,
-      error: err instanceof Error ? err.message : 'Withdrawal failed',
+      error: err instanceof Error ? err.message : "Withdrawal failed",
     };
   }
 }

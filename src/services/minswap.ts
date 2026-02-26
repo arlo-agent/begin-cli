@@ -1,8 +1,8 @@
 /**
  * Minswap Aggregator API client for Cardano DEX operations
- * 
+ *
  * Documentation: https://docs.minswap.org/developer/aggregator-api
- * 
+ *
  * Supports:
  * - Price estimation and routing
  * - Transaction building
@@ -11,7 +11,7 @@
 
 // API endpoints by network
 const MINSWAP_API_URLS: Record<string, string> = {
-  mainnet: 'https://agg-api.minswap.org/aggregator',
+  mainnet: "https://agg-api.minswap.org/aggregator",
 };
 
 /**
@@ -29,20 +29,20 @@ export interface MinswapToken {
 }
 
 export type Protocol =
-  | 'MinswapV2'
-  | 'Minswap'
-  | 'MinswapStable'
-  | 'MuesliSwap'
-  | 'Splash'
-  | 'SundaeSwapV3'
-  | 'SundaeSwap'
-  | 'VyFinance'
-  | 'CswapV1'
-  | 'WingRidersV2'
-  | 'WingRiders'
-  | 'WingRidersStableV2'
-  | 'Spectrum'
-  | 'SplashStable';
+  | "MinswapV2"
+  | "Minswap"
+  | "MinswapStable"
+  | "MuesliSwap"
+  | "Splash"
+  | "SundaeSwapV3"
+  | "SundaeSwap"
+  | "VyFinance"
+  | "CswapV1"
+  | "WingRidersV2"
+  | "WingRiders"
+  | "WingRidersStableV2"
+  | "Spectrum"
+  | "SplashStable";
 
 /**
  * Route leg information
@@ -165,11 +165,7 @@ function isRetryableStatus(status: number): boolean {
 /**
  * Calculate delay with exponential backoff and jitter
  */
-function calculateBackoffDelay(
-  attempt: number,
-  baseDelayMs: number,
-  maxDelayMs: number
-): number {
+function calculateBackoffDelay(attempt: number, baseDelayMs: number, maxDelayMs: number): number {
   // Exponential backoff: baseDelay * 2^attempt
   const exponentialDelay = baseDelayMs * Math.pow(2, attempt);
   // Cap at maxDelay
@@ -202,19 +198,16 @@ export class MinswapClient {
   /**
    * Make API request with error handling and retry logic
    */
-  private async request<T>(
-    endpoint: string,
-    options: RequestInit = {}
-  ): Promise<T> {
+  private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
     const url = `${this.baseUrl}${endpoint}`;
     let lastError: Error | null = null;
-    
+
     for (let attempt = 0; attempt <= this.retryConfig.maxRetries; attempt++) {
       try {
         const response = await fetch(url, {
           ...options,
           headers: {
-            'Content-Type': 'application/json',
+            "Content-Type": "application/json",
             ...options.headers,
           },
         });
@@ -229,7 +222,7 @@ export class MinswapClient {
             );
             console.warn(
               `Minswap API returned ${response.status}, retrying in ${delay}ms ` +
-              `(attempt ${attempt + 1}/${this.retryConfig.maxRetries + 1})`
+                `(attempt ${attempt + 1}/${this.retryConfig.maxRetries + 1})`
             );
             await sleep(delay);
             continue;
@@ -237,7 +230,7 @@ export class MinswapClient {
 
           let errorMessage = `Minswap API error: ${response.status}`;
           try {
-            const errorData = await response.json() as MinswapApiError;
+            const errorData = (await response.json()) as MinswapApiError;
             errorMessage = errorData.message || errorData.error || errorMessage;
           } catch {
             // Use default error message
@@ -248,10 +241,10 @@ export class MinswapClient {
         return response.json() as Promise<T>;
       } catch (err) {
         lastError = err instanceof Error ? err : new Error(String(err));
-        
+
         // Only retry on network errors or retryable status codes
         // If it's not a network error (i.e., we got a response), don't retry
-        if (err instanceof TypeError && err.message.includes('fetch')) {
+        if (err instanceof TypeError && err.message.includes("fetch")) {
           // Network error - retry
           if (attempt < this.retryConfig.maxRetries) {
             const delay = calculateBackoffDelay(
@@ -261,7 +254,7 @@ export class MinswapClient {
             );
             console.warn(
               `Network error, retrying in ${delay}ms ` +
-              `(attempt ${attempt + 1}/${this.retryConfig.maxRetries + 1})`
+                `(attempt ${attempt + 1}/${this.retryConfig.maxRetries + 1})`
             );
             await sleep(delay);
             continue;
@@ -271,7 +264,7 @@ export class MinswapClient {
       }
     }
 
-    throw lastError || new Error('Request failed after retries');
+    throw lastError || new Error("Request failed after retries");
   }
 
   private mapAsset(asset: {
@@ -285,8 +278,8 @@ export class MinswapClient {
   }): MinswapToken {
     return {
       tokenId: asset.token_id,
-      ticker: asset.ticker ?? asset.token_id.slice(0, 8).toUpperCase() + '...',
-      name: asset.project_name ?? asset.ticker ?? 'Unknown Token',
+      ticker: asset.ticker ?? asset.token_id.slice(0, 8).toUpperCase() + "...",
+      name: asset.project_name ?? asset.ticker ?? "Unknown Token",
       decimals: asset.decimals ?? 0,
       verified: asset.is_verified ?? false,
       logoUrl: asset.logo ?? undefined,
@@ -298,7 +291,7 @@ export class MinswapClient {
   /**
    * Get current ADA price in a currency
    */
-  async getAdaPrice(currency: string = 'usd'): Promise<{ price: number; change24h: number }> {
+  async getAdaPrice(currency: string = "usd"): Promise<{ price: number; change24h: number }> {
     const params = new URLSearchParams({ currency });
     const response = await this.request<{
       currency: string;
@@ -332,7 +325,7 @@ export class MinswapClient {
       wallet: string;
       ada: string;
       minimum_lovelace: string;
-      balance: Array<{ asset: Parameters<MinswapClient['mapAsset']>[0]; amount: string }>;
+      balance: Array<{ asset: Parameters<MinswapClient["mapAsset"]>[0]; amount: string }>;
       amount_in_decimal: boolean;
     }>(`/wallet?${params}`);
 
@@ -361,10 +354,10 @@ export class MinswapClient {
     searchAfter?: string[];
   }> {
     const response = await this.request<{
-      tokens: Array<Parameters<MinswapClient['mapAsset']>[0]>;
+      tokens: Array<Parameters<MinswapClient["mapAsset"]>[0]>;
       search_after?: string[];
-    }>('/tokens', {
-      method: 'POST',
+    }>("/tokens", {
+      method: "POST",
       body: JSON.stringify({
         query,
         only_verified: onlyVerified,
@@ -433,8 +426,8 @@ export class MinswapClient {
       aggregator_fee: string;
       aggregator_fee_percent: number;
       amount_in_decimal: boolean;
-    }>('/estimate', {
-      method: 'POST',
+    }>("/estimate", {
+      method: "POST",
       body: JSON.stringify(body),
     });
 
@@ -495,7 +488,7 @@ export class MinswapClient {
       estimateBody.exclude_protocols = params.estimate.excludeProtocols;
     }
 
-    if (typeof params.estimate.allowMultiHops === 'boolean') {
+    if (typeof params.estimate.allowMultiHops === "boolean") {
       estimateBody.allow_multi_hops = params.estimate.allowMultiHops;
     }
 
@@ -513,14 +506,14 @@ export class MinswapClient {
       body.inputs_to_choose = params.inputsToChoose;
     }
 
-    if (typeof params.amountInDecimal === 'boolean') {
+    if (typeof params.amountInDecimal === "boolean") {
       body.amount_in_decimal = params.amountInDecimal;
     }
 
     const response = await this.request<{
       cbor: string;
-    }>('/build-tx', {
-      method: 'POST',
+    }>("/build-tx", {
+      method: "POST",
       body: JSON.stringify(body),
     });
 
@@ -532,14 +525,11 @@ export class MinswapClient {
   /**
    * Submit signed transaction
    */
-  async submitTx(params: {
-    cbor: string;
-    witnessSet: string;
-  }): Promise<SubmitTxResponse> {
+  async submitTx(params: { cbor: string; witnessSet: string }): Promise<SubmitTxResponse> {
     const response = await this.request<{
       tx_id: string;
-    }>('/finalize-and-submit-tx', {
-      method: 'POST',
+    }>("/finalize-and-submit-tx", {
+      method: "POST",
       body: JSON.stringify({
         cbor: params.cbor,
         witness_set: params.witnessSet,
@@ -567,8 +557,8 @@ export class MinswapClient {
       orders: Array<{
         owner_address: string;
         protocol: Protocol;
-        token_in: Parameters<MinswapClient['mapAsset']>[0];
-        token_out: Parameters<MinswapClient['mapAsset']>[0];
+        token_in: Parameters<MinswapClient["mapAsset"]>[0];
+        token_out: Parameters<MinswapClient["mapAsset"]>[0];
         amount_in: string;
         min_amount_out: string;
         created_at: number;
@@ -602,8 +592,8 @@ export class MinswapClient {
   }): Promise<BuildTxResponse> {
     const response = await this.request<{
       cbor: string;
-    }>('/cancel-tx', {
-      method: 'POST',
+    }>("/cancel-tx", {
+      method: "POST",
       body: JSON.stringify({
         sender: params.sender,
         orders: params.orders.map((order) => ({
@@ -617,7 +607,6 @@ export class MinswapClient {
       cbor: response.cbor,
     };
   }
-
 
   /**
    * Get network this client is configured for
@@ -638,7 +627,7 @@ export function createMinswapClient(network: string, partner?: string): MinswapC
  * Mock Minswap client for development/testing without API access
  */
 export class MockMinswapClient extends MinswapClient {
-  constructor(network: string = 'mainnet') {
+  constructor(network: string = "mainnet") {
     super(network);
   }
 
@@ -647,7 +636,7 @@ export class MockMinswapClient extends MinswapClient {
     await new Promise((resolve) => setTimeout(resolve, 500));
 
     const amountNum = parseFloat(params.amount);
-    const mockRate = params.tokenIn === 'lovelace' ? 0.05 : 20; // ADA->MIN or MIN->ADA
+    const mockRate = params.tokenIn === "lovelace" ? 0.05 : 20; // ADA->MIN or MIN->ADA
     const amountOut = (amountNum * mockRate).toFixed(6);
     const minAmountOut = (amountNum * mockRate * (1 - params.slippage / 100)).toFixed(6);
 
@@ -657,26 +646,26 @@ export class MockMinswapClient extends MinswapClient {
       amountIn: params.amount,
       amountOut,
       minAmountOut,
-      totalLpFee: '0.3',
-      totalDexFee: '0.1',
-      deposits: '0',
+      totalLpFee: "0.3",
+      totalDexFee: "0.1",
+      deposits: "0",
       avgPriceImpact: 0.15,
-      aggregatorFee: '0.05',
+      aggregatorFee: "0.05",
       aggregatorFeePercent: 0.5,
       paths: [
         [
           {
-            poolId: 'mock_pool_ada_min_v2',
-            protocol: 'MinswapV2',
-            lpToken: 'mock_lp_token',
+            poolId: "mock_pool_ada_min_v2",
+            protocol: "MinswapV2",
+            lpToken: "mock_lp_token",
             tokenIn: params.tokenIn,
             tokenOut: params.tokenOut,
             amountIn: params.amount,
             amountOut,
             minAmountOut,
-            lpFee: '0.3',
-            dexFee: '0.1',
-            deposits: '0',
+            lpFee: "0.3",
+            dexFee: "0.1",
+            deposits: "0",
             priceImpact: 0.15,
           },
         ],
@@ -693,7 +682,7 @@ export class MockMinswapClient extends MinswapClient {
     await new Promise((resolve) => setTimeout(resolve, 300));
 
     return {
-      cbor: 'mock_unsigned_tx_cbor_' + Date.now().toString(16),
+      cbor: "mock_unsigned_tx_cbor_" + Date.now().toString(16),
     };
   }
 
@@ -701,7 +690,7 @@ export class MockMinswapClient extends MinswapClient {
     await new Promise((resolve) => setTimeout(resolve, 500));
 
     return {
-      txId: 'mock_tx_id_' + Date.now().toString(36),
+      txId: "mock_tx_id_" + Date.now().toString(36),
     };
   }
 
@@ -715,37 +704,37 @@ export class MockMinswapClient extends MinswapClient {
 
     const allTokens: MinswapToken[] = [
       {
-        tokenId: 'lovelace',
-        ticker: 'ADA',
-        name: 'Cardano',
+        tokenId: "lovelace",
+        ticker: "ADA",
+        name: "Cardano",
         decimals: 6,
         verified: true,
       },
       {
-        tokenId: '29d222ce763455e3d7a09a665ce554f00ac89d2e99a1a83d267170c64d494e',
-        ticker: 'MIN',
-        name: 'Minswap',
+        tokenId: "29d222ce763455e3d7a09a665ce554f00ac89d2e99a1a83d267170c64d494e",
+        ticker: "MIN",
+        name: "Minswap",
         decimals: 6,
         verified: true,
       },
       {
-        tokenId: 'f66d78b4a3cb3d37afa0ec36461e51ecbde00f26c8f0a68f94b6988069555344',
-        ticker: 'iUSD',
-        name: 'Indigo USD',
+        tokenId: "f66d78b4a3cb3d37afa0ec36461e51ecbde00f26c8f0a68f94b6988069555344",
+        ticker: "iUSD",
+        name: "Indigo USD",
         decimals: 6,
         verified: true,
       },
       {
-        tokenId: 'a0028f350aaabe0545fdcb56b039bfb08e4bb4d8c4d7c3c7d481c235484f534b59',
-        ticker: 'HOSKY',
-        name: 'Hosky Token',
+        tokenId: "a0028f350aaabe0545fdcb56b039bfb08e4bb4d8c4d7c3c7d481c235484f534b59",
+        ticker: "HOSKY",
+        name: "Hosky Token",
         decimals: 0,
         verified: true,
       },
       {
-        tokenId: 'b0028f350aaabe0545fdcb56b039bfb08e4bb4d8c4d7c3c7d481c235534e454b',
-        ticker: 'SNEK',
-        name: 'Snek',
+        tokenId: "b0028f350aaabe0545fdcb56b039bfb08e4bb4d8c4d7c3c7d481c235534e454b",
+        ticker: "SNEK",
+        name: "Snek",
         decimals: 0,
         verified: true,
       },
@@ -778,17 +767,17 @@ export class MockMinswapClient extends MinswapClient {
     await new Promise((resolve) => setTimeout(resolve, 200));
 
     const adaToken: MinswapToken = {
-      tokenId: 'lovelace',
-      ticker: 'ADA',
-      name: 'Cardano',
+      tokenId: "lovelace",
+      ticker: "ADA",
+      name: "Cardano",
       decimals: 6,
       verified: true,
     };
 
     const minToken: MinswapToken = {
-      tokenId: '29d222ce763455e3d7a09a665ce554f00ac89d2e99a1a83d267170c64d494e',
-      ticker: 'MIN',
-      name: 'Minswap',
+      tokenId: "29d222ce763455e3d7a09a665ce554f00ac89d2e99a1a83d267170c64d494e",
+      ticker: "MIN",
+      name: "Minswap",
       decimals: 6,
       verified: true,
     };
@@ -796,15 +785,15 @@ export class MockMinswapClient extends MinswapClient {
     return [
       {
         ownerAddress,
-        protocol: 'MinswapV2',
+        protocol: "MinswapV2",
         tokenIn: adaToken,
         tokenOut: minToken,
-        amountIn: amountInDecimal ? '100' : '100000000',
-        minAmountOut: amountInDecimal ? '4.95' : '4950000',
+        amountIn: amountInDecimal ? "100" : "100000000",
+        minAmountOut: amountInDecimal ? "4.95" : "4950000",
         createdAt: Date.now(),
-        txIn: 'mock_tx_in_0',
-        dexFee: amountInDecimal ? '0.1' : '100000',
-        deposit: amountInDecimal ? '2' : '2000000',
+        txIn: "mock_tx_in_0",
+        dexFee: amountInDecimal ? "0.1" : "100000",
+        deposit: amountInDecimal ? "2" : "2000000",
       },
     ];
   }
@@ -816,7 +805,7 @@ export class MockMinswapClient extends MinswapClient {
     await new Promise((resolve) => setTimeout(resolve, 200));
 
     return {
-      cbor: 'mock_cancel_tx_cbor_' + Date.now().toString(16),
+      cbor: "mock_cancel_tx_cbor_" + Date.now().toString(16),
     };
   }
 }

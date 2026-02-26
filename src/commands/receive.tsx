@@ -1,10 +1,17 @@
-import React, { useState, useEffect } from 'react';
-import { Box, Text } from 'ink';
-import { readFile } from 'node:fs/promises';
-import { join } from 'node:path';
-import { generateQRCode, isValidCardanoAddress, truncateAddress } from '../lib/qr.js';
-import { deriveAddresses, type NetworkType } from '../lib/address.js';
-import { getMnemonic, walletExists, WALLETS_DIR, MNEMONIC_ENV_VAR, PASSWORD_ENV_VAR, getPasswordFromEnv } from '../lib/keystore.js';
+import React, { useState, useEffect } from "react";
+import { Box, Text } from "ink";
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
+import { generateQRCode, isValidCardanoAddress, truncateAddress } from "../lib/qr.js";
+import { deriveAddresses, type NetworkType } from "../lib/address.js";
+import {
+  getMnemonic,
+  walletExists,
+  WALLETS_DIR,
+  MNEMONIC_ENV_VAR,
+  PASSWORD_ENV_VAR,
+  getPasswordFromEnv,
+} from "../lib/keystore.js";
 
 interface ReceiveProps {
   /** Either a wallet name or a raw address */
@@ -21,17 +28,17 @@ interface ReceiveProps {
 
 type ResolvedTarget =
   | { isWallet: false; address: string }
-  | { isWallet: true; walletName: string; address: string; source: 'wallet_file' | 'keystore' };
+  | { isWallet: true; walletName: string; address: string; source: "wallet_file" | "keystore" };
 
 async function getSavedPaymentAddress(walletName: string): Promise<string | null> {
   // Some wallet formats store a cleartext receive address in the file (e.g. addresses.payment).
   // If present, we can show it without decrypting mnemonic.
   try {
     const filePath = join(WALLETS_DIR, `${walletName}.json`);
-    const raw = await readFile(filePath, 'utf8');
+    const raw = await readFile(filePath, "utf8");
     const parsed = JSON.parse(raw) as unknown as { addresses?: { payment?: unknown } };
     const payment = parsed?.addresses?.payment;
-    return typeof payment === 'string' && payment.trim().length > 0 ? payment.trim() : null;
+    return typeof payment === "string" && payment.trim().length > 0 ? payment.trim() : null;
   } catch {
     return null;
   }
@@ -51,13 +58,15 @@ async function resolveTargetToAddress(opts: {
 
   // Wallet name passed — must exist on disk
   if (!walletExists(target)) {
-    throw new Error(`Wallet "${target}" not found. Provide a valid wallet name or Cardano address.`);
+    throw new Error(
+      `Wallet "${target}" not found. Provide a valid wallet name or Cardano address.`
+    );
   }
 
   // Fast path: cleartext payment address exists in wallet file
   const saved = await getSavedPaymentAddress(target);
   if (saved && isValidCardanoAddress(saved)) {
-    return { isWallet: true, walletName: target, address: saved, source: 'wallet_file' };
+    return { isWallet: true, walletName: target, address: saved, source: "wallet_file" };
   }
 
   // Password priority: --password flag > BEGIN_CLI_WALLET_PASSWORD env var
@@ -73,7 +82,7 @@ async function resolveTargetToAddress(opts: {
 
   const mnemonic = getMnemonic(effectivePassword, target);
   const derived = await deriveAddresses(mnemonic, network);
-  return { isWallet: true, walletName: target, address: derived.baseAddress, source: 'keystore' };
+  return { isWallet: true, walletName: target, address: derived.baseAddress, source: "keystore" };
 }
 
 export function Receive({ target, showQR, json, network, password }: ReceiveProps) {
@@ -82,7 +91,7 @@ export function Receive({ target, showQR, json, network, password }: ReceiveProp
   const [qrCode, setQrCode] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isWallet, setIsWallet] = useState(false);
-  const [walletSource, setWalletSource] = useState<'wallet_file' | 'keystore' | null>(null);
+  const [walletSource, setWalletSource] = useState<"wallet_file" | "keystore" | null>(null);
 
   useEffect(() => {
     const resolveAddress = async () => {
@@ -97,7 +106,7 @@ export function Receive({ target, showQR, json, network, password }: ReceiveProp
         setIsWallet(resolved.isWallet);
         setWalletSource(resolved.isWallet ? resolved.source : null);
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Unknown error');
+        setError(err instanceof Error ? err.message : "Unknown error");
         setLoading(false);
         return;
       }
@@ -150,7 +159,7 @@ export function Receive({ target, showQR, json, network, password }: ReceiveProp
 
   if (!address) {
     if (json) {
-      console.log(JSON.stringify({ error: 'No address found' }, null, 2));
+      console.log(JSON.stringify({ error: "No address found" }, null, 2));
       return null;
     }
     return <Text color="red">No address found</Text>;
@@ -173,7 +182,9 @@ export function Receive({ target, showQR, json, network, password }: ReceiveProp
   return (
     <Box flexDirection="column" padding={1}>
       <Box marginBottom={1}>
-        <Text bold color="cyan">Receive ADA</Text>
+        <Text bold color="cyan">
+          Receive ADA
+        </Text>
         <Text color="gray"> ({network})</Text>
       </Box>
 
@@ -183,7 +194,7 @@ export function Receive({ target, showQR, json, network, password }: ReceiveProp
           <Text bold>{target}</Text>
           {walletSource && (
             <Text color="gray">
-              {walletSource === 'wallet_file' ? ' (from wallet file)' : ' (derived from mnemonic)'}
+              {walletSource === "wallet_file" ? " (from wallet file)" : " (derived from mnemonic)"}
             </Text>
           )}
         </Box>
@@ -204,7 +215,9 @@ export function Receive({ target, showQR, json, network, password }: ReceiveProp
 
       <Box marginTop={1}>
         <Text color="gray" italic>
-          {showQR ? 'Scan QR code or copy address above to receive ADA' : 'Use --qr flag to display QR code'}
+          {showQR
+            ? "Scan QR code or copy address above to receive ADA"
+            : "Use --qr flag to display QR code"}
         </Text>
       </Box>
     </Box>
