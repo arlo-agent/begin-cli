@@ -11,9 +11,10 @@ import {
 import {
   loadWallet,
   checkWalletAvailability,
+  createProvider,
   type TransactionConfig,
 } from "../../lib/transaction.js";
-import type { MeshWallet } from "@meshsdk/core";
+import { Transaction, type MeshWallet } from "@meshsdk/core";
 
 interface StakeDelegateProps {
   poolId: string;
@@ -149,7 +150,7 @@ export function StakeDelegate({
 
         if (yes) {
           setState("building");
-          simulateDelegation();
+          executeDelegation();
         } else {
           setState("confirm");
         }
@@ -171,7 +172,7 @@ export function StakeDelegate({
 
       if (yes) {
         setState("building");
-        simulateDelegation();
+        executeDelegation();
       } else {
         setState("confirm");
       }
@@ -187,34 +188,52 @@ export function StakeDelegate({
 
     if (input === "y" || input === "Y") {
       setState("building");
-      void simulateDelegation();
+      void executeDelegation();
     } else if (input === "n" || input === "N" || key.escape) {
       setState("cancelled");
       setTimeout(() => exit(), 500);
     }
   });
 
-  const simulateDelegation = async () => {
-    // Simulate MeshJS transaction building
-    // In real implementation:
-    // 1. const tx = new Transaction({ initiator: wallet });
-    // 2. if (needsRegistration) tx.registerStake(stakeAddress);
-    // 3. tx.delegateStake(stakeAddress, poolId);
-    // 4. const unsignedTx = await tx.build();
-    // 5. const signedTx = await wallet.signTx(unsignedTx);
-    // 6. const txHash = await wallet.submitTx(signedTx);
+  const executeDelegation = async () => {
+    try {
+      if (!wallet || !stakeAddress) {
+        throw new Error('Wallet or stake address not available');
+      }
 
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-    setState("signing");
+      // Build the delegation transaction
+      const tx = new Transaction({ initiator: wallet });
 
-    await new Promise((resolve) => setTimeout(resolve, 1500));
-    setState("submitting");
+      // Register stake key if first-time delegation
+      if (needsRegistration) {
+        tx.registerStake(stakeAddress);
+      }
 
-    await new Promise((resolve) => setTimeout(resolve, 2000));
-    setTxHash("mock_delegation_tx_" + Date.now().toString(36));
-    setState("success");
+      // Delegate to the pool
+      tx.delegateStake(stakeAddress, poolId);
 
-    setTimeout(() => exit(), 2000);
+      // Build the transaction
+      const unsignedTx = await tx.build();
+
+      setState('signing');
+
+      // Sign the transaction
+      const signedTx = await wallet.signTx(unsignedTx);
+
+      setState('submitting');
+
+      // Submit the transaction
+      const submittedTxHash = await wallet.submitTx(signedTx);
+      setTxHash(submittedTxHash);
+      setState('success');
+
+      setTimeout(() => exit(), 2000);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Delegation failed';
+      setError(message);
+      setState('error');
+      setTimeout(() => exit(), 2000);
+    }
   };
 
   // JSON output
@@ -382,9 +401,6 @@ export function StakeDelegate({
             accumulating after that.
           </Text>
         </Box>
-        <Box marginTop={1}>
-          <Text color="yellow">⚠ This is a MOCK transaction - no actual delegation occurred</Text>
-        </Box>
       </Box>
     );
   }
@@ -448,10 +464,6 @@ export function StakeDelegate({
         <Text color="gray">Estimated fee: </Text>
         <Text color="yellow">~{needsRegistration ? "2.17" : "0.17"} ADA</Text>
         {needsRegistration && <Text color="gray"> (includes 2 ADA registration deposit)</Text>}
-      </Box>
-
-      <Box marginTop={1}>
-        <Text color="yellow">⚠ This is a MOCK transaction - no real ADA will be staked</Text>
       </Box>
 
       <Box marginTop={1}>
