@@ -3,6 +3,14 @@
  */
 
 import { createCoinGeckoClient, isCoinGeckoTicker } from './coingecko.js';
+import {
+  searchSolanaTokens,
+  getTrendingSolanaTokens,
+  findSolanaTokenByTicker,
+  isBinanceSolanaToken,
+  getJupiterPrice,
+  getMintAddressForSymbol,
+} from './jupiter.js';
 
 const MINSWAP_MAINNET_API = 'https://api-mainnet-prod.minswap.org';
 const BINANCE_DATA_API = 'https://data-api.binance.vision/api/v3';
@@ -54,7 +62,7 @@ export interface PriceData {
   volume24h: number;
   marketCap: number;
   currency: string;
-  source: 'coingecko' | 'minswap';
+  source: 'coingecko' | 'minswap' | 'binance' | 'jupiter';
 }
 
 /**
@@ -124,10 +132,48 @@ interface MinswapMetricsResponse {
   asset_metrics: MinswapAssetMetricsItem[];
 }
 
+export type ChainFilter = 'cardano' | 'solana' | 'all';
+
+/**
+ * Binance 24hr ticker response
+ */
+interface BinanceTicker24hr {
+  symbol: string;
+  lastPrice: string;
+  priceChangePercent: string;
+  volume: string;
+  quoteVolume: string;
+}
+
+/**
+ * Get 24hr price data from Binance for a trading pair
+ */
+export async function getBinancePrice(symbol: string): Promise<PriceData | null> {
+  const pair = `${symbol.toUpperCase()}USDT`;
+  const response = await fetch(`${BINANCE_DATA_API}/ticker/24hr?symbol=${pair}`);
+
+  if (!response.ok) return null;
+
+  const data = (await response.json()) as BinanceTicker24hr;
+  const price = parseFloat(data.lastPrice);
+  if (!Number.isFinite(price)) return null;
+
+  return {
+    ticker: symbol.toUpperCase(),
+    name: symbol.toUpperCase(),
+    price,
+    change24h: parseFloat(data.priceChangePercent) || 0,
+    volume24h: parseFloat(data.quoteVolume) || 0,
+    marketCap: 0,
+    currency: 'usd',
+    source: 'binance',
+  };
+}
+
 /**
  * Search for Cardano native tokens on Minswap
  */
-export async function searchTokens(
+export async function searchCardanoTokens(
   term: string,
   limit: number = 20,
   onlyVerified: boolean = true,
@@ -153,9 +199,82 @@ export async function searchTokens(
 }
 
 /**
+ * Search tokens across chains
+ */
+export async function searchTokens(
+  term: string,
+  limit: number = 20,
+  onlyVerified: boolean = true,
+  currency: string = 'usd',
+  chain: ChainFilter = 'all'
+): Promise<TokenMetrics[]> {
+  const results: TokenMetrics[] = [];
+
+  if (chain === 'cardano' || chain === 'all') {
+    try {
+      const cardanoResults = await searchCardanoTokens(term, limit, onlyVerified, currency);
+      results.push(...cardanoResults);
+    } catch {
+      // Skip if Minswap fails
+    }
+  }
+
+  if (chain === 'solana' || chain === 'all') {
+    try {
+      const solanaResults = await searchSolanaTokens(term, limit);
+      results.push(...solanaResults);
+    } catch {
+      // Skip if Jupiter fails
+    }
+  }
+
+  // Deduplicate by ticker (keep first occurrence)
+  const seen = new Set<string>();
+  const deduped = results.filter((t) => {
+    const key = `${t.ticker.toUpperCase()}-${t.tokenId}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+
+  return deduped.slice(0, limit);
+}
+
+/**
  * Get trending/top tokens by volume
  */
 export async function getTrendingTokens(
+  limit: number = 20,
+  currency: string = 'usd',
+  chain: ChainFilter = 'all'
+): Promise<TokenMetrics[]> {
+  const results: TokenMetrics[] = [];
+
+  if (chain === 'solana' || chain === 'all') {
+    try {
+      const solanaResults = await getTrendingSolanaTokens(limit);
+      results.push(...solanaResults);
+    } catch {
+      // Skip if Jupiter fails
+    }
+  }
+
+  if (chain === 'cardano' || chain === 'all') {
+    try {
+      const cardanoResults = await getTrendingCardanoTokens(limit, currency);
+      results.push(...cardanoResults);
+    } catch {
+      // Skip if Minswap fails
+    }
+  }
+
+  return results.slice(0, limit);
+}
+
+/**
+ * Get trending Cardano tokens by volume from Minswap
+ */
+async function getTrendingCardanoTokens(
   limit: number = 20,
   currency: string = 'usd'
 ): Promise<TokenMetrics[]> {
@@ -264,6 +383,30 @@ export async function getPrice(
       currency: price.currency,
       source: 'coingecko',
     };
+  }
+
+  // Try Binance for known Solana tokens
+  if (isBinanceSolanaToken(tickerUpper)) {
+    const binancePrice = await getBinancePrice(tickerUpper);
+    if (binancePrice) return binancePrice;
+  }
+
+  // Try Jupiter for Solana tokens by ticker
+  const solanaToken = await findSolanaTokenByTicker(tickerUpper);
+  if (solanaToken) {
+    const jupPrice = await getJupiterPrice(solanaToken.address);
+    if (jupPrice !== null) {
+      return {
+        ticker: solanaToken.symbol,
+        name: solanaToken.name,
+        price: jupPrice,
+        change24h: 0,
+        volume24h: solanaToken.daily_volume ?? 0,
+        marketCap: 0,
+        currency,
+        source: 'jupiter',
+      };
+    }
   }
 
   // Otherwise, try Minswap for Cardano native tokens

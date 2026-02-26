@@ -94,7 +94,12 @@ export function TokenPrice({ symbol, currency, json }: TokenPriceProps) {
 
       <Box marginTop={1}>
         <Text color="gray" dimColor>
-          {price.name} • Source: {price.source === 'coingecko' ? 'CoinGecko' : 'Minswap'}
+          {price.name} • Source: {
+            price.source === 'coingecko' ? 'CoinGecko' :
+            price.source === 'binance' ? 'Binance' :
+            price.source === 'jupiter' ? 'Jupiter' :
+            'Minswap'
+          }
         </Text>
       </Box>
     </Box>

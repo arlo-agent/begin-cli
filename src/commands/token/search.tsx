@@ -11,6 +11,7 @@ import {
   formatChange,
   formatCompact,
   type TokenMetrics,
+  type ChainFilter,
 } from '../../services/market.js';
 import { outputSuccess, outputError } from '../../lib/output.js';
 import { ExitCode } from '../../lib/errors.js';
@@ -21,9 +22,10 @@ interface TokenSearchProps {
   currency: string;
   json: boolean;
   limit: number;
+  chain: ChainFilter;
 }
 
-export function TokenSearch({ query, trending, currency, json, limit }: TokenSearchProps) {
+export function TokenSearch({ query, trending, currency, json, limit, chain }: TokenSearchProps) {
   const [loading, setLoading] = useState(true);
   const [tokens, setTokens] = useState<TokenMetrics[]>([]);
   const [error, setError] = useState<Error | null>(null);
@@ -33,12 +35,12 @@ export function TokenSearch({ query, trending, currency, json, limit }: TokenSea
       try {
         let results: TokenMetrics[];
         if (trending) {
-          results = await getTrendingTokens(limit, currency);
+          results = await getTrendingTokens(limit, currency, chain);
         } else if (query) {
-          results = await searchTokens(query, limit, true);
+          results = await searchTokens(query, limit, true, currency, chain);
         } else {
           // Default to trending if no query
-          results = await getTrendingTokens(limit, currency);
+          results = await getTrendingTokens(limit, currency, chain);
         }
         setTokens(results);
       } catch (err) {
@@ -48,7 +50,7 @@ export function TokenSearch({ query, trending, currency, json, limit }: TokenSea
       }
     };
     fetchTokens();
-  }, [query, trending, currency, limit]);
+  }, [query, trending, currency, limit, chain]);
 
   // Handle JSON output
   useEffect(() => {

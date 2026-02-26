@@ -91,6 +91,7 @@ const cli = meow(
 
   Token Options
     --trending        Show trending tokens by volume (token search)
+    --chain           Chain filter: cardano, solana, all (default: all)
     --currency, -c    Currency for prices (default: usd)
 
   Environment
@@ -192,6 +193,7 @@ const cli = meow(
       showSeed: { type: "boolean", default: false },
       // Token discovery flags
       trending: { type: "boolean", default: false },
+      chain: { type: "string", default: "all" },
       currency: { type: "string", shortFlag: "c", default: "EUR" },
       // Buy-specific flags
       token: { type: "string", default: "ADA" },
@@ -248,6 +250,7 @@ if (command === "mcp") {
     showSeed: boolean;
     // Token discovery flags
     trending: boolean;
+    chain: string;
     currency: string;
     // Buy-specific flags
     token: string;
@@ -288,6 +291,7 @@ if (command === "mcp") {
     protocol: rawFlags.protocol,
     showSeed: rawFlags.showSeed,
     trending: rawFlags.trending,
+    chain: rawFlags.chain,
     currency: rawFlags.currency,
     token: rawFlags.token,
   };
