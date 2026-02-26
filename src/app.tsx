@@ -6,6 +6,7 @@ import { CardanoHistory } from "./commands/cardano/history.js";
 import { CardanoSend } from "./commands/cardano/send.js";
 import { SolanaBalance, SolanaHistory, SolanaSend } from "./commands/solana/index.js";
 import { BitcoinBalance, BitcoinHistory, BitcoinSend } from "./commands/bitcoin/index.js";
+import { EVMBalance, EVMHistory, EVMSend } from "./commands/evm/index.js";
 import { Receive } from "./commands/receive.js";
 import { StakePools } from "./commands/stake/pools.js";
 import { StakeDelegate } from "./commands/stake/delegate.js";
@@ -29,7 +30,8 @@ import { Buy } from "./commands/buy.js";
 import { isValidNetwork, type Network } from "./lib/config.js";
 import type { NetworkType } from "./lib/address.js";
 import type { ChainFilter } from "./services/market.js";
-import type { SolanaNetwork, BitcoinNetwork } from "./lib/chains/types.js";
+import type { SolanaNetwork, BitcoinNetwork, EVMNetwork } from "./lib/chains/types.js";
+import { getSupportedEVMNetworks } from "./lib/chains/evm.js";
 
 export interface AppFlags {
   network: string;
@@ -70,6 +72,8 @@ export interface AppFlags {
   // Token discovery flags
   trending: boolean;
   chain: string;
+  // EVM-specific flags
+  evmNetwork?: string;
 }
 
 interface AppProps {
@@ -360,6 +364,82 @@ export function App({ command, subcommand, args, flags, showHelp }: AppProps) {
       <Box flexDirection="column">
         <Text color="red">Unknown bitcoin command: {subcommand || "(none)"}</Text>
         <Text color="gray">Available commands: balance, history, send</Text>
+      </Box>
+    );
+  }
+
+  // ---- EVM commands ----
+  if (command === "evm") {
+    // Parse EVM network from flag or default to ethereum
+    const supportedNetworks = getSupportedEVMNetworks();
+    const evmNetworkFlag = flags.evmNetwork || "ethereum";
+
+    if (!supportedNetworks.includes(evmNetworkFlag as EVMNetwork)) {
+      return (
+        <Box flexDirection="column">
+          <Text color="red">Invalid EVM network: {evmNetworkFlag}</Text>
+          <Text color="gray">Supported networks: {supportedNetworks.join(", ")}</Text>
+        </Box>
+      );
+    }
+
+    const evmNetwork = evmNetworkFlag as EVMNetwork;
+
+    if (subcommand === "balance") {
+      const address = args[0];
+      if (!address)
+        return invalidUsage("Address is required", "begin evm balance <address> [--network ethereum]");
+      return (
+        <EVMBalance address={address} network={evmNetwork} json={flags.json} />
+      );
+    }
+
+    if (subcommand === "history") {
+      const address = args[0];
+      if (!address)
+        return invalidUsage("Address is required", "begin evm history <address> [--network ethereum]");
+      return (
+        <EVMHistory
+          address={address}
+          network={evmNetwork}
+          json={flags.json}
+          limit={flags.limit}
+        />
+      );
+    }
+
+    if (subcommand === "send") {
+      const [to, amountStr] = args;
+      if (!to || !amountStr)
+        return invalidUsage(
+          "Recipient address and amount are required",
+          "begin evm send <to> <amount> [--network ethereum] [options]"
+        );
+      const amount = Number(amountStr);
+      if (!Number.isFinite(amount) || amount <= 0)
+        return invalidUsage(
+          "Amount must be a positive number",
+          "begin evm send <to> <amount> [--network ethereum] [options]"
+        );
+      return (
+        <EVMSend
+          to={to}
+          amount={amount}
+          network={evmNetwork}
+          walletName={flags.wallet}
+          password={flags.password}
+          token={flags.asset?.[0]} // Use first asset as ERC-20 token address
+          jsonOutput={flags.json}
+          yes={flags.yes}
+        />
+      );
+    }
+
+    return (
+      <Box flexDirection="column">
+        <Text color="red">Unknown evm command: {subcommand || "(none)"}</Text>
+        <Text color="gray">Available commands: balance, history, send</Text>
+        <Text color="gray">Networks: {supportedNetworks.join(", ")}</Text>
       </Box>
     );
   }

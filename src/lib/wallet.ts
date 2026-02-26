@@ -27,6 +27,7 @@ import {
 import type { MultiChainAddresses, ChainId } from "./chains/types.js";
 import { createSolanaAdapter } from "./chains/solana.js";
 import { createBitcoinAdapter } from "./chains/bitcoin.js";
+import { createEVMAdapter } from "./chains/evm.js";
 
 // Encryption constants
 const SCRYPT_N = 2 ** 14; // CPU/memory cost parameter
@@ -580,6 +581,13 @@ async function deriveMultiChainAddresses(
     publicKey: bitcoinWallet.publicKey,
   };
 
+  // EVM addresses (same address works on all EVM chains)
+  const evmAdapter = createEVMAdapter();
+  const evmWallet = await evmAdapter.createWallet(mnemonic);
+  addresses.evm = {
+    address: evmWallet.address,
+  };
+
   return addresses;
 }
 
@@ -886,7 +894,14 @@ export async function addChainToWallet(
       publicKey: bitcoinWallet.publicKey,
     };
   }
-  // EVM will be added in Phase 3
+
+  if (chain === "evm" && !chains.evm) {
+    const evmAdapter = createEVMAdapter();
+    const evmWallet = await evmAdapter.createWallet(mnemonic);
+    chains.evm = {
+      address: evmWallet.address,
+    };
+  }
 
   // Create updated v3 wallet file
   const keychainAvailable = await isKeychainAvailable();

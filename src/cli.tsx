@@ -29,6 +29,12 @@ const cli = meow(
     bitcoin history <address>        Show Bitcoin transaction history
     bitcoin send <to> <amount>       Send BTC
 
+    evm balance <address>            Check balance for an EVM address
+    evm history <address>            Show EVM transaction history
+    evm send <to> <amount>           Send native currency or ERC-20 tokens
+                                     Use --evm-network to select chain (default: ethereum)
+                                     Supported: ethereum, base, polygon, arbitrum, optimism, bnb, avalanche
+
     token search <query>             Search Cardano tokens by name/ticker
     token search --trending          Show top tokens by 24h volume
     token price <symbol>             Get price for ADA, BTC, SOL, or Cardano tokens
@@ -101,6 +107,10 @@ const cli = meow(
     --trending        Show trending tokens by volume (token search)
     --chain           Chain filter: cardano, solana, all (default: all)
     --currency, -c    Currency for prices (default: usd)
+
+  EVM Options
+    --evm-network     EVM network to use [default: ethereum]
+                      Supported: ethereum, base, polygon, arbitrum, optimism, bnb, avalanche
 
   Environment
     BEGIN_CLI_MNEMONIC           Mnemonic for CI/agent use (bypasses keystore)
@@ -208,6 +218,8 @@ const cli = meow(
       currency: { type: "string", shortFlag: "c", default: "EUR" },
       // Buy-specific flags
       token: { type: "string", default: "ADA" },
+      // EVM-specific flags
+      evmNetwork: { type: "string", default: "ethereum" },
     },
   }
 );
@@ -268,6 +280,8 @@ if (command === "mcp") {
     currency: string;
     // Buy-specific flags
     token: string;
+    // EVM-specific flags
+    evmNetwork: string;
   };
 
   const network = rawFlags.network ?? config.network ?? "mainnet";
@@ -310,6 +324,7 @@ if (command === "mcp") {
     chain: rawFlags.chain,
     currency: rawFlags.currency,
     token: rawFlags.token,
+    evmNetwork: rawFlags.evmNetwork,
   };
 
   setOutputContext({ json: flags.json });

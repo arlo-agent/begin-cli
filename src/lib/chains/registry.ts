@@ -6,6 +6,7 @@
 import type { ChainId, IChainAdapter } from "./types.js";
 import { SolanaAdapter, createSolanaAdapter } from "./solana.js";
 import { BitcoinAdapter, createBitcoinAdapter } from "./bitcoin.js";
+import { EVMAdapter, createEVMAdapter } from "./evm.js";
 
 class ChainRegistry {
   private adapters: Map<ChainId, IChainAdapter> = new Map();
@@ -36,6 +37,10 @@ class ChainRegistry {
   getBitcoin(): BitcoinAdapter | undefined {
     return this.adapters.get("bitcoin") as BitcoinAdapter | undefined;
   }
+
+  getEVM(): EVMAdapter | undefined {
+    return this.adapters.get("evm") as EVMAdapter | undefined;
+  }
 }
 
 // Global registry instance
@@ -44,6 +49,7 @@ const registry = new ChainRegistry();
 // Register default adapters
 registry.register(createSolanaAdapter("mainnet-beta"));
 registry.register(createBitcoinAdapter("mainnet"));
+registry.register(createEVMAdapter("ethereum"));
 
 export { registry, ChainRegistry };
 
