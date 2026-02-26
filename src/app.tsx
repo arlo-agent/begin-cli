@@ -4,6 +4,7 @@ import { CardanoBalance } from "./commands/cardano/balance.js";
 import { CardanoUtxos } from "./commands/cardano/utxos.js";
 import { CardanoHistory } from "./commands/cardano/history.js";
 import { CardanoSend } from "./commands/cardano/send.js";
+import { SolanaBalance, SolanaHistory, SolanaSend } from "./commands/solana/index.js";
 import { Receive } from "./commands/receive.js";
 import { StakePools } from "./commands/stake/pools.js";
 import { StakeDelegate } from "./commands/stake/delegate.js";
@@ -27,6 +28,7 @@ import { Buy } from "./commands/buy.js";
 import { isValidNetwork, type Network } from "./lib/config.js";
 import type { NetworkType } from "./lib/address.js";
 import type { ChainFilter } from "./services/market.js";
+import type { SolanaNetwork } from "./lib/chains/types.js";
 
 export interface AppFlags {
   network: string;
@@ -230,6 +232,70 @@ export function App({ command, subcommand, args, flags, showHelp }: AppProps) {
       <Box flexDirection="column">
         <Text color="red">Unknown cardano command: {subcommand || "(none)"}</Text>
         <Text color="gray">Available commands: balance, utxos, history, send</Text>
+      </Box>
+    );
+  }
+
+  // ---- Solana commands ----
+  if (command === "solana") {
+    // Map network to Solana network (mainnet -> mainnet-beta, preprod/preview -> devnet)
+    const solanaNetwork: SolanaNetwork =
+      network === "mainnet" ? "mainnet-beta" : "devnet";
+
+    if (subcommand === "balance") {
+      const address = args[0];
+      if (!address)
+        return invalidUsage("Address is required", "begin solana balance <address>");
+      return (
+        <SolanaBalance address={address} network={solanaNetwork} json={flags.json} />
+      );
+    }
+
+    if (subcommand === "history") {
+      const address = args[0];
+      if (!address)
+        return invalidUsage("Address is required", "begin solana history <address>");
+      return (
+        <SolanaHistory
+          address={address}
+          network={solanaNetwork}
+          json={flags.json}
+          limit={flags.limit}
+        />
+      );
+    }
+
+    if (subcommand === "send") {
+      const [to, amountStr] = args;
+      if (!to || !amountStr)
+        return invalidUsage(
+          "Recipient address and amount are required",
+          "begin solana send <to> <amount> [options]"
+        );
+      const amount = Number(amountStr);
+      if (!Number.isFinite(amount) || amount <= 0)
+        return invalidUsage(
+          "Amount must be a positive number",
+          "begin solana send <to> <amount> [options]"
+        );
+      return (
+        <SolanaSend
+          to={to}
+          amount={amount}
+          network={solanaNetwork}
+          walletName={flags.wallet}
+          password={flags.password}
+          token={flags.asset?.[0]} // Use first asset as SPL token mint
+          jsonOutput={flags.json}
+          yes={flags.yes}
+        />
+      );
+    }
+
+    return (
+      <Box flexDirection="column">
+        <Text color="red">Unknown solana command: {subcommand || "(none)"}</Text>
+        <Text color="gray">Available commands: balance, history, send</Text>
       </Box>
     );
   }
