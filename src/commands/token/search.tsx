@@ -117,8 +117,9 @@ interface TokenRowProps {
 function TokenRow({ token, index }: TokenRowProps) {
   const changeColor = token.change24h >= 0 ? 'green' : 'red';
 
-  // Format ticker with padding for alignment
-  const ticker = token.ticker.padEnd(8);
+  // Display ticker, fallback to name or short tokenId when ticker is empty
+  const displayLabel = (token.ticker || token.name || token.tokenId.slice(0, 12)).trim();
+  const ticker = displayLabel.padEnd(8);
   const price = formatPrice(token.priceUsd);
   const change = formatChange(token.change24h);
   const volume = formatCompact(token.volume24h);

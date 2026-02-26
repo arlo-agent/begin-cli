@@ -73,11 +73,12 @@ export function TokenPrice({ symbol, currency, json }: TokenPriceProps) {
   if (!price) return <Box><Text color="red">No price data available</Text></Box>;
 
   const changeColor = price.change24h >= 0 ? 'green' : 'red';
+  const displayTicker = (price.ticker || price.name || symbol).trim() || '—';
 
   return (
     <Box flexDirection="column" padding={1}>
       <Box>
-        <Text bold color="cyan">{price.ticker}</Text>
+        <Text bold color="cyan">{displayTicker}</Text>
         <Text color="gray"> — </Text>
         <Text bold>{formatPrice(price.price)}</Text>
         <Text> </Text>

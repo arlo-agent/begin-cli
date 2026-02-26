@@ -52,6 +52,7 @@ export interface AppFlags {
   id?: string[];
   protocol?: string;
   showSeed: boolean;
+  yes: boolean;
   // Token discovery flags
   trending: boolean;
   currency: string;

@@ -53,45 +53,57 @@ export interface KlineData {
 }
 
 /**
- * Minswap asset search response
+ * Minswap list asset (GET /v1/assets) - asset shape in list and inside metrics
  */
-interface MinswapAssetSearchResult {
-  id: string;
-  name: string;
-  ticker: string;
-  logo: string;
-  decimals: number;
+interface MinswapListAsset {
+  currency_symbol: string;
+  token_name: string;
   is_verified: boolean;
-  policy_id: string;
-  asset_name: string;
+  /** Some assets return symbol at top level when ticker is empty */
+  symbol?: string;
+  metadata?: {
+    name?: string;
+    ticker?: string;
+    symbol?: string;
+    decimals?: number;
+    logo?: string;
+    url?: string;
+    description?: string;
+  };
 }
 
 /**
- * Minswap asset metrics response
+ * Minswap list assets response (GET /v1/assets)
  */
-interface MinswapAssetMetricsResult {
-  id: string;
-  name: string;
-  ticker: string;
-  logo: string;
-  decimals: number;
-  is_verified: boolean;
-  policy_id: string;
-  asset_name: string;
-  price_usd: number;
-  price_ada: number;
+interface MinswapListAssetsResponse {
+  search_after?: unknown;
+  assets: MinswapListAsset[];
+}
+
+/**
+ * Single item from POST /v1/assets/metrics or GET /v1/assets/:id/metrics
+ */
+interface MinswapAssetMetricsItem {
+  asset: MinswapListAsset;
+  price: number;
+  price_change_1h?: number;
   price_change_24h: number;
+  price_change_7d?: number;
+  volume_1h?: number;
   volume_24h: number;
+  volume_7d?: number;
   liquidity: number;
   market_cap: number;
+  total_supply?: number;
+  circulating_supply?: number;
 }
 
 /**
- * Minswap metrics response wrapper
+ * POST /v1/assets/metrics response
  */
 interface MinswapMetricsResponse {
-  assets: MinswapAssetMetricsResult[];
-  total: number;
+  search_after?: unknown;
+  asset_metrics: MinswapAssetMetricsItem[];
 }
 
 /**
@@ -117,16 +129,15 @@ export async function searchTokens(
     throw new Error(`Minswap API error: ${response.status}`);
   }
 
-  const assets = (await response.json()) as MinswapAssetSearchResult[];
+  const raw = (await response.json()) as MinswapListAssetsResponse;
+  const assets = Array.isArray(raw?.assets) ? raw.assets : [];
 
   // For search results, we need to fetch metrics separately to get price/volume
+  // Asset ID format: policy_id.token_name (Cardano standard)
   if (assets.length === 0) return [];
 
-  // Get metrics for found assets
-  return getTokenMetrics(
-    assets.map((a) => a.id),
-    'usd'
-  );
+  const tokenIds = assets.map((a) => `${a.currency_symbol}.${a.token_name}`);
+  return getTokenMetrics(tokenIds, 'usd');
 }
 
 /**
@@ -157,7 +168,8 @@ export async function getTrendingTokens(
   }
 
   const data = (await response.json()) as MinswapMetricsResponse;
-  return data.assets.map(mapMetricsResult);
+  const items = Array.isArray(data?.asset_metrics) ? data.asset_metrics : [];
+  return items.map((item) => mapAssetMetricsItem(item, currency));
 }
 
 /**
@@ -202,8 +214,8 @@ export async function getSingleTokenMetrics(
     throw new Error(`Minswap API error: ${response.status}`);
   }
 
-  const data = (await response.json()) as MinswapAssetMetricsResult;
-  return mapMetricsResult(data);
+  const data = (await response.json()) as MinswapAssetMetricsItem;
+  return mapAssetMetricsItem(data, currency);
 }
 
 /**
@@ -328,21 +340,32 @@ export function getBinanceSymbol(ticker: string): string | null {
 }
 
 /**
- * Map Minswap metrics response to TokenMetrics
+ * Map Minswap asset metrics item (list or single) to TokenMetrics
  */
-function mapMetricsResult(data: MinswapAssetMetricsResult): TokenMetrics {
+function mapAssetMetricsItem(
+  item: MinswapAssetMetricsItem,
+  currency: string
+): TokenMetrics {
+  const { asset, price, price_change_24h, volume_24h, liquidity, market_cap } = item;
+  const tokenId = `${asset.currency_symbol}.${asset.token_name}`;
+  const meta = asset.metadata ?? {};
+  const tickerRaw =
+    meta.ticker?.trim() ||
+    meta.symbol?.trim() ||
+    asset.symbol?.trim() ||
+    '';
   return {
-    tokenId: data.id,
-    ticker: data.ticker,
-    name: data.name,
-    verified: data.is_verified,
-    priceUsd: data.price_usd,
-    priceAda: data.price_ada,
-    change24h: data.price_change_24h,
-    volume24h: data.volume_24h,
-    liquidity: data.liquidity,
-    marketCap: data.market_cap,
-    logoUrl: data.logo,
+    tokenId,
+    ticker: tickerRaw,
+    name: meta.name ?? '',
+    verified: asset.is_verified,
+    priceUsd: currency.toLowerCase() === 'usd' ? price : 0,
+    priceAda: currency.toLowerCase() === 'ada' ? price : 0,
+    change24h: price_change_24h ?? 0,
+    volume24h: volume_24h ?? 0,
+    liquidity: liquidity ?? 0,
+    marketCap: market_cap ?? 0,
+    logoUrl: meta.logo,
   };
 }
 
