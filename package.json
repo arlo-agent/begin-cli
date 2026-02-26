@@ -36,6 +36,7 @@
   "license": "MIT",
   "dependencies": {
     "@meshsdk/core": "^1.9.0-beta.98",
+    "@meshsdk/core-cst": "^1.9.0-beta.98",
     "@modelcontextprotocol/sdk": "^1.27.1",
     "@solana/spl-token": "^0.4.14",
     "@solana/web3.js": "^1.98.4",

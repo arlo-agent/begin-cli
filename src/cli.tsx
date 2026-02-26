@@ -62,6 +62,11 @@ const cli = meow(
     swap orders [options]        List pending swap orders
     swap cancel --id <tx-in>     Cancel pending swap order(s)
 
+    bridge [options]             Cross-chain bridge via XOSwap
+    bridge quote [options]       Get a bridge quote without executing
+    bridge status --order <id>   Check bridge order status
+    bridge orders --asset <asset> List bridge orders
+
     mcp                              Start MCP server for AI agent integration
 
   Options
@@ -112,6 +117,15 @@ const cli = meow(
   EVM Options
     --evm-network     EVM network to use [default: ethereum]
                       Supported: ethereum, base, polygon, arbitrum, optimism, bnb, avalanche
+
+  Bridge Options
+    --from            Asset to bridge from (BTC, SOL, ADA, ETH, etc.)
+    --to              Asset to bridge to
+    --amount          Amount to bridge
+    --slippage, -s    Slippage tolerance in % [default: 0.5]
+    --order           Bridge order ID (for status command)
+    --asset, -a       Asset filter (for orders command)
+    --yes, -y         Skip confirmation prompt
 
   Environment
     BEGIN_CLI_MNEMONIC           Mnemonic for CI/agent use (bypasses keystore)
@@ -179,6 +193,12 @@ const cli = meow(
     $ begin buy --amount 50 --currency EUR --token ADA
     $ begin buy --amount 100 --currency USD --token BTC
     $ begin buy --token ADA --json
+
+    # Cross-chain bridge
+    $ begin bridge quote --from BTC --to SOL --amount 0.1
+    $ begin bridge --from BTC --to SOL --amount 0.1 --yes
+    $ begin bridge status --order <orderId>
+    $ begin bridge orders --asset BTC
 `,
   {
     importMeta: import.meta,
@@ -221,6 +241,8 @@ const cli = meow(
       token: { type: "string", default: "ADA" },
       // EVM-specific flags
       evmNetwork: { type: "string", default: "ethereum" },
+      // Bridge-specific flags
+      order: { type: "string" },
     },
   }
 );
@@ -283,6 +305,8 @@ if (command === "mcp") {
     token: string;
     // EVM-specific flags
     evmNetwork: string;
+    // Bridge-specific flags
+    order?: string;
   };
 
   const network = rawFlags.network ?? config.network ?? "mainnet";
@@ -326,6 +350,7 @@ if (command === "mcp") {
     currency: rawFlags.currency,
     token: rawFlags.token,
     evmNetwork: rawFlags.evmNetwork,
+    order: rawFlags.order,
   };
 
   setOutputContext({ json: flags.json });
