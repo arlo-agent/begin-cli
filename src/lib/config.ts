@@ -6,7 +6,7 @@
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { errors } from "./errors.js";
+import { errors, getErrorMessage } from "./errors.js";
 
 export type Network = "mainnet" | "preprod" | "preview";
 export type Provider = "blockfrost" | "koios" | "ogmios";
@@ -67,7 +67,7 @@ export function loadConfig(): Config {
       throw errors.configError("Invalid config file: malformed JSON");
     }
     throw errors.configError(
-      `Failed to read config: ${err instanceof Error ? err.message : String(err)}`
+      `Failed to read config: ${getErrorMessage(err)}`
     );
   }
 }
@@ -81,7 +81,7 @@ export function saveConfig(config: Config): void {
     writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2) + "\n", { mode: 0o600 });
   } catch (err) {
     throw errors.configError(
-      `Failed to save config: ${err instanceof Error ? err.message : String(err)}`
+      `Failed to save config: ${getErrorMessage(err)}`
     );
   }
 }

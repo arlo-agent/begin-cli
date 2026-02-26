@@ -26,6 +26,7 @@ import {
   type TransactionConfig,
 } from "../../lib/transaction.js";
 import type { MeshWallet } from "@meshsdk/core";
+import { getErrorMessage } from "../../lib/errors.js";
 
 interface SwapProps {
   from: string;
@@ -146,7 +147,7 @@ export function Swap({
       // Continue with token resolution
       await resolveTokens(minswapClient || client!);
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Failed to load wallet";
+      const message = getErrorMessage(err, "Failed to load wallet");
       if (message.includes("Incorrect password")) {
         setError("Incorrect password. Please try again.");
       } else {
@@ -204,7 +205,7 @@ export function Swap({
         setState("confirm");
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to get quote");
+      setError(getErrorMessage(err, "Failed to get quote"));
       setState("error");
       setTimeout(() => exit(), 2000);
     }
@@ -295,7 +296,7 @@ export function Swap({
 
       setTimeout(() => exit(), 2000);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Swap failed");
+      setError(getErrorMessage(err, "Swap failed"));
       setState("error");
       setTimeout(() => exit(), 2000);
     }

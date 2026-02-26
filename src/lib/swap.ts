@@ -8,6 +8,7 @@
  */
 
 import { MinswapClient, type SwapEstimate, type MinswapToken } from "../services/minswap.js";
+import { getErrorMessage } from "./errors.js";
 
 /**
  * Well-known token mappings (ticker -> tokenId)
@@ -361,7 +362,7 @@ export async function extractWitnessSet(signedTxCbor: string): Promise<string> {
     return witnessSet.toCbor();
   } catch (err) {
     // Log warning and throw an error - don't silently fall back
-    const message = err instanceof Error ? err.message : "Unknown error";
+    const message = getErrorMessage(err, "Unknown error");
     console.warn(`Warning: Failed to extract witness set: ${message}`);
     throw new Error(
       `Failed to extract witness set from signed transaction: ${message}. ` +

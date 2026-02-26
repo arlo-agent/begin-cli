@@ -10,6 +10,7 @@ import React, { useState, useEffect } from "react";
 import { Box, Text, useInput, useApp } from "ink";
 import { createWallet, walletExists, type WalletInfo } from "../../lib/wallet.js";
 import { isKeychainAvailable } from "../../lib/keystore.js";
+import { getErrorMessage } from "../../lib/errors.js";
 
 interface WalletCreateProps {
   name: string;
@@ -53,7 +54,7 @@ export function WalletCreate({ name, network, showSeed = false }: WalletCreatePr
           setStep("checking-keychain");
         }
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Unknown error");
+        setError(getErrorMessage(err, "Unknown error"));
         setStep("error");
       }
     };
@@ -142,7 +143,7 @@ export function WalletCreate({ name, network, showSeed = false }: WalletCreatePr
         setUsesKeychain(result.usesKeychain);
         setStep(showSeed ? "show-mnemonic" : "complete");
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to create wallet");
+        setError(getErrorMessage(err, "Failed to create wallet"));
         setStep("error");
       }
     };

@@ -20,6 +20,7 @@ import {
   type WalletOptions,
 } from "../lib/transaction.js";
 import { getPasswordFromEnv } from "../lib/keystore.js";
+import { getErrorMessage } from "../lib/errors.js";
 
 export interface SendParams {
   to: string;
@@ -193,7 +194,7 @@ export async function sendAda(params: SendParams): Promise<SendResult> {
       network,
     };
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Transaction failed";
+    const message = getErrorMessage(err, "Transaction failed");
     return {
       status: "error",
       toAddress: to,

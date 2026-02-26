@@ -123,3 +123,12 @@ export function toBeginError(err: unknown): BeginError {
   if (err instanceof Error) return new BeginError(err.message, ErrorCode.UNKNOWN_ERROR);
   return new BeginError(String(err), ErrorCode.UNKNOWN_ERROR);
 }
+
+/**
+ * Get a string message from an unknown error, with optional fallback.
+ * Use in catch blocks for consistent error display.
+ */
+export function getErrorMessage(err: unknown, fallback?: string): string {
+  if (err instanceof Error) return err.message;
+  return fallback ?? String(err);
+}

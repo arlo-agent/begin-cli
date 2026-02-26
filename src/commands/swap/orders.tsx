@@ -13,6 +13,7 @@ import {
   loadWallet,
   type TransactionConfig,
 } from "../../lib/transaction.js";
+import { getErrorMessage } from "../../lib/errors.js";
 
 interface SwapOrdersProps {
   network: string;
@@ -93,7 +94,7 @@ export function SwapOrders({
           exit();
         }
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to load orders");
+        setError(getErrorMessage(err, "Failed to load orders"));
         setState("error");
         setTimeout(() => exit(), 2000);
       }
@@ -110,7 +111,7 @@ export function SwapOrders({
       setResolvedAddress(walletAddress);
       setState("loading");
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Failed to load wallet";
+      const message = getErrorMessage(err, "Failed to load wallet");
       if (message.includes("Incorrect password")) {
         setError("Incorrect password. Please try again.");
       } else {

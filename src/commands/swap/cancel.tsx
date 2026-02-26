@@ -15,6 +15,7 @@ import {
 } from "../../lib/transaction.js";
 import { extractWitnessSet } from "../../lib/swap.js";
 import type { MeshWallet } from "@meshsdk/core";
+import { getErrorMessage } from "../../lib/errors.js";
 
 interface SwapCancelProps {
   network: string;
@@ -130,7 +131,7 @@ export function SwapCancel({
           setState("confirm");
         }
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to load pending orders");
+        setError(getErrorMessage(err, "Failed to load pending orders"));
         setState("error");
         setTimeout(() => exit(), 2000);
       }
@@ -148,7 +149,7 @@ export function SwapCancel({
       setSenderAddress(address);
       setState("loading-orders");
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Failed to load wallet";
+      const message = getErrorMessage(err, "Failed to load wallet");
       if (message.includes("Incorrect password")) {
         setError("Incorrect password. Please try again.");
       } else {
@@ -207,7 +208,7 @@ export function SwapCancel({
 
       setTimeout(() => exit(), 2000);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Cancel failed");
+      setError(getErrorMessage(err, "Cancel failed"));
       setState("error");
       setTimeout(() => exit(), 2000);
     }

@@ -16,6 +16,7 @@ import {
   hasEnvMnemonic,
   PASSWORD_ENV_VAR,
 } from "../../lib/keystore.js";
+import { getErrorMessage } from "../../lib/errors.js";
 
 interface WalletExportProps {
   walletName?: string;
@@ -99,7 +100,7 @@ export function WalletExport({
         setResolvedName(name);
         setState("success");
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Unknown error");
+        setError(getErrorMessage(err, "Unknown error"));
         setState("error");
       }
     };

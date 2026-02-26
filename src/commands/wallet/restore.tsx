@@ -15,6 +15,7 @@ import {
   type WalletInfo,
 } from "../../lib/wallet.js";
 import { isKeychainAvailable } from "../../lib/keystore.js";
+import { getErrorMessage } from "../../lib/errors.js";
 
 interface WalletRestoreProps {
   name: string;
@@ -56,7 +57,7 @@ export function WalletRestore({ name, network }: WalletRestoreProps) {
           setStep("mnemonic");
         }
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Unknown error");
+        setError(getErrorMessage(err, "Unknown error"));
         setStep("error");
       }
     };
@@ -194,7 +195,7 @@ export function WalletRestore({ name, network }: WalletRestoreProps) {
         setWalletInfo(info);
         setStep("complete");
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to restore wallet");
+        setError(getErrorMessage(err, "Failed to restore wallet"));
         setStep("error");
       }
     };

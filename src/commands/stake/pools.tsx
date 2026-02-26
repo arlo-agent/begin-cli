@@ -7,6 +7,7 @@ import {
   lovelaceToAda,
   type StakePool,
 } from "../../lib/staking.js";
+import { getErrorMessage } from "../../lib/errors.js";
 
 interface StakePoolsProps {
   search?: string;
@@ -50,7 +51,7 @@ export function StakePools({ search, network, json, limit = 10 }: StakePoolsProp
         }
         setPools(result);
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Unknown error");
+        setError(getErrorMessage(err, "Unknown error"));
       } finally {
         setLoading(false);
       }

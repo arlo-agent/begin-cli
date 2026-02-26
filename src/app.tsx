@@ -60,9 +60,6 @@ export interface AppFlags {
   yes: boolean;
   // Token discovery flags
   trending: boolean;
-  // Buy-specific flags
-  currency: string;
-  token: string;
 }
 
 interface AppProps {

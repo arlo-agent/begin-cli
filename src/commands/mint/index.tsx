@@ -16,7 +16,7 @@ import {
   type ImageFileInfo,
 } from "../../lib/mint.js";
 import { outputSuccess, exitWithError, isJsonMode } from "../../lib/output.js";
-import { errors, ExitCode } from "../../lib/errors.js";
+import { errors, ExitCode, getErrorMessage } from "../../lib/errors.js";
 
 // ============================================================================
 // Types
@@ -128,7 +128,7 @@ export function MintCommand({
         setInfo({ imageFile, costEstimate });
         setState("confirm");
       } catch (err) {
-        const message = err instanceof Error ? err.message : "Validation failed";
+        const message = getErrorMessage(err, "Validation failed");
         setError(message);
         setState("error");
         if (jsonOutput) {
@@ -216,7 +216,7 @@ export function MintCommand({
       setState("success");
       setTimeout(() => exit(), 2000);
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Minting failed";
+      const message = getErrorMessage(err, "Minting failed");
       setError(message);
       setState("error");
       if (jsonOutput) {

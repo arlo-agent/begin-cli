@@ -21,6 +21,7 @@ import {
   type WalletOptions,
 } from "../lib/transaction.js";
 import { getPasswordFromEnv } from "../lib/keystore.js";
+import { getErrorMessage } from "../lib/errors.js";
 
 export interface SwapQuoteParams {
   from: string;
@@ -164,7 +165,7 @@ export async function getSwapQuote(params: SwapQuoteParams): Promise<SwapQuoteRe
       status: "error",
       network,
       slippage: slippage,
-      error: err instanceof Error ? err.message : "Failed to get quote",
+      error: getErrorMessage(err, "Failed to get quote"),
     };
   }
 }
@@ -288,7 +289,7 @@ export async function executeSwap(params: SwapExecuteParams): Promise<SwapExecut
     return {
       status: "error",
       network,
-      error: err instanceof Error ? err.message : "Swap execution failed",
+      error: getErrorMessage(err, "Swap execution failed"),
     };
   }
 }

@@ -12,6 +12,7 @@ import {
   checkWalletAvailability,
   type TransactionConfig,
 } from "../../lib/transaction.js";
+import { getErrorMessage } from "../../lib/errors.js";
 
 interface StakeStatusProps {
   network: string;
@@ -103,7 +104,7 @@ export function StakeStatus({
       // Continue with status fetch
       await fetchStatus(derivedStakeAddress);
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Failed to load wallet";
+      const message = getErrorMessage(err, "Failed to load wallet");
       if (message.includes("Incorrect password")) {
         setError("Incorrect password. Please try again.");
       } else {
@@ -132,7 +133,7 @@ export function StakeStatus({
       setStatus(delegationStatus);
       setState("success");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to fetch delegation status");
+      setError(getErrorMessage(err, "Failed to fetch delegation status"));
       setState("error");
       setTimeout(() => exit(), 2000);
     }

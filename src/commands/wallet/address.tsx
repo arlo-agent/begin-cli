@@ -24,6 +24,7 @@ import {
   MNEMONIC_ENV_VAR,
   PASSWORD_ENV_VAR,
 } from "../../lib/keystore.js";
+import { getErrorMessage } from "../../lib/errors.js";
 
 interface WalletAddressProps {
   network: NetworkType;
@@ -98,7 +99,7 @@ export function WalletAddress({
         setAddresses(derived);
         setState("success");
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Unknown error");
+        setError(getErrorMessage(err, "Unknown error"));
         setState("error");
       }
     };
@@ -290,7 +291,7 @@ export function SingleAddress({ network, addressType, walletName, password }: Si
             break;
         }
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Unknown error");
+        setError(getErrorMessage(err, "Unknown error"));
       }
     };
 

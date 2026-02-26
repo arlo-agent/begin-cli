@@ -15,6 +15,7 @@ import {
   type ResolvedToken,
   type FormattedQuote,
 } from "../../lib/swap.js";
+import { getErrorMessage } from "../../lib/errors.js";
 
 interface SwapQuoteProps {
   from: string;
@@ -80,7 +81,7 @@ export function SwapQuote({ from, to, amount, slippage, multiHop, network, json 
 
         setState("success");
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to get quote");
+        setError(getErrorMessage(err, "Failed to get quote"));
         setState("error");
       }
     };

@@ -19,7 +19,7 @@ import {
 } from "../../lib/transaction.js";
 import { getPasswordFromEnv, PASSWORD_ENV_VAR } from "../../lib/keystore.js";
 import { outputSuccess, exitWithError } from "../../lib/output.js";
-import { ExitCode, errors } from "../../lib/errors.js";
+import { ExitCode, errors, getErrorMessage } from "../../lib/errors.js";
 
 function lovelaceToAdaDisplay(lovelace: string): string {
   try {
@@ -123,7 +123,7 @@ export function CardanoSend({
 
       setState("confirm");
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Failed to load wallet";
+      const message = getErrorMessage(err, "Failed to load wallet");
       setError(
         message.includes("Incorrect password") ? "Incorrect password. Please try again." : message
       );
@@ -311,7 +311,7 @@ export function CardanoSend({
       setState("success");
       setTimeout(() => exit(), 1500);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Transaction failed");
+      setError(getErrorMessage(err, "Transaction failed"));
       setState("error");
       if (jsonOutput) exitWithError(err);
       setTimeout(() => exit(), 2000);

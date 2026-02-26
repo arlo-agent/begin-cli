@@ -23,6 +23,7 @@ import {
 } from "../lib/transaction.js";
 import { getPasswordFromEnv } from "../lib/keystore.js";
 import { hasApiKey } from "../lib/provider.js";
+import { getErrorMessage } from "../lib/errors.js";
 
 export { StakePool, DelegationStatus };
 
@@ -285,7 +286,7 @@ export async function delegateStake(
       status: "error",
       registrationIncluded: false,
       network,
-      error: err instanceof Error ? err.message : "Delegation failed",
+      error: getErrorMessage(err, "Delegation failed"),
     };
   }
 }
@@ -379,7 +380,7 @@ export async function withdrawRewards(
       amount: "0",
       amountAda: "0",
       network,
-      error: err instanceof Error ? err.message : "Withdrawal failed",
+      error: getErrorMessage(err, "Withdrawal failed"),
     };
   }
 }

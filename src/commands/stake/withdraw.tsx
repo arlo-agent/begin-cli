@@ -13,6 +13,7 @@ import {
   type TransactionConfig,
 } from "../../lib/transaction.js";
 import { Transaction, type MeshWallet } from "@meshsdk/core";
+import { getErrorMessage } from "../../lib/errors.js";
 
 interface StakeWithdrawProps {
   network: string;
@@ -80,7 +81,7 @@ export function StakeWithdraw({
       // Continue with status loading
       await loadStatus(derivedStakeAddress);
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Failed to load wallet";
+      const message = getErrorMessage(err, "Failed to load wallet");
       if (message.includes("Incorrect password")) {
         setError("Incorrect password. Please try again.");
       } else {
@@ -135,7 +136,7 @@ export function StakeWithdraw({
         setState("confirm");
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load delegation status");
+      setError(getErrorMessage(err, "Failed to load delegation status"));
       setState("error");
       setTimeout(() => exit(), 2000);
     }
@@ -217,7 +218,7 @@ export function StakeWithdraw({
 
       setTimeout(() => exit(), 2000);
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Withdrawal failed';
+      const message = getErrorMessage(err, "Withdrawal failed");
       setError(message);
       setState('error');
       setTimeout(() => exit(), 2000);

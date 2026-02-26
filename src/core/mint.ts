@@ -12,6 +12,7 @@ import {
   validateMetadataLengths,
   estimateMintCost,
 } from "../lib/mint.js";
+import { getErrorMessage } from "../lib/errors.js";
 
 export interface MintNftParams {
   /** Path to image file */
@@ -151,7 +152,7 @@ export async function mintNft(params: MintNftParams): Promise<MintNftResult> {
       status: "error",
       toAddress: to,
       network,
-      error: err instanceof Error ? err.message : "Minting failed",
+      error: getErrorMessage(err, "Minting failed"),
     };
   }
 }

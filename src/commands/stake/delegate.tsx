@@ -15,6 +15,7 @@ import {
   type TransactionConfig,
 } from "../../lib/transaction.js";
 import { Transaction, type MeshWallet } from "@meshsdk/core";
+import { getErrorMessage } from "../../lib/errors.js";
 
 interface StakeDelegateProps {
   poolId: string;
@@ -116,7 +117,7 @@ export function StakeDelegate({
       // Continue with pool loading
       await loadPoolData(derivedStakeAddress);
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Failed to load wallet";
+      const message = getErrorMessage(err, "Failed to load wallet");
       if (message.includes("Incorrect password")) {
         setError("Incorrect password. Please try again.");
       } else {
@@ -177,7 +178,7 @@ export function StakeDelegate({
         setState("confirm");
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load pool data");
+      setError(getErrorMessage(err, "Failed to load pool data"));
       setState("error");
     }
   };
@@ -229,7 +230,7 @@ export function StakeDelegate({
 
       setTimeout(() => exit(), 2000);
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Delegation failed';
+      const message = getErrorMessage(err, "Delegation failed");
       setError(message);
       setState('error');
       setTimeout(() => exit(), 2000);

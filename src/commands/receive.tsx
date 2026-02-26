@@ -12,6 +12,7 @@ import {
   PASSWORD_ENV_VAR,
   getPasswordFromEnv,
 } from "../lib/keystore.js";
+import { getErrorMessage } from "../lib/errors.js";
 
 interface ReceiveProps {
   /** Either a wallet name or a raw address */
@@ -106,7 +107,7 @@ export function Receive({ target, showQR, json, network, password }: ReceiveProp
         setIsWallet(resolved.isWallet);
         setWalletSource(resolved.isWallet ? resolved.source : null);
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Unknown error");
+        setError(getErrorMessage(err, "Unknown error"));
         setLoading(false);
         return;
       }

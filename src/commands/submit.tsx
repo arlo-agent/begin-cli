@@ -6,6 +6,7 @@ import {
   loadTxFromFile,
   type TransactionConfig,
 } from "../lib/transaction.js";
+import { getErrorMessage } from "../lib/errors.js";
 
 interface SubmitProps {
   txFile: string;
@@ -129,7 +130,7 @@ export function Submit({ txFile, network, wait = true, jsonOutput = false }: Sub
         setState("success");
         setTimeout(() => exit(), 1000);
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Submission failed");
+        setError(getErrorMessage(err, "Submission failed"));
         setState("error");
         setTimeout(() => exit(), 1500);
       }

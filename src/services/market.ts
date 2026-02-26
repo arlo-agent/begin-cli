@@ -2,11 +2,29 @@
  * Unified market data service combining Minswap, CoinGecko, and Binance
  */
 
-import { createCoinGeckoClient, isCoinGeckoTicker, type CoinGeckoPrice } from './coingecko.js';
-import { createMinswapClient, type MinswapToken } from './minswap.js';
+import { createCoinGeckoClient, isCoinGeckoTicker } from './coingecko.js';
 
 const MINSWAP_MAINNET_API = 'https://api-mainnet-prod.minswap.org';
 const BINANCE_DATA_API = 'https://data-api.binance.vision/api/v3';
+
+interface MinswapApiError extends Error {
+  status?: number;
+}
+
+function minswapFetch<T>(url: string, options?: RequestInit): Promise<T> {
+  return fetch(url, options).then(async (response) => {
+    if (!response.ok) {
+      const msg =
+        response.status === 429
+          ? 'Minswap rate limit exceeded. Please try again later.'
+          : `Minswap API error: ${response.status}`;
+      const err = new Error(msg) as MinswapApiError;
+      err.status = response.status;
+      throw err;
+    }
+    return response.json() as Promise<T>;
+  });
+}
 
 /**
  * Token metrics from Minswap
@@ -112,7 +130,8 @@ interface MinswapMetricsResponse {
 export async function searchTokens(
   term: string,
   limit: number = 20,
-  onlyVerified: boolean = true
+  onlyVerified: boolean = true,
+  currency: string = 'usd'
 ): Promise<TokenMetrics[]> {
   const params = new URLSearchParams({
     term,
@@ -120,16 +139,9 @@ export async function searchTokens(
     only_verified: String(onlyVerified),
   });
 
-  const response = await fetch(`${MINSWAP_MAINNET_API}/v1/assets?${params}`);
-
-  if (!response.ok) {
-    if (response.status === 429) {
-      throw new Error('Minswap rate limit exceeded. Please try again later.');
-    }
-    throw new Error(`Minswap API error: ${response.status}`);
-  }
-
-  const raw = (await response.json()) as MinswapListAssetsResponse;
+  const raw = await minswapFetch<MinswapListAssetsResponse>(
+    `${MINSWAP_MAINNET_API}/v1/assets?${params}`
+  );
   const assets = Array.isArray(raw?.assets) ? raw.assets : [];
 
   // For search results, we need to fetch metrics separately to get price/volume
@@ -137,7 +149,7 @@ export async function searchTokens(
   if (assets.length === 0) return [];
 
   const tokenIds = assets.map((a) => `${a.currency_symbol}.${a.token_name}`);
-  return getTokenMetrics(tokenIds, 'usd');
+  return getTokenMetrics(tokenIds, currency);
 }
 
 /**
@@ -147,27 +159,21 @@ export async function getTrendingTokens(
   limit: number = 20,
   currency: string = 'usd'
 ): Promise<TokenMetrics[]> {
-  const response = await fetch(`${MINSWAP_MAINNET_API}/v1/assets/metrics`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      term: '',
-      limit,
-      only_verified: true,
-      sort_direction: 'desc',
-      sort_field: 'volume_24h',
-      currency,
-    }),
-  });
-
-  if (!response.ok) {
-    if (response.status === 429) {
-      throw new Error('Minswap rate limit exceeded. Please try again later.');
+  const data = await minswapFetch<MinswapMetricsResponse>(
+    `${MINSWAP_MAINNET_API}/v1/assets/metrics`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        term: '',
+        limit,
+        only_verified: true,
+        sort_direction: 'desc',
+        sort_field: 'volume_24h',
+        currency,
+      }),
     }
-    throw new Error(`Minswap API error: ${response.status}`);
-  }
-
-  const data = (await response.json()) as MinswapMetricsResponse;
+  );
   const items = Array.isArray(data?.asset_metrics) ? data.asset_metrics : [];
   return items.map((item) => mapAssetMetricsItem(item, currency));
 }
@@ -202,20 +208,15 @@ export async function getSingleTokenMetrics(
   tokenId: string,
   currency: string = 'usd'
 ): Promise<TokenMetrics | null> {
-  const response = await fetch(
-    `${MINSWAP_MAINNET_API}/v1/assets/${encodeURIComponent(tokenId)}/metrics?currency=${currency}`
-  );
-
-  if (!response.ok) {
-    if (response.status === 404) return null;
-    if (response.status === 429) {
-      throw new Error('Minswap rate limit exceeded. Please try again later.');
-    }
-    throw new Error(`Minswap API error: ${response.status}`);
+  try {
+    const data = await minswapFetch<MinswapAssetMetricsItem>(
+      `${MINSWAP_MAINNET_API}/v1/assets/${encodeURIComponent(tokenId)}/metrics?currency=${currency}`
+    );
+    return mapAssetMetricsItem(data, currency);
+  } catch (err) {
+    if (err instanceof Error && (err as MinswapApiError).status === 404) return null;
+    throw err;
   }
-
-  const data = (await response.json()) as MinswapAssetMetricsItem;
-  return mapAssetMetricsItem(data, currency);
 }
 
 /**
@@ -225,7 +226,7 @@ export async function findTokenByTicker(
   ticker: string,
   currency: string = 'usd'
 ): Promise<TokenMetrics | null> {
-  const results = await searchTokens(ticker, 10, true);
+  const results = await searchTokens(ticker, 10, true, currency);
 
   // Find exact ticker match (case-insensitive)
   const tickerUpper = ticker.toUpperCase();

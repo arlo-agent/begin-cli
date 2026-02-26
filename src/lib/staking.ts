@@ -3,6 +3,8 @@
  * Uses @meshsdk/core for transaction building and Blockfrost for pool data
  */
 
+import { getBlockfrostBaseUrl } from "../services/blockfrost.js";
+
 export interface StakePool {
   poolId: string;
   ticker: string;
@@ -71,12 +73,6 @@ interface BlockfrostAccountResponse {
   pool_id: string | null;
 }
 
-const BLOCKFROST_URLS: Record<string, string> = {
-  mainnet: "https://cardano-mainnet.blockfrost.io/api/v0",
-  preprod: "https://cardano-preprod.blockfrost.io/api/v0",
-  preview: "https://cardano-preview.blockfrost.io/api/v0",
-};
-
 /**
  * Get Blockfrost API headers
  */
@@ -96,10 +92,7 @@ export async function searchPools(
   network: string,
   limit: number = 10
 ): Promise<StakePool[]> {
-  const baseUrl = BLOCKFROST_URLS[network];
-  if (!baseUrl) {
-    throw new Error(`Unknown network: ${network}`);
-  }
+  const baseUrl = getBlockfrostBaseUrl(network);
 
   const headers = getHeaders();
 
@@ -152,10 +145,7 @@ export async function searchPools(
  * Fetch detailed pool information
  */
 export async function fetchPoolDetails(poolId: string, network: string): Promise<StakePool | null> {
-  const baseUrl = BLOCKFROST_URLS[network];
-  if (!baseUrl) {
-    throw new Error(`Unknown network: ${network}`);
-  }
+  const baseUrl = getBlockfrostBaseUrl(network);
 
   const headers = getHeaders();
 
@@ -201,10 +191,7 @@ export async function fetchPoolDetails(poolId: string, network: string): Promise
  * List top stake pools by delegator count
  */
 export async function listTopPools(network: string, limit: number = 10): Promise<StakePool[]> {
-  const baseUrl = BLOCKFROST_URLS[network];
-  if (!baseUrl) {
-    throw new Error(`Unknown network: ${network}`);
-  }
+  const baseUrl = getBlockfrostBaseUrl(network);
 
   const headers = getHeaders();
 
@@ -237,10 +224,7 @@ export async function getDelegationStatus(
   stakeAddress: string,
   network: string
 ): Promise<DelegationStatus> {
-  const baseUrl = BLOCKFROST_URLS[network];
-  if (!baseUrl) {
-    throw new Error(`Unknown network: ${network}`);
-  }
+  const baseUrl = getBlockfrostBaseUrl(network);
 
   const headers = getHeaders();
 

@@ -36,15 +36,22 @@ const BLOCKFROST_URLS: Record<string, string> = {
 };
 
 /**
+ * Get Blockfrost API base URL for a network (shared with lib/staking and other consumers).
+ */
+export function getBlockfrostBaseUrl(network: string): string {
+  const baseUrl = BLOCKFROST_URLS[network];
+  if (!baseUrl) {
+    throw new Error(`Unknown network: ${network}. Use mainnet, preprod, or preview.`);
+  }
+  return baseUrl;
+}
+
+/**
  * Fetch balance for a Cardano address
  */
 export async function fetchBalance(address: string, network: string): Promise<BalanceResult> {
   const apiKey = process.env.BLOCKFROST_API_KEY;
-  const baseUrl = BLOCKFROST_URLS[network];
-
-  if (!baseUrl) {
-    throw new Error(`Unknown network: ${network}. Use mainnet, preprod, or preview.`);
-  }
+  const baseUrl = getBlockfrostBaseUrl(network);
 
   // If no API key, return mock data for development
   if (!apiKey) {

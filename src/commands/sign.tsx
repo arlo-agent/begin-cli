@@ -10,6 +10,7 @@ import {
   type TransactionConfig,
 } from "../lib/transaction.js";
 import { getPasswordFromEnv, PASSWORD_ENV_VAR } from "../lib/keystore.js";
+import { getErrorMessage } from "../lib/errors.js";
 
 interface SignProps {
   txFile: string;
@@ -52,7 +53,7 @@ export function Sign({
       // Verify tx file exists first
       loadTxFromFile(txFile);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load transaction file");
+      setError(getErrorMessage(err, "Failed to load transaction file"));
       setState("error");
       setTimeout(() => exit(), 1500);
       return;
@@ -132,7 +133,7 @@ export function Sign({
       setState("success");
       setTimeout(() => exit(), 1000);
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Signing failed";
+      const message = getErrorMessage(err, "Signing failed");
       // Make password errors more user-friendly
       if (message.includes("Incorrect password")) {
         setError("Incorrect password. Please try again.");
