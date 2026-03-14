@@ -4,7 +4,7 @@ import { CardanoBalance } from "./commands/cardano/balance.js";
 import { CardanoUtxos } from "./commands/cardano/utxos.js";
 import { CardanoHistory } from "./commands/cardano/history.js";
 import { CardanoSend } from "./commands/cardano/send.js";
-import { SolanaBalance, SolanaHistory, SolanaSend } from "./commands/solana/index.js";
+import { SolanaBalance, SolanaHistory, SolanaSend, SolanaSwap } from "./commands/solana/index.js";
 import { BitcoinBalance, BitcoinHistory, BitcoinSend } from "./commands/bitcoin/index.js";
 import { EVMBalance, EVMHistory, EVMSend } from "./commands/evm/index.js";
 import { Receive } from "./commands/receive.js";
@@ -297,10 +297,43 @@ export function App({ command, subcommand, args, flags, showHelp }: AppProps) {
       );
     }
 
+    if (subcommand === "swap") {
+      if (!flags.from || !flags.to || !flags.amount) {
+        return (
+          <Box flexDirection="column">
+            <Text color="red">Error: --from, --to, and --amount are required</Text>
+            <Text color="gray">
+              Usage: begin solana swap --from {"<token>"} --to {"<token>"} --amount {"<amount>"}
+            </Text>
+            <Text color="gray">Options:</Text>
+            <Text color="gray"> --slippage, -s Slippage tolerance % (default: 0.5)</Text>
+            <Text color="gray"> --yes, -y Skip confirmation prompt</Text>
+            <Text color="gray"> --json, -j Output as JSON</Text>
+            <Text color="gray">Examples:</Text>
+            <Text color="gray"> begin solana swap --from SOL --to USDC --amount 1.5</Text>
+            <Text color="gray"> begin solana swap --from USDC --to JUP --amount 100 --slippage 1</Text>
+          </Box>
+        );
+      }
+      return (
+        <SolanaSwap
+          from={flags.from}
+          to={flags.to}
+          amount={flags.amount}
+          slippage={flags.slippage}
+          network={solanaNetwork}
+          walletName={flags.wallet}
+          password={flags.password}
+          jsonOutput={flags.json}
+          yes={flags.yes}
+        />
+      );
+    }
+
     return (
       <Box flexDirection="column">
         <Text color="red">Unknown solana command: {subcommand || "(none)"}</Text>
-        <Text color="gray">Available commands: balance, history, send</Text>
+        <Text color="gray">Available commands: balance, history, send, swap</Text>
       </Box>
     );
   }
