@@ -24,19 +24,19 @@ The recommendation: ship an MCP server and improve the existing Skills files wit
 
 | Feature | MoonPay CLI | Begin CLI | Gap |
 |---|---|---|---|
-| **Chains** | 9 (SOL, ETH, BTC, Base, Polygon, Arbitrum, Optimism, BNB, Avalanche) | 1 (Cardano) | Large |
-| **Wallet creation** | BIP39, AES-256-GCM, OS keychain | BIP39, password-encrypted keystore | **TODO:** Migrate to OS keychain (macOS/Linux/Windows) |
-| **Auth / Agent mode** | Email + OTP (autonomous login possible) | `BEGIN_CLI_MNEMONIC` + `BEGIN_CLI_WALLET_PASSWORD` env vars | **TODO:** Read mnemonic from keychain, make password optional |
-| **Fiat on/off ramp** | Virtual bank accounts, Apple Pay, Venmo, PayPal | Onramper integration exists in b58-extension (feature/solana) | **Port to CLI** — generate URL, send to user |
-| **Token swaps** | Multi-chain via swaps.xyz | Cardano: Minswap (CLI). Solana: Jupiter (b58-extension feature/solana) | Port Jupiter swaps to CLI |
+| **Chains** | 9 (SOL, ETH, BTC, Base, Polygon, Arbitrum, Optimism, BNB, Avalanche) | 10 (ADA, SOL, BTC, ETH, Base, Polygon, Arbitrum, Optimism, BNB, Avalanche) | ✅ **Parity+ (PR #30)** |
+| **Wallet creation** | BIP39, AES-256-GCM, OS keychain | BIP39, OS keychain + password fallback | ✅ **Done (PR #21)** |
+| **Auth / Agent mode** | Email + OTP (autonomous login possible) | `BEGIN_CLI_MNEMONIC` + `BEGIN_CLI_WALLET_PASSWORD` env vars, OS keychain | ✅ **Done (PR #21)** |
+| **Fiat on/off ramp** | Virtual bank accounts, Apple Pay, Venmo, PayPal | Onramper buy command (URL builder) | ✅ **Done (PR #25)** |
+| **Token swaps** | Multi-chain via swaps.xyz | Cardano: Minswap (CLI). Solana: Jupiter token search (PR #27) | **TODO:** Jupiter swap execution |
 | **Cross-chain bridges** | Yes (swaps.xyz) | XOSwap integration exists in b58-extension (feature/solana) | Port XOSwap to CLI |
-| **Staking** | None | Delegate, pool search, status, rewards — **currently uses simulated data** | **TODO:** Implement with MeshSDK (real Cardano staking) |
+| **Staking** | None | Delegate, pool search, status, rewards — real MeshSDK | ✅ **Done (PR #23)** |
 | **Governance** | None | Cardano governance support | **Begin ahead** |
 | **NFT minting** | None | NMKR integration (mint + send in one command) | **Begin ahead** |
 | **Trading automation** | DCA, limit orders, stop losses (OS cron scripts) | None | Large |
-| **Token discovery** | Trending, market data, risk scores | Minswap API (Cardano) + Jupiter token list (Solana, in b58-extension) | Port existing integrations to CLI |
-| **MCP server** | `mp mcp` built-in | None | Critical gap |
-| **Skills system** | 16 SKILL.md files shipped in npm package | 2 SKILL.md files (`skills/` + `skill/`) | Exists but needs expansion |
+| **Token discovery** | Trending, market data, risk scores | Minswap (Cardano) + Jupiter (Solana) + CoinGecko + Binance | ✅ **Done (PR #26, #27)** |
+| **MCP server** | `mp mcp` built-in | `begin mcp` built-in | ✅ **Done (PR #20)** |
+| **Skills system** | 16 SKILL.md files shipped in npm package | Individual SKILL.md files per feature | ✅ **Done (PR #22)** |
 | **Offline signing** | None visible | Full air-gapped workflow (dry-run → sign → submit) | **Begin ahead** |
 | **Output formats** | `--format compact` (JSON), `--format table` | `--json` flag | Comparable |
 | **Terminal UI** | Plain text (Commander.js) | Ink 5 + React interactive components | **Begin ahead** |
