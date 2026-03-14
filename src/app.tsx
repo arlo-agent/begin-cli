@@ -27,6 +27,7 @@ import { MintCommand } from "./commands/mint/index.js";
 import { TokenSearch } from "./commands/token/search.js";
 import { TokenPrice } from "./commands/token/price.js";
 import { Buy } from "./commands/buy.js";
+import { Bridge, BridgeQuote, BridgeStatus, BridgeOrders } from "./commands/bridge/index.js";
 import { isValidNetwork, type Network } from "./lib/config.js";
 import type { NetworkType } from "./lib/address.js";
 import type { ChainFilter } from "./services/market.js";
@@ -74,6 +75,8 @@ export interface AppFlags {
   chain: string;
   // EVM-specific flags
   evmNetwork?: string;
+  // Bridge-specific flags
+  order?: string;
 }
 
 interface AppProps {
@@ -794,6 +797,114 @@ export function App({ command, subcommand, args, flags, showHelp }: AppProps) {
         <Text color="red">Unknown policy command: {subcommand}</Text>
         <Text color="gray">Available commands: show, set</Text>
       </Box>
+    );
+  }
+
+  // ---- Bridge commands (cross-chain via XOSwap) ----
+  if (command === "bridge") {
+    // Bridge quote subcommand: begin bridge quote --from BTC --to SOL --amount 0.1
+    if (subcommand === "quote") {
+      if (!flags.from || !flags.to || !flags.amount) {
+        return (
+          <Box flexDirection="column">
+            <Text color="red">Error: --from, --to, and --amount are required</Text>
+            <Text color="gray">
+              Usage: begin bridge quote --from {"<asset>"} --to {"<asset>"} --amount {"<amount>"}
+            </Text>
+            <Text color="gray">Supported assets: BTC, SOL, ADA, ETH, MATIC, AVAX, BNB, ARB, OP</Text>
+            <Text color="gray">Options:</Text>
+            <Text color="gray"> --json, -j Output as JSON</Text>
+          </Box>
+        );
+      }
+      return (
+        <BridgeQuote
+          from={flags.from}
+          to={flags.to}
+          amount={flags.amount}
+          json={flags.json}
+        />
+      );
+    }
+
+    // Bridge status subcommand: begin bridge status --order <orderId>
+    if (subcommand === "status") {
+      if (!flags.order) {
+        return (
+          <Box flexDirection="column">
+            <Text color="red">Error: --order is required</Text>
+            <Text color="gray">Usage: begin bridge status --order {"<orderId>"}</Text>
+            <Text color="gray">Options:</Text>
+            <Text color="gray"> --json, -j Output as JSON</Text>
+          </Box>
+        );
+      }
+      return (
+        <BridgeStatus
+          orderId={flags.order}
+          json={flags.json}
+        />
+      );
+    }
+
+    // Bridge orders subcommand: begin bridge orders --address <addr> --asset BTC
+    if (subcommand === "orders") {
+      if (!flags.asset || flags.asset.length === 0) {
+        return (
+          <Box flexDirection="column">
+            <Text color="red">Error: --asset is required</Text>
+            <Text color="gray">Usage: begin bridge orders --asset {"<asset>"} [--address {"<addr>"}]</Text>
+            <Text color="gray">Supported assets: BTC, SOL, ADA, ETH, MATIC, AVAX, BNB, ARB, OP</Text>
+            <Text color="gray">Options:</Text>
+            <Text color="gray"> --address Address to check (uses wallet if not specified)</Text>
+            <Text color="gray"> --json, -j Output as JSON</Text>
+          </Box>
+        );
+      }
+      return (
+        <BridgeOrders
+          address={flags.address}
+          asset={flags.asset[0]}
+          walletName={flags.wallet}
+          password={flags.password}
+          json={flags.json}
+        />
+      );
+    }
+
+    // Main bridge command: begin bridge --from BTC --to SOL --amount 0.1
+    if (!flags.from || !flags.to || !flags.amount) {
+      return (
+        <Box flexDirection="column">
+          <Text color="red">Error: --from, --to, and --amount are required</Text>
+          <Text color="gray">
+            Usage: begin bridge --from {"<asset>"} --to {"<asset>"} --amount {"<amount>"}
+          </Text>
+          <Text color="gray">Supported assets: BTC, SOL, ADA, ETH, MATIC, AVAX, BNB, ARB, OP</Text>
+          <Text color="gray">Options:</Text>
+          <Text color="gray"> --slippage, -s Slippage tolerance % (default: 0.5)</Text>
+          <Text color="gray"> --yes, -y Skip confirmation prompt</Text>
+          <Text color="gray"> --json, -j Output as JSON</Text>
+          <Text color="gray">Subcommands:</Text>
+          <Text color="gray"> quote Get a bridge quote without executing</Text>
+          <Text color="gray"> status Check bridge order status</Text>
+          <Text color="gray"> orders List bridge orders for an address</Text>
+        </Box>
+      );
+    }
+
+    return (
+      <Bridge
+        from={flags.from}
+        to={flags.to}
+        amount={flags.amount}
+        slippage={flags.slippage}
+        yes={flags.yes}
+        network={flags.network}
+        walletName={flags.wallet}
+        password={flags.password}
+        json={flags.json}
+      />
     );
   }
 
