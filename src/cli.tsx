@@ -25,6 +25,7 @@ const cli = meow(
     solana balance <address>         Check SOL balance for an address
     solana history <address>         Show Solana transaction history
     solana send <to> <amount>        Send SOL (use --asset for SPL tokens)
+    solana swap [options]            Swap Solana tokens via Jupiter
 
     bitcoin balance <address>        Check BTC balance for an address
     bitcoin history <address>        Show Bitcoin transaction history
@@ -150,13 +151,18 @@ const cli = meow(
     $ begin cardano send addr1qy... 10 --wallet my-wallet --password mypass
     $ begin cardano send addr1qy... 2 --asset abc123...def.HOSKY:1000
 
-    # Swap tokens
+    # Cardano swap tokens (Minswap)
     $ begin swap quote --from ADA --to MIN --amount 100
     $ begin swap --from ADA --to MIN --amount 100 --slippage 0.5
     $ begin swap --from ADA --to MIN --amount 100 --yes --json
     $ begin swap orders
     $ begin swap orders --address addr1qy...
     $ begin swap cancel --id <tx_in> --yes
+
+    # Solana swap tokens (Jupiter)
+    $ begin solana swap --from SOL --to USDC --amount 1.5
+    $ begin solana swap --from USDC --to JUP --amount 100 --slippage 1
+    $ begin solana swap --from SOL --to BONK --amount 0.5 --yes --json
 
     # Token discovery
     $ begin token search HOSKY
