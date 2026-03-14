@@ -85,7 +85,7 @@ export function createProvider(config: TransactionConfig): BlockfrostProvider {
   if (!apiKey) {
     throw errors.providerError(
       `No Blockfrost API key found for ${network}.\n` +
-        `Set BLOCKFROST_API_KEY (or BLOCKFROST_API_KEY_${network.toUpperCase()} / BLOCKFROST_API_KEY_MAINNET) or configure via 'begin config set blockfrost.${network} <key>'.\n` +
+        `Set BLOCKFROST_API_KEY (or BLOCKFROST_API_KEY_${network.toUpperCase()}) or configure via 'begin config set blockfrost.${network} <key>'.\n` +
         `Get a free API key at: https://blockfrost.io`
     );
   }

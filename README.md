@@ -146,12 +146,17 @@ export BEGIN_CLI_MNEMONIC="word1 word2 ... word24"
 ### Step 4: Get Your Address
 
 ```bash
-# Display receiving address
+# Display addresses for all chains (Cardano, Solana, Bitcoin, EVM)
 begin wallet address
 
-# With QR code for mobile wallets
+# With QR code for Cardano payment address
 begin wallet address --qr
+
+# JSON output includes cardano, solana, bitcoin, and evm addresses
+begin wallet address --json
 ```
+
+`begin wallet address` shows your Cardano payment, enterprise, and stake addresses, plus your Solana, Bitcoin, and EVM addresses (same mnemonic, derived for each chain). Use `--full` to show full addresses; omit it for shortened form.
 
 ### Step 5: Check Balance
 
@@ -216,8 +221,8 @@ begin stake withdraw --yes
 | `begin wallet create <name>` | Create a new wallet (use `--show-seed` to display recovery phrase and addresses) |
 | `begin wallet restore <name>` | Restore from mnemonic |
 | `begin wallet list` | List all wallets |
-| `begin wallet address` | Show receiving address |
-| `begin wallet address --qr` | Show address with QR code |
+| `begin wallet address` | Show addresses for all chains (Cardano, Solana, Bitcoin, EVM) |
+| `begin wallet address --qr` | Show addresses with QR code for Cardano payment address |
 | `begin wallet export [name]` | Show mnemonic phrase (use with care) |
 
 ### Balance & History
@@ -320,6 +325,25 @@ begin balance addr1... --json
       }
     ]
   }
+}
+```
+
+```bash
+# Wallet addresses (all chains)
+begin wallet address --json
+```
+
+```json
+{
+  "network": "mainnet",
+  "cardano": {
+    "paymentAddress": "addr1qy...",
+    "enterpriseAddress": "addr1vy...",
+    "stakeAddress": "stake1u..."
+  },
+  "solana": { "address": "..." },
+  "bitcoin": { "address": "..." },
+  "evm": { "address": "0x..." }
 }
 ```
 

@@ -592,6 +592,16 @@ async function deriveMultiChainAddresses(
 }
 
 /**
+ * Derive addresses for all supported chains from a mnemonic (exported for wallet address list).
+ */
+export async function getMultiChainAddressesFromMnemonic(
+  mnemonic: string[],
+  networkId: 0 | 1
+): Promise<MultiChainAddresses> {
+  return deriveMultiChainAddresses(mnemonic, networkId);
+}
+
+/**
  * Create a new multi-chain wallet (v3 format)
  */
 export async function createMultiChainWallet(
