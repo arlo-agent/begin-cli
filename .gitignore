@@ -1,7 +1,9 @@
-# Dependencies
-node_modules/
+# Rust
+/target/
+Cargo.lock
 
-# Build output
+# Node/TypeScript
+node_modules/
 dist/
 
 # IDE
@@ -14,10 +16,12 @@ dist/
 .DS_Store
 Thumbs.db
 
-# Environment
+# Environment/Secrets
 .env
 .env.local
 .env.*.local
+*.key
+*.pem
 
 # Logs
 *.log
