@@ -19,6 +19,8 @@ Thumbs.db
 .env.local
 .env.*.local
 
+colosseum.env 
+
 # Logs
 *.log
 npm-debug.log*

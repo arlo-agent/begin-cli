@@ -158,6 +158,14 @@ begin wallet address --json
 
 `begin wallet address` shows your Cardano payment, enterprise, and stake addresses, plus your Solana, Bitcoin, and EVM addresses (same mnemonic, derived for each chain). Use `--full` to show full addresses; omit it for shortened form.
 
+To see your **total balance and assets on all chains** in one place, use:
+
+```bash
+begin wallet balance
+# Or for a specific wallet and EVM network:
+begin wallet balance --wallet mywallet --evm-network base --json
+```
+
 ### Step 5: Check Balance
 
 ```bash
@@ -223,6 +231,7 @@ begin stake withdraw --yes
 | `begin wallet list` | List all wallets |
 | `begin wallet address` | Show addresses for all chains (Cardano, Solana, Bitcoin, EVM) |
 | `begin wallet address --qr` | Show addresses with QR code for Cardano payment address |
+| `begin wallet balance [--wallet <name>]` | Total balance and assets across all chains (Cardano, Bitcoin, Solana, EVM); use `--evm-network` for EVM chain |
 | `begin wallet export [name]` | Show mnemonic phrase (use with care) |
 
 ### Balance & History
@@ -250,6 +259,16 @@ begin stake withdraw --yes
 | `begin stake delegate <pool>` | Delegate to pool |
 | `begin stake status` | View delegation status |
 | `begin stake withdraw` | Withdraw rewards |
+
+### Fiat Onramp (Onramper)
+
+**Default (no `--token`):** the widget lists every supported Begin asset (Cardano, Bitcoin, Solana + USDC on Solana, and EVM assets: Ethereum, **Base (ETH + USDC)**, Polygon, Arbitrum, Optimism, BNB, Avalanche — same `0x` address). **`wallets=`** is filled for every asset in that list when addresses are known: from the wallet file (v3 `chains`) and, in this **ALL** mode, **derived from the same mnemonic** for any missing chain (like begin-mobile). Use OS keychain / `BEGIN_CLI_MNEMONIC` / `BEGIN_CLI_WALLET_PASSWORD` so decryption works when the file only stores Cardano. Requires `ONRAMP_SECRET` when `wallets=` is present. **With `--token`**, `onlyCryptos` is narrowed (e.g. `ADA`, `EVM`, `ETH`, `BASE`, `USDC_BASE`). Set `ONRAMPER_API_KEY` and `ONRAMP_SECRET` in `.env` as needed.
+
+| Command | Description |
+|---------|-------------|
+| `begin buy --amount <fiat> --currency <code>` | Open Onramper buy (`redirectAtCheckout=false`, optional `ONRAMPER_THEME`); **omit `--token`** to list every supported asset |
+| `begin buy --token <token>` | Narrow assets (`ALL` same as omit, or `ADA`, `BTC`, `SOL`/`USDC`, `BASE`, `USDC_BASE`, `EVM`, `ETH`, …) |
+| `begin buy --json` | Print checkout URL as JSON |
 
 ### Global Flags
 
@@ -290,6 +309,9 @@ Located at `~/.begin-cli/config.json`:
 | `BEGIN_CLI_MNEMONIC` | 24-word recovery phrase | `word1 word2...` |
 | `BEGIN_CLI_NETWORK` | Default network | `mainnet` |
 | `BEGIN_CLI_WALLET` | Default wallet name | `mywallet` |
+| `ONRAMPER_API_KEY` | Onramper widget API key (required for `begin buy`) | `pk_prod_...` |
+| `ONRAMP_SECRET` | Onramper URL signing secret when `wallets=` is sent | `your_onramper_signing_secret` |
+| `ONRAMPER_THEME` | Optional extra widget query string (e.g. `hideTopBar=true`) | `hideTopBar=true` |
 | `BEGIN_CLI_CONFIG` | Config file path | `~/.begin-cli/config.json` |
 
 **Priority order:** CLI flags > Environment variables > Config file > Defaults
@@ -341,9 +363,25 @@ begin wallet address --json
     "enterpriseAddress": "addr1vy...",
     "stakeAddress": "stake1u..."
   },
-  "solana": { "address": "..." },
   "bitcoin": { "address": "..." },
+  "solana": { "address": "..." },
   "evm": { "address": "0x..." }
+}
+```
+
+```bash
+# Wallet balance (all chains)
+begin wallet balance --json
+```
+
+```json
+{
+  "network": "mainnet",
+  "source": "wallet: mywallet",
+  "cardano": { "ada": "125.43", "lovelace": "125430000", "tokenCount": 2, "tokens": [...] },
+  "bitcoin": { "btc": "0.00123456", "satoshis": "123456" },
+  "solana": { "sol": "1.5", "lamports": "1500000000", "tokenCount": 0, "tokens": [] },
+  "evm": { "eth": "0.5", "symbol": "ETH", "tokenCount": 1, "tokens": [...] }
 }
 ```
 

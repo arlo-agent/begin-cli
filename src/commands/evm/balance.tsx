@@ -106,39 +106,28 @@ export function EVMBalance({ address, network, json }: EVMBalanceProps) {
         <Text>{truncateAddress(address)}</Text>
       </Box>
 
-      <Box marginTop={1}>
-        <Text color="gray">Balance: </Text>
-        <Text bold color="green">
-          {balance.native.uiAmount.toFixed(6)} {networkConfig.symbol}
-        </Text>
-      </Box>
-
-      {balance.tokens.length > 0 && (
-        <Box flexDirection="column" marginTop={1}>
-          <Text color="gray" bold>
-            ERC-20 Tokens ({balance.tokens.length}):
-          </Text>
-          {balance.tokens.slice(0, 10).map((token, i) => (
-            <Box key={i} flexDirection="column" paddingLeft={2} marginTop={i === 0 ? 0 : 1}>
-              <Box>
-                <Text color="yellow">{token.symbol || truncateAddress(token.mint)}</Text>
-                <Text color="gray">: </Text>
-                <Text bold>{token.uiAmount.toFixed(token.decimals > 6 ? 6 : token.decimals)}</Text>
-              </Box>
-              <Box paddingLeft={2}>
-                <Text color="gray" dimColor>
-                  Contract: {token.mint.slice(0, 16)}...
-                </Text>
-              </Box>
-            </Box>
-          ))}
-          {balance.tokens.length > 10 && (
-            <Box paddingLeft={2} marginTop={1}>
-              <Text color="gray">...and {balance.tokens.length - 10} more tokens</Text>
-            </Box>
-          )}
+      <Box flexDirection="column" marginTop={1}>
+        <Box>
+          <Text color="gray">{networkConfig.symbol}: </Text>
+          <Text bold color="green">{balance.native.uiAmount.toFixed(6)}</Text>
         </Box>
-      )}
+
+        {balance.tokens.slice(0, 10).map((token) => {
+          const label = token.symbol?.trim() || truncateAddress(token.mint);
+          const dp = token.decimals > 8 ? 8 : token.decimals;
+          return (
+            <Box key={token.mint} marginTop={1}>
+              <Text color="gray">{label}: </Text>
+              <Text bold>{token.uiAmount.toFixed(dp)}</Text>
+            </Box>
+          );
+        })}
+        {balance.tokens.length > 10 && (
+          <Box marginTop={1}>
+            <Text color="gray">...and {balance.tokens.length - 10} more tokens</Text>
+          </Box>
+        )}
+      </Box>
     </Box>
   );
 }

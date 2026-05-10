@@ -16,6 +16,8 @@ import {
   isCriticalPriceImpact,
   formatRoute,
   extractWitnessSet,
+  MISSING_PURE_ADA_COLLATERAL,
+  pureAdaCollateralInputHintsForMinswap,
   type ResolvedToken,
   type FormattedQuote,
 } from "../../lib/swap.js";
@@ -27,6 +29,7 @@ import {
 } from "../../lib/transaction.js";
 import type { MeshWallet } from "@meshsdk/core";
 import { getErrorMessage } from "../../lib/errors.js";
+import { truncateDecimalString } from "../../lib/format-amount.js";
 
 interface SwapProps {
   from: string;
@@ -177,13 +180,15 @@ export function Swap({
       setFromToken(resolvedFrom);
       setToToken(resolvedTo);
 
+      const normalizedAmount = truncateDecimalString(amount, resolvedFrom.decimals);
+
       // Get quote
       setState("quoting");
 
       const request: EstimateRequest = {
         tokenIn: resolvedFrom.tokenId,
         tokenOut: resolvedTo.tokenId,
-        amount,
+        amount: normalizedAmount,
         slippage,
         allowMultiHops: multiHop,
         amountInDecimal: true,
@@ -240,13 +245,18 @@ export function Swap({
         throw new Error("Missing estimate request");
       }
 
-      // Build transaction
       setState("building");
+
+      const collateralHints = await pureAdaCollateralInputHintsForMinswap(wallet);
+      if (collateralHints.length === 0) {
+        throw new Error(MISSING_PURE_ADA_COLLATERAL);
+      }
 
       const buildResult = await minswapClient.buildTx({
         sender: senderAddress,
         minAmountOut: swapEstimate.minAmountOut,
         estimate: request,
+        inputsToChoose: collateralHints,
         amountInDecimal: true,
       });
 

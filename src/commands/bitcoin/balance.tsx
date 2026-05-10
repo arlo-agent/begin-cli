@@ -95,10 +95,8 @@ export function BitcoinBalance({ address, network, json }: BitcoinBalanceProps) 
       </Box>
 
       <Box marginTop={1}>
-        <Text color="gray">Balance: </Text>
-        <Text bold color="green">
-          {balance.native.uiAmount.toFixed(8)} BTC
-        </Text>
+        <Text color="gray">BTC: </Text>
+        <Text bold color="green">{balance.native.uiAmount.toFixed(8)}</Text>
         <Text color="gray"> ({balance.native.amount} satoshis)</Text>
       </Box>
     </Box>

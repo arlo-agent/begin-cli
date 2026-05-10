@@ -4,20 +4,11 @@
 
 import React, { useState, useEffect } from "react";
 import { Box, Text } from "ink";
-import { createProvider, hasApiKey, type UTxO, type Asset } from "../../lib/provider.js";
+import { hasApiKey } from "../../lib/provider.js";
 import { outputSuccess, outputError } from "../../lib/output.js";
 import { ExitCode } from "../../lib/errors.js";
 import type { Network } from "../../lib/config.js";
-
-interface UtxoInfo {
-  txHash: string;
-  outputIndex: number;
-  lovelace: string;
-  ada: string;
-  tokens: { policyId: string; assetName: string; quantity: string; unit: string }[];
-  datumHash?: string;
-  scriptRef?: boolean;
-}
+import { getUtxos, type UtxosResult } from "../../core/balance.js";
 
 interface CardanoUtxosProps {
   address: string;
@@ -25,100 +16,18 @@ interface CardanoUtxosProps {
   json: boolean;
 }
 
-function parseAssetUnit(unit: string): { policyId: string; assetName: string } {
-  const policyId = unit.slice(0, 56);
-  const assetNameHex = unit.slice(56);
-  let assetName = "";
-  if (assetNameHex) {
-    try {
-      assetName = Buffer.from(assetNameHex, "hex").toString("utf8");
-    } catch {
-      assetName = assetNameHex;
-    }
-  }
-  return { policyId, assetName };
-}
-
-function transformUtxo(utxo: UTxO): UtxoInfo {
-  const lovelace = utxo.output.amount.find((a: Asset) => a.unit === "lovelace");
-  const lovelaceStr = lovelace?.quantity || "0";
-  const adaStr = (Number(lovelaceStr) / 1_000_000).toFixed(6);
-  const tokens = utxo.output.amount
-    .filter((a: Asset) => a.unit !== "lovelace")
-    .map((a: Asset) => ({ ...parseAssetUnit(a.unit), quantity: a.quantity, unit: a.unit }));
-  return {
-    txHash: utxo.input.txHash,
-    outputIndex: utxo.input.outputIndex,
-    lovelace: lovelaceStr,
-    ada: adaStr,
-    tokens,
-    datumHash: utxo.output.dataHash || undefined,
-    scriptRef: !!utxo.output.scriptRef,
-  };
-}
-
-async function fetchUtxos(address: string, network: Network): Promise<UtxoInfo[]> {
-  const provider = createProvider(network);
-  const utxos = await provider.fetchAddressUTxOs(address);
-  return utxos.map(transformUtxo);
-}
-
-function getMockUtxos(): UtxoInfo[] {
-  return [
-    {
-      txHash: "abc123def456789abc123def456789abc123def456789abc123def456789abcd",
-      outputIndex: 0,
-      lovelace: "50000000",
-      ada: "50.000000",
-      tokens: [
-        {
-          policyId: "a0028f350aaabe0545fdcb56b039bfb08e4bb4d8c4d7c3c7d481c235",
-          assetName: "HOSKY",
-          quantity: "1000000",
-          unit: "a0028f350aaabe0545fdcb56b039bfb08e4bb4d8c4d7c3c7d481c235484f534b59",
-        },
-      ],
-    },
-    {
-      txHash: "def456789abc123def456789abc123def456789abc123def456789abc123defa",
-      outputIndex: 1,
-      lovelace: "75430000",
-      ada: "75.430000",
-      tokens: [],
-    },
-    {
-      txHash: "123abc456def789abc123def456789abc123def456789abc123def456789abc1",
-      outputIndex: 0,
-      lovelace: "1500000",
-      ada: "1.500000",
-      tokens: [
-        {
-          policyId: "b0028f350aaabe0545fdcb56b039bfb08e4bb4d8c4d7c3c7d481c235",
-          assetName: "SNEK",
-          quantity: "500",
-          unit: "b0028f350aaabe0545fdcb56b039bfb08e4bb4d8c4d7c3c7d481c235534e454b",
-        },
-      ],
-    },
-  ];
-}
-
 export function CardanoUtxos({ address, network, json }: CardanoUtxosProps) {
   const [loading, setLoading] = useState(true);
-  const [utxos, setUtxos] = useState<UtxoInfo[]>([]);
+  const [result, setResult] = useState<UtxosResult | null>(null);
   const [error, setError] = useState<Error | null>(null);
-  const [useMock, setUseMock] = useState(false);
 
   useEffect(() => {
     const loadUtxos = async () => {
       try {
         if (!hasApiKey(network)) {
           if (!json) console.error("\n⚠ No BLOCKFROST_API_KEY set - returning mock data\n");
-          setUtxos(getMockUtxos());
-          setUseMock(true);
-        } else {
-          setUtxos(await fetchUtxos(address, network));
         }
+        setResult(await getUtxos(address, network));
       } catch (err) {
         setError(err instanceof Error ? err : new Error(String(err)));
       } finally {
@@ -128,28 +37,28 @@ export function CardanoUtxos({ address, network, json }: CardanoUtxosProps) {
     loadUtxos();
   }, [address, network, json]);
 
-  const totalLovelace = utxos.reduce((sum, u) => sum + BigInt(u.lovelace), BigInt(0));
-  const totalAda = (Number(totalLovelace) / 1_000_000).toFixed(6);
+  const utxos = result?.utxos ?? [];
+  const totalAda = result?.totalAda ?? "0";
 
   useEffect(() => {
     if (json && !loading) {
       if (error) {
         outputError(error);
         process.exit(ExitCode.ERROR);
-      } else {
+      } else if (result) {
         outputSuccess({
-          address,
-          network,
-          utxoCount: utxos.length,
-          totalLovelace: totalLovelace.toString(),
-          totalAda,
-          utxos,
-          ...(useMock && { mock: true }),
+          address: result.address,
+          network: result.network,
+          utxoCount: result.utxoCount,
+          totalLovelace: result.totalLovelace,
+          totalAda: result.totalAda,
+          utxos: result.utxos,
+          ...(result.mock && { mock: true }),
         });
         process.exit(ExitCode.SUCCESS);
       }
     }
-  }, [json, loading, error, utxos, address, network, totalLovelace, totalAda, useMock]);
+  }, [json, loading, error, result]);
 
   if (json) return null;
   if (loading)
@@ -164,6 +73,7 @@ export function CardanoUtxos({ address, network, json }: CardanoUtxosProps) {
         <Text color="red">Error: {error.message}</Text>
       </Box>
     );
+  if (!result) return <Text color="red">No result</Text>;
 
   return (
     <Box flexDirection="column" padding={1}>
@@ -172,7 +82,7 @@ export function CardanoUtxos({ address, network, json }: CardanoUtxosProps) {
           UTXOs
         </Text>
         <Text color="gray"> ({network})</Text>
-        {useMock && <Text color="yellow"> [MOCK]</Text>}
+        {result.mock && <Text color="yellow"> [MOCK]</Text>}
       </Box>
       <Box>
         <Text color="gray">Address: </Text>
@@ -223,9 +133,9 @@ export function CardanoUtxos({ address, network, json }: CardanoUtxosProps) {
                   <Text color="gray">Tokens:</Text>
                   {utxo.tokens.slice(0, 3).map((token, j) => (
                     <Box key={j} paddingLeft={2}>
-                      <Text color="yellow">{token.assetName || "(unnamed)"}</Text>
+                      <Text color="yellow">{token.displayLabel}</Text>
                       <Text color="gray">: </Text>
-                      <Text>{token.quantity}</Text>
+                      <Text>{token.quantityFormatted}</Text>
                     </Box>
                   ))}
                   {utxo.tokens.length > 3 && (

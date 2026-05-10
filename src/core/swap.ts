@@ -10,7 +10,8 @@ import {
   formatSwapQuote,
   validateSlippage,
   extractWitnessSet,
-  type ResolvedToken,
+  MISSING_PURE_ADA_COLLATERAL,
+  pureAdaCollateralInputHintsForMinswap,
   type FormattedQuote,
 } from "../lib/swap.js";
 import {
@@ -245,7 +246,16 @@ export async function executeSwap(params: SwapExecuteParams): Promise<SwapExecut
       amountInDecimal: true,
     });
 
-    // Build transaction
+    const collateralHints = await pureAdaCollateralInputHintsForMinswap(meshWallet);
+    if (collateralHints.length === 0) {
+      return {
+        status: "error",
+        network,
+        error: MISSING_PURE_ADA_COLLATERAL,
+      };
+    }
+
+    // Build transaction (hint ADA-only UTXO so collateral is not a multi-asset output)
     const buildResult = await client.buildTx({
       sender: senderAddress,
       minAmountOut: estimate.minAmountOut,
@@ -257,6 +267,7 @@ export async function executeSwap(params: SwapExecuteParams): Promise<SwapExecut
         allowMultiHops: multiHop,
         amountInDecimal: true,
       },
+      inputsToChoose: collateralHints,
       amountInDecimal: true,
     });
 

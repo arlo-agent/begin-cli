@@ -102,40 +102,30 @@ export function SolanaBalance({ address, network, json }: SolanaBalanceProps) {
         <Text>{truncateAddress(address)}</Text>
       </Box>
 
-      <Box marginTop={1}>
-        <Text color="gray">Balance: </Text>
-        <Text bold color="green">
-          {balance.native.uiAmount.toFixed(9)} SOL
-        </Text>
-        <Text color="gray"> ({balance.native.amount} lamports)</Text>
-      </Box>
-
-      {balance.tokens.length > 0 && (
-        <Box flexDirection="column" marginTop={1}>
-          <Text color="gray" bold>
-            SPL Tokens ({balance.tokens.length}):
+      <Box flexDirection="column" marginTop={1}>
+        <Box>
+          <Text color="gray">SOL: </Text>
+          <Text bold color="green">
+            {balance.native.uiAmount.toFixed(9)}
           </Text>
-          {balance.tokens.slice(0, 10).map((token, i) => (
-            <Box key={i} flexDirection="column" paddingLeft={2} marginTop={i === 0 ? 0 : 1}>
-              <Box>
-                <Text color="yellow">{token.symbol || truncateAddress(token.mint)}</Text>
-                <Text color="gray">: </Text>
-                <Text bold>{token.uiAmount.toFixed(token.decimals)}</Text>
-              </Box>
-              <Box paddingLeft={2}>
-                <Text color="gray" dimColor>
-                  Mint: {token.mint.slice(0, 16)}...
-                </Text>
-              </Box>
-            </Box>
-          ))}
-          {balance.tokens.length > 10 && (
-            <Box paddingLeft={2} marginTop={1}>
-              <Text color="gray">...and {balance.tokens.length - 10} more tokens</Text>
-            </Box>
-          )}
+          <Text color="gray"> ({balance.native.amount} lamports)</Text>
         </Box>
-      )}
+
+        {balance.tokens.slice(0, 10).map((token) => {
+          const label = token.symbol?.trim() || truncateAddress(token.mint);
+          return (
+            <Box key={token.mint} marginTop={1}>
+              <Text color="gray">{label}: </Text>
+              <Text bold>{token.uiAmount.toFixed(token.decimals)}</Text>
+            </Box>
+          );
+        })}
+        {balance.tokens.length > 10 && (
+          <Box marginTop={1}>
+            <Text color="gray">...and {balance.tokens.length - 10} more tokens</Text>
+          </Box>
+        )}
+      </Box>
     </Box>
   );
 }

@@ -362,33 +362,3 @@ export function getTokenDecimals(tokenInput: string): number {
   return SOLANA_TOKEN_DECIMALS[upperInput] ?? 9;
 }
 
-/**
- * Parse amount to smallest units based on decimals
- */
-export function parseAmountToSmallestUnit(amount: string, decimals: number): string {
-  const [intPart, decPart = ""] = amount.split(".");
-  const paddedDecPart = decPart.padEnd(decimals, "0").slice(0, decimals);
-  const fullStr = intPart + paddedDecPart;
-  // Remove leading zeros but keep at least one digit
-  return fullStr.replace(/^0+/, "") || "0";
-}
-
-/**
- * Format amount from smallest units to human readable
- */
-export function formatAmountFromSmallestUnit(amount: string, decimals: number): string {
-  if (decimals === 0) return amount;
-
-  const padded = amount.padStart(decimals + 1, "0");
-  const intPart = padded.slice(0, -decimals) || "0";
-  const decPart = padded.slice(-decimals);
-
-  // Remove trailing zeros
-  const trimmedDecPart = decPart.replace(/0+$/, "");
-
-  if (trimmedDecPart === "") {
-    return intPart;
-  }
-
-  return `${intPart}.${trimmedDecPart}`;
-}

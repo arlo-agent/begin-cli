@@ -155,6 +155,22 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function parseResponseJson<T>(bodyText: string, context: string): T {
+  const trimmed = bodyText.trim();
+  if (!trimmed) {
+    throw new Error(`${context}: empty response body`);
+  }
+  try {
+    return JSON.parse(trimmed) as T;
+  } catch (e) {
+    const preview = trimmed.length > 200 ? `${trimmed.slice(0, 200)}…` : trimmed;
+    const reason = e instanceof SyntaxError ? e.message : String(e);
+    throw new Error(`${context}: response is not JSON (${reason}). Body: ${preview}`, {
+      cause: e,
+    });
+  }
+}
+
 /**
  * Check if a status code is retryable (429 or 5xx)
  */
@@ -212,6 +228,10 @@ export class MinswapClient {
           },
         });
 
+        const logFinalizeResponse =
+          process.env.MINSWAP_LOG_AGGREGATOR_RESPONSES === "true" &&
+          endpoint === "/finalize-and-submit-tx";
+
         if (!response.ok) {
           // Check if this is a retryable error
           if (isRetryableStatus(response.status) && attempt < this.retryConfig.maxRetries) {
@@ -225,20 +245,32 @@ export class MinswapClient {
                 `(attempt ${attempt + 1}/${this.retryConfig.maxRetries + 1})`
             );
             await sleep(delay);
+            const retryBody = await response.text();
+            console.log(retryBody);
             continue;
           }
 
+          const errorBody = await response.text();
           let errorMessage = `Minswap API error: ${response.status}`;
           try {
-            const errorData = (await response.json()) as MinswapApiError;
+            const errorData = parseResponseJson<MinswapApiError>(errorBody, endpoint);
             errorMessage = errorData.message || errorData.error || errorMessage;
           } catch {
-            // Use default error message
+            const preview =
+              errorBody.trim().length > 300 ? `${errorBody.trim().slice(0, 300)}…` : errorBody.trim();
+            if (preview) {
+              errorMessage = `${errorMessage} — ${preview}`;
+            }
           }
           throw new Error(errorMessage);
         }
 
-        return response.json() as Promise<T>;
+        const bodyText = await response.text();
+        if (logFinalizeResponse) {
+          const method = (options.method ?? "GET").toUpperCase();
+          console.log(`[Minswap] ${method} ${endpoint} response:\n${bodyText}`);
+        }
+        return parseResponseJson<T>(bodyText, `Minswap ${endpoint}`);
       } catch (err) {
         lastError = err instanceof Error ? err : new Error(String(err));
 
@@ -492,8 +524,9 @@ export class MinswapClient {
       estimateBody.allow_multi_hops = params.estimate.allowMultiHops;
     }
 
-    if (params.estimate.partner) {
-      estimateBody.partner = params.estimate.partner;
+    const partner = params.estimate.partner ?? this.partner;
+    if (partner) {
+      estimateBody.partner = partner;
     }
 
     const body: Record<string, unknown> = {
@@ -678,7 +711,10 @@ export class MockMinswapClient extends MinswapClient {
     sender: string;
     minAmountOut: string;
     estimate: EstimateRequest;
+    inputsToChoose?: string[];
+    amountInDecimal?: boolean;
   }): Promise<BuildTxResponse> {
+    void params;
     await new Promise((resolve) => setTimeout(resolve, 300));
 
     return {
@@ -802,6 +838,7 @@ export class MockMinswapClient extends MinswapClient {
     sender: string;
     orders: Array<{ txIn: string; protocol: Protocol }>;
   }): Promise<BuildTxResponse> {
+    void params;
     await new Promise((resolve) => setTimeout(resolve, 200));
 
     return {

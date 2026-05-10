@@ -51,7 +51,12 @@ export function WalletAddress({
   const [allChains, setAllChains] = useState<MultiChainAddresses | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [source, setSource] = useState<string>("");
-  const [qrCode, setQrCode] = useState<string | null>(null);
+  const [qrCodes, setQrCodes] = useState<{
+    cardano?: string;
+    bitcoin?: string;
+    solana?: string;
+    evm?: string;
+  }>({});
 
   const networkId = network === "mainnet" ? 1 : 0;
 
@@ -117,21 +122,42 @@ export function WalletAddress({
 
   useEffect(() => {
     const genQR = async () => {
-      if (!qr || json || !addresses?.baseAddress) {
-        setQrCode(null);
+      if (!qr || json) {
+        setQrCodes({});
         return;
       }
-
+      const entries: Array<{ key: "cardano" | "bitcoin" | "solana" | "evm"; address: string }> = [];
+      if (addresses?.baseAddress) entries.push({ key: "cardano", address: addresses.baseAddress });
+      if (allChains?.bitcoin?.address) entries.push({ key: "bitcoin", address: allChains.bitcoin.address });
+      if (allChains?.solana?.address) entries.push({ key: "solana", address: allChains.solana.address });
+      if (allChains?.evm?.address) entries.push({ key: "evm", address: allChains.evm.address });
+      if (entries.length === 0) {
+        setQrCodes({});
+        return;
+      }
       try {
-        const qrStr = await generateQRCode(addresses.baseAddress);
-        setQrCode(qrStr);
+        const results = await Promise.all(
+          entries.map(async ({ key, address }) => {
+            try {
+              const qrStr = await generateQRCode(address);
+              return { key, qr: qrStr } as const;
+            } catch {
+              return { key, qr: undefined } as const;
+            }
+          })
+        );
+        const next: typeof qrCodes = {};
+        for (const { key, qr: qrStr } of results) {
+          if (qrStr) next[key] = qrStr;
+        }
+        setQrCodes(next);
       } catch {
-        setQrCode(null);
+        setQrCodes({});
       }
     };
 
     genQR();
-  }, [addresses, qr, json]);
+  }, [addresses, allChains, qr, json]);
 
   // Loading state
   if (state === "loading") {
@@ -171,7 +197,7 @@ export function WalletAddress({
     return <Text color="red">No addresses derived</Text>;
   }
 
-  // JSON output
+  // JSON output (order: cardano, bitcoin, solana, evm)
   if (json) {
     const output: Record<string, unknown> = {
       network: addresses.network,
@@ -181,15 +207,16 @@ export function WalletAddress({
         stakeAddress: addresses.stakeAddress,
       },
     };
-    if (allChains) {
-      if (allChains.solana) output.solana = { address: allChains.solana.address };
-      if (allChains.bitcoin) output.bitcoin = { address: allChains.bitcoin.address };
-      if (allChains.evm) output.evm = { address: allChains.evm.address };
-    }
+    if (allChains?.bitcoin) output.bitcoin = { address: allChains.bitcoin.address };
+    if (allChains?.solana) output.solana = { address: allChains.solana.address };
+    if (allChains?.evm) output.evm = { address: allChains.evm.address };
     return <Text>{JSON.stringify(output, null, 2)}</Text>;
   }
 
-  // Regular output
+  // Regular output: per chain (Cardano, Bitcoin, Solana, EVM)
+  const addr = (raw: string, prefix = 20, suffix = 12) =>
+    full ? raw : shortenAddress(raw, prefix, suffix);
+
   return (
     <Box flexDirection="column" padding={1}>
       {/* Header */}
@@ -200,7 +227,6 @@ export function WalletAddress({
         <Text color="gray"> ({network})</Text>
       </Box>
 
-      {/* Source info */}
       {source && (
         <Box marginBottom={1}>
           <Text color="gray">Source: </Text>
@@ -208,109 +234,82 @@ export function WalletAddress({
         </Box>
       )}
 
-      {/* Payment Address (Base) */}
+      {/* Cardano */}
       <Box flexDirection="column" marginBottom={1}>
-        <Box>
-          <Text color="green">💳 Payment Address</Text>
-          <Text color="gray"> (base address for receiving/sending)</Text>
-        </Box>
-        <Box paddingLeft={2}>
-          {full ? (
-            <Text>{addresses.baseAddress}</Text>
-          ) : (
-            <Text>{shortenAddress(addresses.baseAddress, 20, 12)}</Text>
+        <Text bold color="green">Cardano</Text>
+        <Box flexDirection="column" paddingLeft={2} marginTop={1}>
+          <Box>
+            <Text color="gray">Payment (base): </Text>
+            <Text>{addr(addresses.baseAddress)}</Text>
+          </Box>
+          {qr && qrCodes.cardano && (
+            <Box marginTop={1}>
+              <Text>{qrCodes.cardano}</Text>
+            </Box>
+          )}
+          {addresses.enterpriseAddress && (
+            <Box marginTop={1}>
+              <Text color="gray">Enterprise: </Text>
+              <Text>{addr(addresses.enterpriseAddress)}</Text>
+            </Box>
+          )}
+          {addresses.stakeAddress && (
+            <Box marginTop={1}>
+              <Text color="gray">Stake: </Text>
+              <Text>{addr(addresses.stakeAddress, 16, 10)}</Text>
+            </Box>
           )}
         </Box>
-        {qr && qrCode && (
-          <Box marginTop={1} paddingLeft={2}>
-            <Text>{qrCode}</Text>
-          </Box>
-        )}
       </Box>
 
-      {/* Enterprise Address */}
-      {addresses.enterpriseAddress && (
+      {/* Bitcoin */}
+      {allChains?.bitcoin && (
         <Box flexDirection="column" marginBottom={1}>
-          <Box>
-            <Text color="yellow">🏢 Enterprise Address</Text>
-            <Text color="gray"> (payment only, no staking)</Text>
-          </Box>
-          <Box paddingLeft={2}>
-            {full ? (
-              <Text>{addresses.enterpriseAddress}</Text>
-            ) : (
-              <Text>{shortenAddress(addresses.enterpriseAddress, 20, 12)}</Text>
+          <Text bold color="orange">Bitcoin</Text>
+          <Box paddingLeft={2} marginTop={1}>
+            <Text>{addr(allChains.bitcoin.address, 12, 8)}</Text>
+            {qr && qrCodes.bitcoin && (
+              <Box marginTop={1}>
+                <Text>{qrCodes.bitcoin}</Text>
+              </Box>
             )}
           </Box>
         </Box>
       )}
 
-      {/* Stake Address */}
-      {addresses.stakeAddress && (
+      {/* Solana */}
+      {allChains?.solana && (
         <Box flexDirection="column" marginBottom={1}>
-          <Box>
-            <Text color="magenta">🥩 Stake Address</Text>
-            <Text color="gray"> (for staking operations)</Text>
-          </Box>
-          <Box paddingLeft={2}>
-            {full ? (
-              <Text>{addresses.stakeAddress}</Text>
-            ) : (
-              <Text>{shortenAddress(addresses.stakeAddress, 16, 10)}</Text>
+          <Text bold color="blue">Solana</Text>
+          <Box paddingLeft={2} marginTop={1}>
+            <Text>{addr(allChains.solana.address, 16, 8)}</Text>
+            {qr && qrCodes.solana && (
+              <Box marginTop={1}>
+                <Text>{qrCodes.solana}</Text>
+              </Box>
             )}
           </Box>
         </Box>
       )}
 
-      {/* Other chains */}
-      {allChains && (
-        <Box flexDirection="column" marginTop={1} marginBottom={1}>
-          <Text bold color="cyan">
-            Other Chains
-          </Text>
-          {allChains.solana && (
-            <Box flexDirection="column" marginTop={1} paddingLeft={2}>
-              <Text color="blue">◎ Solana</Text>
-              <Box paddingLeft={2}>
-                {full ? (
-                  <Text>{allChains.solana.address}</Text>
-                ) : (
-                  <Text>{shortenAddress(allChains.solana.address, 16, 8)}</Text>
-                )}
+      {/* EVM */}
+      {allChains?.evm && (
+        <Box flexDirection="column" marginBottom={1}>
+          <Box>
+            <Text bold color="gray">EVM</Text>
+            <Text color="gray"> (Ethereum, Base, Polygon, etc.)</Text>
+          </Box>
+          <Box paddingLeft={2} marginTop={1}>
+            <Text>{addr(allChains.evm.address, 14, 8)}</Text>
+            {qr && qrCodes.evm && (
+              <Box marginTop={1}>
+                <Text>{qrCodes.evm}</Text>
               </Box>
-            </Box>
-          )}
-          {allChains.bitcoin && (
-            <Box flexDirection="column" marginTop={1} paddingLeft={2}>
-              <Text color="orange">₿ Bitcoin</Text>
-              <Box paddingLeft={2}>
-                {full ? (
-                  <Text>{allChains.bitcoin.address}</Text>
-                ) : (
-                  <Text>{shortenAddress(allChains.bitcoin.address, 12, 8)}</Text>
-                )}
-              </Box>
-            </Box>
-          )}
-          {allChains.evm && (
-            <Box flexDirection="column" marginTop={1} paddingLeft={2}>
-              <Box>
-                <Text color="gray">⟠ EVM</Text>
-                <Text color="gray"> (Ethereum, Base, Polygon, etc.)</Text>
-              </Box>
-              <Box paddingLeft={2}>
-                {full ? (
-                  <Text>{allChains.evm.address}</Text>
-                ) : (
-                  <Text>{shortenAddress(allChains.evm.address, 14, 8)}</Text>
-                )}
-              </Box>
-            </Box>
-          )}
+            )}
+          </Box>
         </Box>
       )}
 
-      {/* Hint for full addresses */}
       {!full && (
         <Box marginTop={1}>
           <Text color="gray" dimColor>

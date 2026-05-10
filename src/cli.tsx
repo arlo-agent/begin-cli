@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import "./suppress-bigint-warning.js";
 import "dotenv/config";
 import React from "react";
 import { render } from "ink";
@@ -41,7 +42,8 @@ const cli = meow(
     token search --trending          Show top tokens by 24h volume
     token price <symbol>             Get price for ADA, BTC, SOL, or Cardano tokens
 
-    wallet address                   Show derived wallet addresses
+    wallet address                   Show derived wallet addresses for all chains
+    wallet balance [--wallet <name>]  Total balance and assets across Cardano, Bitcoin, Solana, EVM
     wallet create <name> [--show-seed]  Create a new wallet (silent by default)
     wallet restore <name>            Restore a wallet from mnemonic (interactive)
 
@@ -97,7 +99,7 @@ const cli = meow(
   Buy Options
     --amount          Fiat amount to spend [default: 50]
     --currency        Fiat currency (EUR, USD, GBP, etc.) [default: EUR]
-    --token           Crypto to buy (ADA, BTC) [default: ADA]
+    --token           Crypto to buy (omit = all supported assets). Narrow with ADA, BTC, SOL, BASE, USDC_BASE, EVM, ETH, …
 
   Swap Options
     --from            Token to swap from (ADA, MIN, policyId.assetName, etc.)
@@ -137,6 +139,9 @@ const cli = meow(
     BLOCKFROST_API_KEY_MAINNET   API key for mainnet (overrides generic)
     BLOCKFROST_API_KEY_PREPROD   API key for preprod (overrides generic)
     BLOCKFROST_API_KEY_PREVIEW   API key for preview (overrides generic)
+    ONRAMPER_API_KEY             Onramper widget API key (required for begin buy)
+    ONRAMP_SECRET                Onramper URL signing secret (required when prefilling wallets)
+    ONRAMPER_THEME               Optional extra widget query params (e.g. hideTopBar=true)
     NMKR_API_KEY                 NMKR API key for NFT minting
     NMKR_PROJECT_UID             NMKR Project UID for NFT minting
 
@@ -196,9 +201,10 @@ const cli = meow(
     $ begin mint --image ./art.png --name "Art001" --description "My art" --yes
 
     # Buy crypto with fiat
+    $ begin buy --amount 50 --currency EUR
     $ begin buy --amount 50 --currency EUR --token ADA
     $ begin buy --amount 100 --currency USD --token BTC
-    $ begin buy --token ADA --json
+    $ begin buy --token ETH --json
 
     # Cross-chain bridge
     $ begin bridge quote --from BTC --to SOL --amount 0.1
@@ -243,8 +249,8 @@ const cli = meow(
       trending: { type: "boolean", default: false },
       chain: { type: "string", default: "all" },
       currency: { type: "string", shortFlag: "c", default: "EUR" },
-      // Buy-specific flags
-      token: { type: "string", default: "ADA" },
+      // Buy-specific flags (omit --token = full supported list in widget)
+      token: { type: "string" },
       // EVM-specific flags
       evmNetwork: { type: "string", default: "ethereum" },
       // Bridge-specific flags
@@ -308,7 +314,7 @@ if (command === "mcp") {
     chain: string;
     currency: string;
     // Buy-specific flags
-    token: string;
+    token?: string;
     // EVM-specific flags
     evmNetwork: string;
     // Bridge-specific flags

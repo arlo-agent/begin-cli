@@ -2,6 +2,7 @@
  * Unit tests for swap utilities
  */
 
+import type { UTxO } from '@meshsdk/core';
 import { describe, it, expect, beforeEach } from 'vitest';
 import {
   resolveTokenId,
@@ -16,6 +17,9 @@ import {
   formatRoute,
   KNOWN_TOKENS,
   TOKEN_DECIMALS,
+  pickPureAdaCollateralCborHex,
+  isPureAdaUtxo,
+  MIN_LOVELACE_FOR_COLLATERAL_HINT,
   type ResolvedToken,
 } from '../src/lib/swap.js';
 import { MockMinswapClient, type SwapEstimate } from '../src/services/minswap.js';
@@ -345,6 +349,66 @@ describe('Swap Quote Formatting', () => {
 
     expect(quote.rate).toBe('1 ADA = 0.05 MIN');
     expect(quote.inverseRate).toBe('1 MIN = 20 ADA');
+  });
+});
+
+function makeUtxo(
+  txHash: string,
+  outputIndex: number,
+  amounts: Array<{ unit: string; quantity: string }>
+): UTxO {
+  return {
+    input: { txHash, outputIndex },
+    output: { address: 'addr1qxmock', amount: amounts },
+  };
+}
+
+describe('pickPureAdaCollateralCborHex', () => {
+  const h64 = (c: string) => c.repeat(64);
+
+  it('returns CBOR hex for smallest pure-ADA UTXO meeting minimum (aligned with getUtxosHex order)', () => {
+    const utxos: UTxO[] = [
+      makeUtxo(h64('a'), 0, [
+        { unit: 'lovelace', quantity: '10000000' },
+        { unit: 'c48c' + '00', quantity: '1' },
+      ]),
+      makeUtxo(h64('b'), 1, [{ unit: 'lovelace', quantity: '8000000' }]),
+      makeUtxo(h64('c'), 2, [{ unit: 'lovelace', quantity: '6000000' }]),
+    ];
+    const hexes = ['cbor0', 'cbor1', 'cbor2'];
+    expect(pickPureAdaCollateralCborHex(utxos, hexes)).toEqual(['cbor2']);
+  });
+
+  it('returns empty when utxo / hex length mismatch', () => {
+    expect(pickPureAdaCollateralCborHex([makeUtxo('x'.repeat(64), 0, [{ unit: 'lovelace', quantity: '6000000' }])], [])).toEqual(
+      []
+    );
+  });
+
+  it('returns empty when no pure-ADA UTXO meets minimum', () => {
+    const utxos: UTxO[] = [
+      makeUtxo(h64('a'), 0, [{ unit: 'lovelace', quantity: '4999999' }]),
+      makeUtxo(h64('b'), 1, [
+        { unit: 'lovelace', quantity: '10000000' },
+        { unit: 'c48c' + '00', quantity: '1' },
+      ]),
+    ];
+    expect(pickPureAdaCollateralCborHex(utxos, ['a', 'b'])).toEqual([]);
+  });
+
+  it('isPureAdaUtxo is true only for lovelace-only outputs', () => {
+    expect(
+      isPureAdaUtxo(makeUtxo('x', 0, [{ unit: 'lovelace', quantity: '5000000' }]))
+    ).toBe(true);
+    expect(
+      isPureAdaUtxo(
+        makeUtxo('x', 0, [
+          { unit: 'lovelace', quantity: '5000000' },
+          { unit: 'ab', quantity: '1' },
+        ])
+      )
+    ).toBe(false);
+    expect(MIN_LOVELACE_FOR_COLLATERAL_HINT).toBe(5_000_000n);
   });
 });
 

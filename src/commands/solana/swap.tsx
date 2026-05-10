@@ -7,13 +7,12 @@
 import React, { useEffect, useState } from "react";
 import { Box, Text, useApp, useInput } from "ink";
 import TextInput from "ink-text-input";
+import { formatSmallestUnitToDecimal, parseDecimalToSmallestUnit } from "../../lib/format-amount.js";
 import {
   getQuote,
   executeSwap,
   resolveTokenMint,
   getTokenDecimals,
-  parseAmountToSmallestUnit,
-  formatAmountFromSmallestUnit,
   formatRoutePlan,
   getSolanaExplorerUrl,
   SOLANA_TOKENS,
@@ -163,7 +162,7 @@ export function SolanaSwap({
       const solBalance = balance.native.uiAmount.toFixed(4);
 
       // Parse amount to smallest unit
-      const inputAmountSmallest = parseAmountToSmallestUnit(amount, fromDecimals);
+      const inputAmountSmallest = parseDecimalToSmallestUnit(amount, fromDecimals);
 
       // Get quote
       setState("quoting");
@@ -232,7 +231,7 @@ export function SolanaSwap({
           from: swapInfo.fromSymbol,
           to: swapInfo.toSymbol,
           inputAmount: swapInfo.inputAmount,
-          outputAmount: formatAmountFromSmallestUnit(result.outputAmount, swapInfo.toDecimals),
+          outputAmount: formatSmallestUnitToDecimal(result.outputAmount, swapInfo.toDecimals),
           txHash: result.txHash,
           priceImpact: result.priceImpact,
         },
@@ -251,8 +250,8 @@ export function SolanaSwap({
           to: {
             token: swapInfo.toSymbol,
             mint: swapInfo.toMint,
-            amount: formatAmountFromSmallestUnit(result.outputAmount, swapInfo.toDecimals),
-            minAmount: formatAmountFromSmallestUnit(
+            amount: formatSmallestUnitToDecimal(result.outputAmount, swapInfo.toDecimals),
+            minAmount: formatSmallestUnitToDecimal(
               swapInfo.quote.otherAmountThreshold,
               swapInfo.toDecimals
             ),
@@ -382,7 +381,7 @@ export function SolanaSwap({
   }
 
   if (state === "success" && swapInfo) {
-    const outputAmount = formatAmountFromSmallestUnit(
+    const outputAmount = formatSmallestUnitToDecimal(
       swapInfo.quote.outAmount,
       swapInfo.toDecimals
     );
@@ -413,11 +412,11 @@ export function SolanaSwap({
   // Confirm prompt
   if (!swapInfo) return null;
 
-  const outputAmount = formatAmountFromSmallestUnit(
+  const outputAmount = formatSmallestUnitToDecimal(
     swapInfo.quote.outAmount,
     swapInfo.toDecimals
   );
-  const minOutputAmount = formatAmountFromSmallestUnit(
+  const minOutputAmount = formatSmallestUnitToDecimal(
     swapInfo.quote.otherAmountThreshold,
     swapInfo.toDecimals
   );

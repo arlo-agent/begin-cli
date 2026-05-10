@@ -7,8 +7,66 @@
  * - Witness set extraction for transaction submission
  */
 
-import { MinswapClient, type SwapEstimate, type MinswapToken } from "../services/minswap.js";
+import type { MeshWallet, UTxO } from "@meshsdk/core";
+import { MinswapClient, type SwapEstimate } from "../services/minswap.js";
 import { getErrorMessage } from "./errors.js";
+
+/**
+ * Minimum lovelace on a pure-ADA UTXO we hint to Minswap via `inputs_to_choose` so the builder
+ * can attach valid script collateral (ADA-only). Aligns with common CIP-30 collateral sizing (~5 ADA).
+ */
+export const MIN_LOVELACE_FOR_COLLATERAL_HINT = 5_000_000n;
+
+export const MISSING_PURE_ADA_COLLATERAL =
+  "No ADA-only UTXO with at least 5 ADA found. Script swaps need collateral that holds only lovelace, not native assets. Send at least 5 ADA to this wallet in a plain transfer so it sits in its own UTXO, then retry.";
+
+export function isPureAdaUtxo(utxo: UTxO): boolean {
+  return utxo.output.amount.length === 1 && utxo.output.amount[0].unit === "lovelace";
+}
+
+function utxoLovelace(utxo: UTxO): bigint {
+  const ada = utxo.output.amount.find((a) => a.unit === "lovelace");
+  return ada ? BigInt(ada.quantity) : 0n;
+}
+
+/**
+ * Minswap OpenAPI only says `inputs_to_choose` is an array of strings. The server deserializes
+ * each entry as a `TransactionUnspentOutput` (CBOR hex), matching `MeshWallet.getUtxosHex()` —
+ * not `txHash#ix` or other ref encodings.
+ *
+ * @param utxoCborHex — same order as `utxos` from `MeshWallet.getUtxos()` / `getUtxosHex()`.
+ */
+export function pickPureAdaCollateralCborHex(
+  utxos: UTxO[],
+  utxoCborHex: string[],
+  minLovelace: bigint = MIN_LOVELACE_FOR_COLLATERAL_HINT
+): string[] {
+  if (utxos.length !== utxoCborHex.length) return [];
+
+  let bestLovelace: bigint | null = null;
+  let bestHex: string | null = null;
+
+  for (let i = 0; i < utxos.length; i++) {
+    const u = utxos[i];
+    const hex = utxoCborHex[i];
+    if (!u || hex === undefined) continue;
+    if (!isPureAdaUtxo(u)) continue;
+    const L = utxoLovelace(u);
+    if (L < minLovelace) continue;
+    if (bestLovelace === null || L < bestLovelace) {
+      bestLovelace = L;
+      bestHex = hex;
+    }
+  }
+
+  return bestHex ? [bestHex] : [];
+}
+
+/** Fetches UTxOs + CBOR hex in parallel and picks one pure-ADA candidate for Minswap `inputs_to_choose`. */
+export async function pureAdaCollateralInputHintsForMinswap(wallet: MeshWallet): Promise<string[]> {
+  const [utxos, hexes] = await Promise.all([wallet.getUtxos(), wallet.getUtxosHex()]);
+  return pickPureAdaCollateralCborHex(utxos, hexes);
+}
 
 /**
  * Well-known token mappings (ticker -> tokenId)
@@ -339,34 +397,30 @@ export function formatSwapQuote(
  * This function extracts the witness set portion.
  *
  * @param signedTxCbor - Signed transaction CBOR hex string
- * @returns Witness set hex string
+ * @returns Witness set hex string (Minswap `/finalize-and-submit-tx` requires hex `witness_set`)
  * @throws Error if witness set extraction fails
  */
+function witnessCborToHex(cbor: string | Uint8Array): string {
+  if (typeof cbor === "string") {
+    return cbor;
+  }
+  return Buffer.from(cbor).toString("hex");
+}
+
 export async function extractWitnessSet(signedTxCbor: string): Promise<string> {
-  // The signed transaction is a CBOR array: [body, witnessSet, isValid, auxiliaryData]
-  // We need to extract the witnessSet (index 1)
-  //
-  // For simplicity, we use a heuristic approach:
-  // The witness set typically starts after the transaction body
-  // A proper implementation would use a CBOR library
-
-  // Note: In production, use @emurgo/cardano-serialization-lib or similar
-
   try {
-    // Dynamically import MeshJS core-cst for transaction deserialization
     const { deserializeTx } = await import("@meshsdk/core-cst");
     const tx = deserializeTx(signedTxCbor);
-
-    // Get witness set from deserialized tx
     const witnessSet = tx.witnessSet();
-    return witnessSet.toCbor();
+    return witnessCborToHex(witnessSet.toCbor() as string | Uint8Array);
   } catch (err) {
     // Log warning and throw an error - don't silently fall back
     const message = getErrorMessage(err, "Unknown error");
     console.warn(`Warning: Failed to extract witness set: ${message}`);
     throw new Error(
       `Failed to extract witness set from signed transaction: ${message}. ` +
-        `Ensure @meshsdk/core-cst is properly installed.`
+        `Ensure @meshsdk/core-cst is properly installed.`,
+      { cause: err }
     );
   }
 }

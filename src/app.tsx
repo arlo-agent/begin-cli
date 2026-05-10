@@ -15,6 +15,7 @@ import { StakeWithdraw } from "./commands/stake/withdraw.js";
 import { Sign } from "./commands/sign.js";
 import { Submit } from "./commands/submit.js";
 import { WalletAddress } from "./commands/wallet/address.js";
+import { WalletBalance } from "./commands/wallet/balance.js";
 import { Swap, SwapCancel, SwapOrders } from "./commands/swap/index.js";
 import { SwapQuote } from "./commands/swap/quote.js";
 import { WalletCreate } from "./commands/wallet/create.js";
@@ -56,7 +57,8 @@ export interface AppFlags {
   to?: string;
   // Buy-specific flags
   currency: string;
-  token: string;
+  /** Omitted → full Onramper asset list (same as ALL). */
+  token?: string;
   // Swap-specific flags
   from?: string;
   amount?: string;
@@ -94,6 +96,20 @@ function invalidUsage(message: string, usage: string) {
       <Text color="gray">Usage: {usage}</Text>
     </Box>
   );
+}
+
+/** True if the string looks like a blockchain address (Cardano, EVM, Bitcoin, Solana), not a wallet name. */
+function looksLikeBlockchainAddress(value: string): boolean {
+  if (!value || value.length < 20) return false;
+  if (value.startsWith("addr1") || value.startsWith("addr_test1")) return true;
+  if (value.startsWith("0x") && /^0x[0-9a-fA-F]{40}$/.test(value)) return true;
+  if (value.startsWith("0x") && value.length >= 42) return true;
+  if (/^[13][a-km-zA-HJ-NP-Z1-9]{25,34}$/.test(value)) return true; // Bitcoin P2PKH/P2SH
+  if (value.startsWith("bc1") && value.length >= 42) return true;
+  if (value.startsWith("tb1") && value.length >= 42) return true;
+  // Solana: base58, usually 32–44 chars
+  if (/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(value) && !value.includes(" ")) return true;
+  return false;
 }
 
 export function App({ command, subcommand, args, flags, showHelp }: AppProps) {
@@ -162,6 +178,35 @@ export function App({ command, subcommand, args, flags, showHelp }: AppProps) {
     return (
       <Submit txFile={txFile} network={flags.network} wait={flags.wait} jsonOutput={flags.json} />
     );
+  }
+
+  // ---- Back-compat: balance [wallet] → global wallet balance (all chains) ----
+  // If no arg, or first arg looks like a wallet name (not a chain address), show wallet balance.
+  if (command === "balance") {
+    const first = args[0];
+    const useWalletBalance = !first || !looksLikeBlockchainAddress(first);
+    if (useWalletBalance) {
+      const walletName = first || flags.wallet;
+      const supportedEvm = getSupportedEVMNetworks();
+      const evmNet = (flags.evmNetwork || "ethereum") as EVMNetwork;
+      if (!supportedEvm.includes(evmNet)) {
+        return (
+          <Box flexDirection="column">
+            <Text color="red">Invalid EVM network: {evmNet}</Text>
+            <Text color="gray">Supported: {supportedEvm.join(", ")}</Text>
+          </Box>
+        );
+      }
+      return (
+        <WalletBalance
+          network={flags.network}
+          walletName={walletName}
+          password={flags.password}
+          evmNetwork={flags.evmNetwork}
+          json={flags.json}
+        />
+      );
+    }
   }
 
   // ---- Back-compat: allow legacy non-namespaced cardano commands ----
@@ -570,10 +615,33 @@ export function App({ command, subcommand, args, flags, showHelp }: AppProps) {
       return <WalletList json={flags.json} />;
     }
 
+    if (subcommand === "balance") {
+      const walletName = args[0] ?? flags.wallet;
+      const supportedEvm = getSupportedEVMNetworks();
+      const evmNet = (flags.evmNetwork || "ethereum") as EVMNetwork;
+      if (!supportedEvm.includes(evmNet)) {
+        return (
+          <Box flexDirection="column">
+            <Text color="red">Invalid EVM network: {evmNet}</Text>
+            <Text color="gray">Supported: {supportedEvm.join(", ")}</Text>
+          </Box>
+        );
+      }
+      return (
+        <WalletBalance
+          network={flags.network}
+          walletName={walletName}
+          password={flags.password}
+          evmNetwork={flags.evmNetwork}
+          json={flags.json}
+        />
+      );
+    }
+
     return (
       <Box flexDirection="column">
         <Text color="red">Unknown wallet command: {subcommand || "(none)"}</Text>
-        <Text color="gray">Available commands: address, create, restore, export, list</Text>
+        <Text color="gray">Available commands: address, balance, create, restore, export, list</Text>
       </Box>
     );
   }

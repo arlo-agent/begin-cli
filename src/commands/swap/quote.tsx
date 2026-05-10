@@ -16,6 +16,7 @@ import {
   type FormattedQuote,
 } from "../../lib/swap.js";
 import { getErrorMessage } from "../../lib/errors.js";
+import { truncateDecimalString } from "../../lib/format-amount.js";
 
 interface SwapQuoteProps {
   from: string;
@@ -62,12 +63,14 @@ export function SwapQuote({ from, to, amount, slippage, multiHop, network, json 
         setFromToken(resolvedFrom);
         setToToken(resolvedTo);
 
+        const normalizedAmount = truncateDecimalString(amount, resolvedFrom.decimals);
+
         // Get estimate
         setState("loading");
         const swapEstimate = await client.estimate({
           tokenIn: resolvedFrom.tokenId,
           tokenOut: resolvedTo.tokenId,
-          amount: amount,
+          amount: normalizedAmount,
           slippage: slippage,
           allowMultiHops: multiHop,
           amountInDecimal: true,

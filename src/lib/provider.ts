@@ -71,6 +71,13 @@ export function hasApiKey(network: Network): boolean {
   return !!getApiKey(network);
 }
 
+/**
+ * Resolve Blockfrost API key (same rules as createProvider). Use for REST calls alongside Mesh.
+ */
+export function getBlockfrostApiKey(network: Network): string | undefined {
+  return getApiKey(network);
+}
+
 // Re-export types from @meshsdk/core that are commonly used
 export { BlockfrostProvider } from "@meshsdk/core";
 export type { UTxO, Asset } from "@meshsdk/core";
